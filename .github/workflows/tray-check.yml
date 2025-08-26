@@ -20,6 +20,35 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Install Visual C++ Build Tools (dumpbin)
+        shell: pwsh
+        run: |
+          # Install Chocolatey if missing (runner usually has it, but defend)
+          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+          }
+          # Install Visual Studio 2019 Build Tools (includes dumpbin)
+          choco install visualstudio2019buildtools --yes --no-progress
+          # Use vswhere to locate dumpbin.exe and add its folder to PATH for the remainder of the job
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $instance = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($instance) {
+              $dumpbin = Get-ChildItem -Path (Join-Path $instance 'VC') -Filter dumpbin.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($dumpbin) {
+                Write-Host "Found dumpbin at: $($dumpbin.DirectoryName)"
+                $env:PATH = "$($dumpbin.DirectoryName);$env:PATH"
+              } else {
+                Write-Host "dumpbin.exe not found under Visual Studio installation"
+              }
+            } else {
+              Write-Host "vswhere did not find an installation with VC tools"
+            }
+          } else {
+            Write-Host "vswhere.exe not present; skip dumpbin path addition"
+          }
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
