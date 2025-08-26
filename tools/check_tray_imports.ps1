@@ -34,10 +34,20 @@ function Invoke-CheckExe($exePath) {
         Write-Output "Imports: COMCTL32: $foundComctl, TaskDialog*: $foundTaskDialog"
     } else {
         Write-Output "dumpbin not found on PATH; doing ASCII substring fallback scan"
-        $bytes = Get-Content -Path $exePath -Encoding Byte -ReadCount 0
-        $s = [System.Text.Encoding]::ASCII.GetString($bytes)
+        try {
+            $bytes = [System.IO.File]::ReadAllBytes($exePath)
+            $s = [System.Text.Encoding]::ASCII.GetString($bytes)
+        } catch {
+            Write-Output "Failed to read binary for ASCII scan: $_"
+            return
+        }
+
         foreach ($pat in @('COMCTL32','ComCtl32','TaskDialogIndirect','TaskDialog','common-controls','commoncontrols')) {
-            if ($s -match [regex]::Escape($pat)) { Write-Output ($pat + ': FOUND') } else { Write-Output ($pat + ': not found') }
+            if ($s -match [regex]::Escape($pat)) {
+                Write-Output ($pat + ': FOUND')
+            } else {
+                Write-Output ($pat + ': not found')
+            }
         }
     }
 }
