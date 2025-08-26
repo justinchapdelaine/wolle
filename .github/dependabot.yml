@@ -1,37 +1,37 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "05:00"
-      timezone: "UTC"
+      time: '05:00'
+      timezone: 'UTC'
     open-pull-requests-limit: 10
-    labels: ["dependencies", "npm"]
+    labels: ['dependencies', 'npm']
     commit-message:
-      prefix: "deps(npm)"
+      prefix: 'deps(npm)'
 
   - package-ecosystem: cargo
-    directory: "/src-tauri"
+    directory: '/src-tauri'
     schedule:
       interval: weekly
       day: monday
-      time: "05:15"
-      timezone: "UTC"
+      time: '05:15'
+      timezone: 'UTC'
     open-pull-requests-limit: 10
-    labels: ["dependencies", "cargo"]
+    labels: ['dependencies', 'cargo']
     commit-message:
-      prefix: "deps(cargo)"
+      prefix: 'deps(cargo)'
 
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "05:30"
-      timezone: "UTC"
+      time: '05:30'
+      timezone: 'UTC'
     open-pull-requests-limit: 5
-    labels: ["dependencies", "github-actions"]
+    labels: ['dependencies', 'github-actions']
     commit-message:
-      prefix: "deps(actions)"
+      prefix: 'deps(actions)'
