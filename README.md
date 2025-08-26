@@ -1,2 +1,34 @@
+# Wolle (MVP scaffold)
+
+This repository contains a minimal scaffold for the Wolle MVP: a Tauri + Rust backend and a Vite frontend.
+
+How to run (dev):
+
+1. Install Node and Rust toolchain.
+2. From the repo root:
+
+```powershell
+npm install
+cargo build --manifest-path src-tauri/Cargo.toml
+npm run tauri:dev
+```
+
+Notes:
+- This is a minimal scaffold for Phase 1. It includes a simple Ollama helper that attempts an HTTP health check at http://127.0.0.1:11434 and falls back to checking the `ollama` CLI.
+- For the full PRD features (context menus, installer, model provisioning, robust positioning), further work is required.
+
+WebView2 preflight
+-------------------
+This repo includes a PowerShell preflight script `tools/webview2-preflight.ps1` which checks for the WebView2 runtime and will download the `Microsoft.Web.WebView2` NuGet package (version 1.0.3405.78) and extract a matching `WebView2Loader.dll` into `target\debug` for dev runs if a system x64 runtime is not detected.
+
+Run the preflight script before `npm run tauri:dev` when testing on a machine where WebView2 may be missing:
+
+```powershell
+npm run preflight:webview2
+npm run tauri:dev
+```
+
+For installer usage, prefer installing the Evergreen WebView2 runtime system-wide; as a fallback the installer can bundle a Fixed Version WebView2 redistributable and copy `WebView2Loader.dll` into the app folder during install.
+
 # wolle
 It's a bunch of wolle

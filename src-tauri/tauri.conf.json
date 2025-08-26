@@ -1,0 +1,8 @@
+{
+  "productName": "Wolle",
+  "version": "0.1.0",
+  "identifier": "com.justinchapdelaine.wolle",
+  "bundle": {
+    "icon": ["../icons/tray.ico"]
+  }
+}

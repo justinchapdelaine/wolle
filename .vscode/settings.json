@@ -1,0 +1,7 @@
+{
+    "chat.instructionsFilesLocations": {
+        "copilot-instructions.md": true,
+        ".github/instructions/prd.instructions.md": true,
+        ".github/instructions/progress.instructions.md": true
+    }
+}

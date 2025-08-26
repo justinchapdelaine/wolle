@@ -1,0 +1,25 @@
+[package]
+name = "wolle-tauri"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Enable the system-tray and api-all features for Tauri
+tauri = { version = "2.8.4", features = ["tray-icon"] }
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+serde_json = "1.0"
+once_cell = "1.17"
+anyhow = "1.0"
+
+[features]
+# Enable tauri's api-all feature when our `tray` feature is selected.
+# Some tauri versions expose tray-related APIs via the `api-all` feature.
+# If needed we can add/adjust dependency-level features later.
+tray = ["tray-icon"]
+
+[dependencies.tray-icon]
+version = "0.21"
+optional = true
+
+
