@@ -68,4 +68,3 @@ Note: while WebView2 loader / architecture mismatches were a plausible earlier h
 
 If anything here is incorrect or you want more detail in any section, update this file or ask the dev assistant to expand a section.
 ```
-

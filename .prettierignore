@@ -1,0 +1,20 @@
+# Dependencies and VCS
+node_modules/
+.git/
+
+# Build outputs
+/dist/
+/target/
+/debug/
+/src-tauri/target/
+
+# Rust/Tauri sources (Prettier doesn't handle these well)
+/src-tauri/**
+
+# Lockfiles and manifests (avoid churn)
+package-lock.json
+
+# Dumpbin artifacts
+/tools/dumpbin_artifact_outputs/
+/dumpbin_*.txt
+/docs/dumpbin_*.txt

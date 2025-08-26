@@ -1,14 +1,16 @@
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { el } from './dom'
 
 const app = document.getElementById('app')
 
 const status = el('div', { id: 'status' }, 'Checking Ollama...')
 const input = el('textarea', { id: 'input', rows: 6, cols: 40 })
-const actionSelect = el('select', {},
+const actionSelect = el(
+  'select',
+  {},
   el('option', { value: 'summarize' }, 'Summarize'),
   el('option', { value: 'rewrite' }, 'Rewrite'),
-  el('option', { value: 'translate' }, 'Translate'),
+  el('option', { value: 'translate' }, 'Translate')
 )
 const runBtn = el('button', {}, 'Run')
 const output = el('pre', { id: 'output' })

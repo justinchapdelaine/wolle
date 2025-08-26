@@ -31,4 +31,3 @@ Decision and next steps
 Notes
 
 - This document and the dump outputs were generated automatically by the scripts in `tools/` and retained in the repo for reproducible verification.
-

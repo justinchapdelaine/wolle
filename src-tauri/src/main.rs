@@ -3,6 +3,7 @@
 use serde::Serialize;
 mod ollama;
 mod utils;
+use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Serialize)]
 struct Health {
@@ -13,6 +14,10 @@ struct Health {
 // Use Tauri's built-in SystemTray API when the `tray` feature is enabled.
 #[cfg(feature = "tray")]
 fn main() {
+  // init logging (to stdout/stderr; Tauri captures in dev console)
+  let _ = fmt()
+    .with_env_filter(EnvFilter::from_default_env())
+    .try_init();
   use std::thread;
   use tauri::Manager;
 
@@ -67,6 +72,10 @@ fn main() {
 
 #[cfg(not(feature = "tray"))]
 fn main() {
+  // init logging
+  let _ = fmt()
+    .with_env_filter(EnvFilter::from_default_env())
+    .try_init();
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![health_check, run_action])
     .run(tauri::generate_context!())
