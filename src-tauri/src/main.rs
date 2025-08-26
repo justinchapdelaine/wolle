@@ -10,98 +10,59 @@ struct Health {
   message: String,
 }
 
-// When the `tray` feature is enabled, include tray support. Otherwise use a simple main so
-// CI and tests that don't require the system tray can still build.
+// Use Tauri's built-in SystemTray API when the `tray` feature is enabled.
 #[cfg(feature = "tray")]
-mod tray_main {
-  use super::*;
-  use std::sync::{Arc, Mutex};
-  use tray_icon::{menu::Menu, menu::MenuItem, TrayIconBuilder};
+fn main() {
+  use std::thread;
+  use tauri::Manager;
 
-  pub fn run() {
-    // Create a simple menu with a status (disabled), show and quit
-    // Build initial menu correctly using the tray-icon (muda) API.
-    let status = MenuItem::with_id("status", "Checking Ollama...", false, None);
-    let show = MenuItem::new("Show", true, None);
-    let quit = MenuItem::new("Quit", true, None);
+  // We create the tray during setup so we can use the App as the Manager
+  tauri::Builder::default()
+    .invoke_handler(tauri::generate_handler![health_check, run_action])
+    .setup(|app| {
+      // Build a simple menu with a status item and actions
+      let menu = tauri::menu::MenuBuilder::new(app)
+        .text("status", "Checking Ollama...")
+        .separator()
+        .text("show", "Show")
+        .text("quit", "Quit")
+        .build()?;
 
-    let menu = {
-      let m = Menu::new();
-      // append returns Result<(), Error>
-      let _ = m.append(&status);
-      let _ = m.append(&show);
-      let _ = m.append(&quit);
-      m
-    };
+      // Create the tray icon with the menu. Icon is optional here.
+      let tray = tauri::tray::TrayIconBuilder::new()
+        .menu(&menu)
+        .build(app)?;
 
-    // Build the tray icon. The icon file is optional; omit to use default.
-    let tray = TrayIconBuilder::new()
-      .with_menu(Box::new(menu))
-      .build()
-      .expect("failed to build tray icon");
+      // Register menu event handler
+      tray.on_menu_event(|app_handle, event| match event.id().as_ref() {
+        "quit" => {
+          std::process::exit(0);
+        }
+        "show" => {
+          if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+          }
+        }
+        _ => {}
+      });
 
-    // Wrap tray in an Arc<Mutex<...>> so we can access it from the run event loop.
-    let tray_handle = Arc::new(Mutex::new(tray));
-
-    // Create a channel: background thread will send status strings to the main
-    // thread where Tauri's event loop runs. The TrayIcon is not Send, so we
-    // must update it on the main thread.
-    let (tx, rx) = std::sync::mpsc::channel::<String>();
-
-    // Spawn a background thread that periodically checks Ollama and sends
-    // status updates over the channel.
-    std::thread::spawn(move || {
-      loop {
+      // Spawn background thread to poll Ollama and update tray tooltip
+      let tray_clone = tray.clone();
+      thread::spawn(move || loop {
         let status_text = match ollama::health() {
           Ok(_) => "Ollama: OK".to_string(),
           Err(e) => format!("Ollama: {}", e),
         };
+        // Update the tray tooltip with the status (works cross-platform)
+        let _ = tray_clone.set_tooltip(Some(status_text));
+        thread::sleep(std::time::Duration::from_secs(30));
+      });
 
-        let _ = tx.send(status_text);
-        std::thread::sleep(std::time::Duration::from_secs(30));
-      }
-    });
-
-    // Run the Tauri app and process events. The run callback executes on the
-    // main thread so it's safe to lock and update the TrayIcon here.
-    use tauri::RunEvent;
-
-    let context = tauri::generate_context!();
-    let mut app = tauri::Builder::default()
-      .invoke_handler(tauri::generate_handler![health_check, run_action])
-      .build(context)
-      .expect("error while building tauri application");
-
-    app.run(move |_app_handle, event| {
-      // On every event, attempt to read a status update and apply it to the tray.
-      if let Ok(status_text) = rx.try_recv() {
-        if let Ok(t) = tray_handle.lock() {
-          // Rebuild menu with updated status
-          let status = MenuItem::with_id("status", status_text.as_str(), false, None);
-          let show = MenuItem::new("Show", true, None);
-          let quit = MenuItem::new("Quit", true, None);
-
-          let menu = {
-            let m = Menu::new();
-            let _ = m.append(&status);
-            let _ = m.append(&show);
-            let _ = m.append(&quit);
-            m
-          };
-
-          let _ = t.set_menu(Some(Box::new(menu)));
-        }
-      }
-
-      match event {
-        RunEvent::ExitRequested { api, .. } => {
-          // Do nothing to allow the exit to proceed. If you want to prevent
-          // exit, call `api.prevent_exit()` here instead.
-        }
-        _ => {}
-      }
-    });
-  }
+      Ok(())
+    })
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }
 
 #[cfg(not(feature = "tray"))]
@@ -110,11 +71,6 @@ fn main() {
     .invoke_handler(tauri::generate_handler![health_check, run_action])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
-}
-
-#[cfg(feature = "tray")]
-fn main() {
-  tray_main::run()
 }
 
 #[tauri::command]

@@ -1,0 +1,35 @@
+name: Windows tray-imports check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-tray-imports:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\/.cargo/registry
+            ~\/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run tray import checks (PowerShell)
+        shell: pwsh
+        run: |
+          Write-Host "Running tools/check_tray_imports.ps1"
+          .\tools\check_tray_imports.ps1

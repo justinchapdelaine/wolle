@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Enable the system-tray and api-all features for Tauri
-tauri = { version = "2.8.4", features = ["tray-icon"] }
+# Tauri dependency: enable default features, but don't enable system-tray
+# unless our feature requests it via the `tray` feature below.
+tauri = { version = "2.8.4", default-features = false, features = ["wry"] }
 serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde_json = "1.0"
@@ -13,13 +14,9 @@ once_cell = "1.17"
 anyhow = "1.0"
 
 [features]
-# Enable tauri's api-all feature when our `tray` feature is selected.
-# Some tauri versions expose tray-related APIs via the `api-all` feature.
-# If needed we can add/adjust dependency-level features later.
-tray = ["tray-icon"]
-
-[dependencies.tray-icon]
-version = "0.21"
-optional = true
+# Enable Tauri's system-tray API and the tray-icon dependency only when our
+# local 'tray' feature is selected. 'system-tray' exposes the SystemTray
+# types and Builder APIs; 'tray-icon' pulls in the platform implementation.
+tray = ["tauri/tray-icon"]
 
 

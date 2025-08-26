@@ -32,3 +32,14 @@ For installer usage, prefer installing the Evergreen WebView2 runtime system-wid
 
 # wolle
 It's a bunch of wolle
+
+Quick check for tray-related imports
+-----------------------------------
+
+There's a small helper script at `tools/check_tray_imports.ps1` that builds both release variants (tray enabled/disabled) and scans the produced EXEs for common-controls / TaskDialog imports. Run it from PowerShell in the repo root:
+
+```powershell
+tools\check_tray_imports.ps1
+```
+
+If `dumpbin.exe` is available on your PATH the script will use it to list imported DLLs; otherwise it falls back to an ASCII substring scan of the EXE.
