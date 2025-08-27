@@ -16,7 +16,13 @@ pub fn health() -> Result<String> {
   match client.get("http://127.0.0.1:11434/api/version").send() {
     Ok(res) if res.status().is_success() => {
       // Try to parse version JSON; fall back to generic message
-      let text = res.text().unwrap_or_default();
+      let text = match res.text() {
+        Ok(t) => t,
+        Err(e) => {
+          warn!(error = %e, "Failed to read Ollama version response body");
+          return Ok(format!("Ollama reachable (failed to read version: {})", e));
+        }
+      };
       if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
         if let Some(ver) = v.get("version").and_then(|s| s.as_str()) {
           return Ok(format!("Ollama v{} reachable", ver));
