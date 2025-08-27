@@ -33,7 +33,7 @@ pub fn health() -> Result<String> {
           debug!(error = %e, response = %text, "Failed to parse Ollama version JSON");
         }
       }
-      return Ok("Ollama reachable".to_string());
+      return Ok("Ollama reachable (version unavailable)".to_string());
     }
     Ok(res) => {
       warn!(status = ?res.status(), "ollama /api/version returned non-success");
