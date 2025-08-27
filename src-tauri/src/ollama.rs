@@ -23,9 +23,14 @@ pub fn health() -> Result<String> {
           return Ok(format!("Ollama reachable (failed to read version: {})", e));
         }
       };
-      if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
-        if let Some(ver) = v.get("version").and_then(|s| s.as_str()) {
-          return Ok(format!("Ollama v{} reachable", ver));
+      match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(v) => {
+          if let Some(ver) = v.get("version").and_then(|s| s.as_str()) {
+            return Ok(format!("Ollama v{} reachable", ver));
+          }
+        }
+        Err(e) => {
+          debug!(error = %e, response = %text, "Failed to parse Ollama version JSON");
         }
       }
       return Ok("Ollama reachable".to_string());
