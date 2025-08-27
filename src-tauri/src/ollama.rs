@@ -11,16 +11,24 @@ pub fn health() -> Result<String> {
     .timeout(Duration::from_secs(2))
     .build()?;
 
-  debug!("checking ollama /health");
-  match client.get("http://127.0.0.1:11434/health").send() {
+  // Prefer the stable Ollama endpoint that exists on all recent versions
+  debug!("checking ollama /api/version");
+  match client.get("http://127.0.0.1:11434/api/version").send() {
     Ok(res) if res.status().is_success() => {
+      // Try to parse version JSON; fall back to generic message
+      let text = res.text().unwrap_or_default();
+      if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+        if let Some(ver) = v.get("version").and_then(|s| s.as_str()) {
+          return Ok(format!("Ollama v{} reachable", ver));
+        }
+      }
       return Ok("Ollama reachable".to_string());
     }
     Ok(res) => {
-      warn!(status = ?res.status(), "ollama /health returned non-success");
+      warn!(status = ?res.status(), "ollama /api/version returned non-success");
     }
     Err(e) => {
-      debug!(error = %e, "ollama /health request failed");
+      debug!(error = %e, "ollama /api/version request failed");
     }
   }
 
