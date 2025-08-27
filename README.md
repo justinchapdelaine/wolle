@@ -50,11 +50,11 @@ If `dumpbin.exe` is available on your PATH the script will use it to list import
 This repo uses two mechanisms to keep dependencies fresh and safe:
 
 - Automated update PRs via Dependabot
-	- Configured in `.github/dependabot.yml`
-	- Covers: npm (root), Cargo (src-tauri), and GitHub Actions
-	- Runs weekly (Mondays, UTC) with PR labels and limits to avoid noise
+  - Configured in `.github/dependabot.yml`
+  - Covers: npm (root), Cargo (src-tauri), and GitHub Actions
+  - Runs weekly (Mondays, UTC) with PR labels and limits to avoid noise
 - Continuous Integration checks
-	- Workflow at `.github/workflows/ci.yml`
-	- On each PR and push to `main`, CI runs: Prettier check, ESLint, Vitest, Vite build, and Rust unit tests
+  - Workflow at `.github/workflows/ci.yml`
+  - On each PR and push to `main`, CI runs: Prettier check, ESLint, Vitest, Vite build, and Rust unit tests
 
 Typical flow: Dependabot opens a PR → CI validates the change → you review/merge. If you prefer more/less frequent updates or grouping (e.g., group all Vite/Vitest bumps), adjust `.github/dependabot.yml` accordingly.
