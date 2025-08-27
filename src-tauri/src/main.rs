@@ -4,6 +4,12 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
+// Use the concrete runtime type from the wry runtime crate.
+// tauri_runtime_wry's Webview type adapts to the platform; on Windows it uses webview2-com
+// under the hood when the webview2-com feature is enabled in `tauri`.
+// Use the re-exported runtime type alias from `tauri` to get a concrete, correctly
+// instantiated runtime type (includes the required UserEvent generic).
+// We'll reference it as `tauri::Wry` below.
 
 #[derive(Serialize)]
 struct Health {
@@ -22,7 +28,7 @@ fn main() {
   use tauri::Manager;
 
   // We create the tray during setup so we can use the App as the Manager
-  tauri::Builder::default()
+  tauri::Builder::<tauri::Wry>::new()
     .invoke_handler(tauri::generate_handler![health_check, run_action])
     .setup(|app| {
       // Build a simple menu with a status item and actions
@@ -76,7 +82,7 @@ fn main() {
   let _ = fmt()
     .with_env_filter(EnvFilter::from_default_env())
     .try_init();
-  tauri::Builder::default()
+  tauri::Builder::<tauri::Wry>::new()
     .invoke_handler(tauri::generate_handler![health_check, run_action])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
