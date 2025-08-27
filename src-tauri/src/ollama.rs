@@ -11,16 +11,35 @@ pub fn health() -> Result<String> {
     .timeout(Duration::from_secs(2))
     .build()?;
 
-  debug!("checking ollama /health");
-  match client.get("http://127.0.0.1:11434/health").send() {
+  // Prefer the stable Ollama endpoint that exists on all recent versions
+  debug!("checking ollama /api/version");
+  match client.get("http://127.0.0.1:11434/api/version").send() {
     Ok(res) if res.status().is_success() => {
-      return Ok("Ollama reachable".to_string());
+      // Try to parse version JSON; fall back to generic message
+      let text = match res.text() {
+        Ok(t) => t,
+        Err(e) => {
+          warn!(error = %e, "Failed to read Ollama version response body");
+          return Ok(format!("Ollama reachable (failed to read version: {})", e));
+        }
+      };
+      match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(v) => {
+          if let Some(ver) = v.get("version").and_then(|s| s.as_str()) {
+            return Ok(format!("Ollama v{} reachable", ver));
+          }
+        }
+        Err(e) => {
+          debug!(error = %e, response = %text, "Failed to parse Ollama version JSON");
+        }
+      }
+      return Ok("Ollama reachable (version unavailable)".to_string());
     }
     Ok(res) => {
-      warn!(status = ?res.status(), "ollama /health returned non-success");
+      warn!(status = ?res.status(), "ollama /api/version returned non-success");
     }
     Err(e) => {
-      debug!(error = %e, "ollama /health request failed");
+      debug!(error = %e, "ollama /api/version request failed");
     }
   }
 

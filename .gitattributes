@@ -1,0 +1,15 @@
+# Enforce consistent LF endings for all text files so Prettier --check is stable across OSes
+* text=auto eol=lf
+
+# Binary files - do not modify or normalize
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.webp binary
+*.exe binary
+*.dll binary
+*.wasm binary
+*.pdf binary
