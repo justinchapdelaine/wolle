@@ -46,4 +46,7 @@ async function check() {
   }
 }
 
+// Fire-and-forget status probe. `check()` handles its own errors and does not reject,
+// so `.catch(...)` here would be redundant. Using `void` makes the intent explicit
+// and satisfies no-floating-promises. If console logging is desired, move logging into `check()`.
 void check()
