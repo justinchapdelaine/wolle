@@ -1,5 +1,7 @@
 import { el } from './dom'
 import { actions, type Action, runAction, healthCheck } from './tauri'
+import { emit } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   provideFluentDesignSystem,
   allComponents,
@@ -43,6 +45,9 @@ function init(): void {
       'Application container element with id "app" not found in DOM. Ensure index.html contains <div id="app"></div>.'
     )
   }
+
+  // Emit readiness early: tokens and container are set, so reveal is safe to avoid flicker.
+  void emit('frontend-ready')
 
   const status = el(
     'div',
@@ -161,6 +166,21 @@ function init(): void {
   // so `.catch(...)` here would be redundant. Using `void` makes the intent explicit
   // and satisfies no-floating-promises. If console logging is desired, move logging into `check()`.
   void check()
+
+  // (ready emitted earlier to make reveal faster)
+
+  // Close affordance: Esc closes the window unless focused element is in a context where
+  // the user expects Escape to be handled differently. Here we allow Esc globally, but
+  // we ignore cases where a native popup could be open (none in our UI) to keep it simple.
+  document.addEventListener('keydown', (ev: KeyboardEvent) => {
+    if (ev.key === 'Escape') {
+      ev.preventDefault()
+      // Fire-and-forget; handle errors without making the handler async
+      void getCurrentWindow()
+        .close()
+        .catch((e) => console.warn('Failed to close window:', e))
+    }
+  })
 }
 
 // Minimal DOM-ready fallback: if #app is missing while the document is still loading,

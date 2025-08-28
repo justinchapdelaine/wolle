@@ -4,7 +4,7 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
-use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder};
+use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager, Listener};
 #[cfg(target_os = "windows")]
 fn is_light_theme() -> bool {
     use winreg::enums::HKEY_CURRENT_USER;
@@ -54,7 +54,10 @@ fn main() {
             } else {
                 WebviewUrl::App("index.html".into())
             };
-            let mut builder = WebviewWindowBuilder::new(app, "main", url).title("Wolle");
+            let mut builder = WebviewWindowBuilder::new(app, "main", url)
+                .title("Wolle")
+                // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
+                .visible(false);
             // Pre-paint background color to eliminate white flash
             #[cfg(target_os = "windows")]
             {
@@ -65,8 +68,34 @@ fn main() {
                 };
                 builder = builder.background_color(bg);
             }
-            builder
-                .build()?;
+            builder.build()?;
+
+            // Hide-until-ready: show when frontend signals readiness, with a 500ms safety fallback
+            use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+            let shown = Arc::new(AtomicBool::new(false));
+            let shown_for_event = shown.clone();
+            let app_for_event = app.handle().clone();
+            app.listen("frontend-ready", move |_e| {
+                if !shown_for_event.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = app_for_event.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            });
+
+            // Safety timeout: ensure the window appears even if the event is missed
+            let shown_for_timer = shown.clone();
+            let app_for_timer = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(250));
+                if !shown_for_timer.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = app_for_timer.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            });
             // Build a simple menu with a status item and actions
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
@@ -124,7 +153,10 @@ fn main() {
             } else {
                 WebviewUrl::App("index.html".into())
             };
-            let mut builder = WebviewWindowBuilder::new(app, "main", url).title("Wolle");
+            let mut builder = WebviewWindowBuilder::new(app, "main", url)
+                .title("Wolle")
+                // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
+                .visible(false);
             #[cfg(target_os = "windows")]
             {
                 let bg = if is_light_theme() {
@@ -135,6 +167,33 @@ fn main() {
                 builder = builder.background_color(bg);
             }
             builder.build()?;
+
+            // Hide-until-ready: show when frontend signals readiness, with a 500ms safety fallback
+            use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+            let shown = Arc::new(AtomicBool::new(false));
+            let shown_for_event = shown.clone();
+            let app_for_event = app.handle().clone();
+            app.listen("frontend-ready", move |_e| {
+                if !shown_for_event.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = app_for_event.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            });
+
+            // Safety timeout: ensure the window appears even if the event is missed
+            let shown_for_timer = shown.clone();
+            let app_for_timer = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(250));
+                if !shown_for_timer.swap(true, Ordering::SeqCst) {
+                    if let Some(window) = app_for_timer.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            });
             Ok(())
         })
         .run(tauri::generate_context!())
