@@ -74,6 +74,8 @@ module.exports = [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'import/no-unresolved': 'off',
+  // Note: import/no-unused-modules is incompatible with ESLint flat config without an .eslintrc ignorePatterns.
+  // For unused export detection, use the ts-prune script added in package.json.
       'n/prefer-node-protocol': 'error',
       'prettier/prettier': 'error',
     },
@@ -111,7 +113,8 @@ module.exports = [
       ...tseslint.configs['recommended-type-checked'].rules,
       ...tseslint.configs['stylistic-type-checked'].rules,
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // In tests, enforce unused vars as errors to avoid dead code in specs/helpers
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'import/no-unresolved': 'off',
       'n/prefer-node-protocol': 'error',
       'prettier/prettier': 'error',
