@@ -44,6 +44,7 @@ module.exports = [
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'import/no-unresolved': 'off',
+      'n/prefer-node-protocol': 'error',
       ...pluginImport.configs.recommended.rules,
       ...pluginN.configs.recommended.rules,
       ...pluginPromise.configs.recommended.rules,
@@ -62,6 +63,7 @@ module.exports = [
     plugins: {
       '@typescript-eslint': tseslint,
       import: pluginImport,
+      n: pluginN,
       promise: pluginPromise,
       prettier: prettierPlugin,
     },
@@ -71,6 +73,7 @@ module.exports = [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'import/no-unresolved': 'off',
+      'n/prefer-node-protocol': 'error',
       'prettier/prettier': 'error',
     },
   },
