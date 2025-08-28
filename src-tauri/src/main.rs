@@ -4,7 +4,23 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder};
+#[cfg(target_os = "windows")]
+fn is_light_theme() -> bool {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let personalize = hkcu
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
+    if let Ok(key) = personalize {
+        if let Ok(val) = key.get_value::<u32, _>("AppsUseLightTheme") {
+            return val != 0;
+        }
+    }
+    // Default to light on failure
+    true
+}
+
 // Use the concrete runtime type from the wry runtime crate.
 // tauri_runtime_wry's Webview type adapts to the platform; on Windows it uses webview2-com
 // under the hood when the webview2-com feature is enabled in `tauri`.
@@ -38,8 +54,18 @@ fn main() {
             } else {
                 WebviewUrl::App("index.html".into())
             };
-            WebviewWindowBuilder::new(app, "main", url)
-                .title("Wolle")
+            let mut builder = WebviewWindowBuilder::new(app, "main", url).title("Wolle");
+            // Pre-paint background color to eliminate white flash
+            #[cfg(target_os = "windows")]
+            {
+                let bg = if is_light_theme() {
+                    Color(0xFF, 0xFF, 0xFF, 0xFF)
+                } else {
+                    Color(0x11, 0x11, 0x11, 0xFF)
+                };
+                builder = builder.background_color(bg);
+            }
+            builder
                 .build()?;
             // Build a simple menu with a status item and actions
             let menu = tauri::menu::MenuBuilder::new(app)
@@ -98,9 +124,17 @@ fn main() {
             } else {
                 WebviewUrl::App("index.html".into())
             };
-            WebviewWindowBuilder::new(app, "main", url)
-                .title("Wolle")
-                .build()?;
+            let mut builder = WebviewWindowBuilder::new(app, "main", url).title("Wolle");
+            #[cfg(target_os = "windows")]
+            {
+                let bg = if is_light_theme() {
+                    Color(0xFF, 0xFF, 0xFF, 0xFF)
+                } else {
+                    Color(0x11, 0x11, 0x11, 0xFF)
+                };
+                builder = builder.background_color(bg);
+            }
+            builder.build()?;
             Ok(())
         })
         .run(tauri::generate_context!())
