@@ -15,7 +15,6 @@
     "index.html",
     "vite.config.*",
     "eslint.config.*",
-    ".eslintrc.cjs",
     "vitest.config.ts"
   ],
   "exclude": ["dist", "node_modules", "src-tauri"]
