@@ -16,18 +16,23 @@ actions.forEach((a) =>
 const runBtn = el('button', {}, 'Run')
 const output = el('pre', { id: 'output' })
 
-runBtn.addEventListener('click', () => {
+async function handleRunClick(): Promise<void> {
   output.textContent = 'Running...'
+  runBtn.disabled = true
   const action = actionSelect.value as Action
   const text = input.value
-  void (async () => {
-    try {
-      const res = await runAction(action, text)
-      output.textContent = res
-    } catch (e) {
-      output.textContent = 'Error: ' + (e instanceof Error ? e.message : String(e))
-    }
-  })()
+  try {
+    const res = await runAction(action, text)
+    output.textContent = res
+  } catch (e) {
+    output.textContent = 'Error: ' + (e instanceof Error ? e.message : String(e))
+  } finally {
+    runBtn.disabled = false
+  }
+}
+
+runBtn.addEventListener('click', () => {
+  void handleRunClick()
 })
 
 app.append(status, actionSelect, input, runBtn, output)
