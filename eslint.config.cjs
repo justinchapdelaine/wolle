@@ -4,6 +4,8 @@
 const pluginImport = require('eslint-plugin-import')
 const pluginN = require('eslint-plugin-n')
 const pluginPromise = require('eslint-plugin-promise')
+const tseslint = require('@typescript-eslint/eslint-plugin')
+const tsParser = require('@typescript-eslint/parser')
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 module.exports = [
@@ -45,6 +47,29 @@ module.exports = [
       ...pluginImport.configs.recommended.rules,
       ...pluginN.configs.recommended.rules,
       ...pluginPromise.configs.recommended.rules,
+    },
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: ['./tsconfig.json'],
+        sourceType: 'module',
+        ecmaVersion: 'latest',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      import: pluginImport,
+      promise: pluginPromise,
+    },
+    rules: {
+      ...tseslint.configs['recommended-type-checked'].rules,
+      ...tseslint.configs['stylistic-type-checked'].rules,
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'import/no-unresolved': 'off',
     },
   },
   {

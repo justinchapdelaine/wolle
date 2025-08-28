@@ -1,7 +1,7 @@
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: Partial<HTMLElementTagNameMap[K]> = {},
-  ...children: Array<string | Node>
+  ...children: (string | Node)[]
 ): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag)
   Object.assign(e, props)
