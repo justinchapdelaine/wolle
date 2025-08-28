@@ -3,10 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "checkJs": false,
-    "isolatedModules": false
+    "isolatedModules": false,
+    "types": ["vitest/globals", "node"]
   },
-  "include": [
-    "src/**/*.test.ts",
-    "src/**/*.spec.ts"
-  ]
+  "include": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }

@@ -37,6 +37,10 @@ pnpm-debug.log*
 logs/
 *.log
 
+# Analyzer outputs
+eslint.sarif
+src-tauri/metadata.json
+
 # Coverage
 coverage/
 
