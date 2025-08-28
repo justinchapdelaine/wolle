@@ -8,14 +8,8 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["vitest/globals", "node", "vite/client"]
+    "types": ["vite/client"]
   },
-  "include": [
-    "src",
-    "index.html",
-    "vite.config.*",
-    "eslint.config.*",
-    "vitest.config.ts"
-  ],
-  "exclude": ["dist", "node_modules", "src-tauri"]
+  "include": ["src", "index.html", "vite.config.*", "eslint.config.*", "vitest.config.ts"],
+  "exclude": ["dist", "node_modules", "src-tauri", "src/**/*.test.ts", "src/**/*.spec.ts"]
 }
