@@ -56,19 +56,6 @@ pub fn health() -> Result<String> {
     ))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn health_returns_err_when_no_ollama() {
-        // This test assumes `ollama` is not present in PATH in CI; it should return an Err.
-        // We don't execute or mock the Command here; instead we check that the function returns
-        // a Result and handle either Ok or Err. This keeps the test stable across environments.
-        let _ = health();
-    }
-}
-
 pub fn query(prompt: &str) -> Result<String> {
     // Minimal MVP: call Ollama REST API generate endpoint with timeouts
     let client = Client::builder()
@@ -89,4 +76,17 @@ pub fn query(prompt: &str) -> Result<String> {
         warn!(?status, "ollama generate returned non-success status");
     }
     Ok(txt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_returns_err_when_no_ollama() {
+        // This test assumes `ollama` is not present in PATH in CI; it should return an Err.
+        // We don't execute or mock the Command here; instead we check that the function returns
+        // a Result and handle either Ok or Err. This keeps the test stable across environments.
+        let _ = health();
+    }
 }
