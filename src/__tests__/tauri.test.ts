@@ -10,6 +10,7 @@ import { actions, runAction, healthCheck } from '../tauri'
 import { invoke } from '@tauri-apps/api/core'
 
 describe('tauri wrappers', () => {
+  const invokeMock = vi.mocked(invoke)
   beforeEach(() => {
     vi.resetAllMocks()
   })
@@ -19,14 +20,14 @@ describe('tauri wrappers', () => {
   })
 
   it('runAction calls invoke with correct args', async () => {
-    ;(invoke as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok')
+    invokeMock.mockResolvedValue('ok')
     const res = await runAction('summarize', 'text')
     expect(res).toBe('ok')
     expect(invoke).toHaveBeenCalledWith('run_action', { action: 'summarize', input: 'text' })
   })
 
   it('healthCheck calls invoke with correct command', async () => {
-    ;(invoke as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('healthy')
+    invokeMock.mockResolvedValue('healthy')
     const res = await healthCheck()
     expect(res).toBe('healthy')
     expect(invoke).toHaveBeenCalledWith('health_check')
