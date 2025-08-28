@@ -58,7 +58,7 @@ pub fn health() -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-        use super::*;
+    use super::*;
 
     #[test]
     fn health_returns_err_when_no_ollama() {
