@@ -4,6 +4,7 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 // Use the concrete runtime type from the wry runtime crate.
 // tauri_runtime_wry's Webview type adapts to the platform; on Windows it uses webview2-com
 // under the hood when the webview2-com feature is enabled in `tauri`.
@@ -27,10 +28,19 @@ fn main() {
     use std::thread;
     use tauri::Manager;
 
-    // We create the tray during setup so we can use the App as the Manager
+    // We create the window and the tray during setup so we can use the App as the Manager
     tauri::Builder::<tauri::Wry>::new()
         .invoke_handler(tauri::generate_handler![health_check, run_action])
         .setup(|app| {
+            // Determine URL (Vite dev server in debug; bundled index.html in release)
+            let url = if cfg!(debug_assertions) {
+                WebviewUrl::External("http://localhost:5173".parse().unwrap())
+            } else {
+                WebviewUrl::App("index.html".into())
+            };
+            WebviewWindowBuilder::new(app, "main", url)
+                .title("Wolle")
+                .build()?;
             // Build a simple menu with a status item and actions
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
@@ -82,6 +92,17 @@ fn main() {
         .try_init();
     tauri::Builder::<tauri::Wry>::new()
         .invoke_handler(tauri::generate_handler![health_check, run_action])
+        .setup(|app| {
+            let url = if cfg!(debug_assertions) {
+                WebviewUrl::External("http://localhost:5173".parse().unwrap())
+            } else {
+                WebviewUrl::App("index.html".into())
+            };
+            WebviewWindowBuilder::new(app, "main", url)
+                .title("Wolle")
+                .build()?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

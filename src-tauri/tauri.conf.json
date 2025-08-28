@@ -2,6 +2,12 @@
   "productName": "Wolle",
   "version": "0.1.0",
   "identifier": "com.justinchapdelaine.wolle",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev"
+  },
   "bundle": {
     "icon": ["../icons/tray.ico"]
   }
