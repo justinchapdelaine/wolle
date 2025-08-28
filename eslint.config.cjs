@@ -16,7 +16,6 @@ module.exports = [
       'dist/**',
       'coverage/**',
       'src-tauri/**',
-      'src/**/*.js',
       'tools/dumpbin_artifact_outputs/**',
       'dumpbin_*.txt',
       'docs/dumpbin_*.txt',
