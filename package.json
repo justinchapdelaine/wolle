@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "deps:ts-unused": "npx --yes ts-prune -p tsconfig.json",
+    "deps:ts-unused": "npx --yes ts-prune -p tsconfig.prune.json",
     "deps:rust-unused": "powershell -ExecutionPolicy Bypass -File ./tools/rust-udeps.ps1",
     "prepare": "husky"
   },
