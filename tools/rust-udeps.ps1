@@ -14,9 +14,10 @@ if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
 }
 
 # Check if nightly is available; if not, install it (minimal profile to keep it light)
-& cargo +nightly -V *> $null
+# Capture output explicitly so we don't hide error information entirely.
+$nightlyCheck = & cargo +nightly -V 2>&1
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "[rust-udeps] Installing nightly toolchain..."
+  Write-Host "[rust-udeps] Nightly toolchain not found; installing..."
   rustup toolchain install nightly --profile minimal
   if ($LASTEXITCODE -ne 0) { throw "Failed to install nightly toolchain" }
 }
