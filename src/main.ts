@@ -19,8 +19,10 @@ function init(): void {
   provideFluentDesignSystem().register(allComponents)
   // Compact layout: negative density yields smaller controls; adjust to taste (-1, -2)
   density.withDefault(-1)
-  // Default to light mode luminance; can be made dynamic later based on OS theme
-  baseLayerLuminance.withDefault(StandardLuminance.LightMode)
+  // Set initial luminance based on OS theme BEFORE building UI to avoid token flip
+  const media = window.matchMedia('(prefers-color-scheme: dark)')
+  const initialMode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
+  baseLayerLuminance.setValueFor(document.documentElement, initialMode)
   // Brand hooks: subtle corner radius tuning; accent color can be provided by CSS var
   document.documentElement.style.setProperty('--accent-base-color', '#2563eb')
   controlCornerRadius.withDefault(6)
@@ -138,13 +140,11 @@ function init(): void {
   updateRunEnabled()
 
   // Theme responsiveness: follow OS light/dark and update luminance token dynamically
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
   const applyLuminance = () => {
     const mode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
     // Set on the document element to apply globally
     baseLayerLuminance.setValueFor(document.documentElement, mode)
   }
-  applyLuminance()
   // Listen for OS theme changes
   media.addEventListener?.('change', applyLuminance)
 
