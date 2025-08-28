@@ -6,6 +6,7 @@ const pluginN = require('eslint-plugin-n')
 const pluginPromise = require('eslint-plugin-promise')
 const tseslint = require('@typescript-eslint/eslint-plugin')
 const tsParser = require('@typescript-eslint/parser')
+const prettierPlugin = require('eslint-plugin-prettier')
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 module.exports = [
@@ -54,7 +55,7 @@ module.exports = [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: ['./tsconfig.json'],
+        project: ['./tsconfig.json', './tsconfig.test.json'],
         sourceType: 'module',
         ecmaVersion: 'latest',
       },
@@ -63,6 +64,7 @@ module.exports = [
       '@typescript-eslint': tseslint,
       import: pluginImport,
       promise: pluginPromise,
+      prettier: prettierPlugin,
     },
     rules: {
       ...tseslint.configs['recommended-type-checked'].rules,
@@ -70,10 +72,11 @@ module.exports = [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'import/no-unresolved': 'off',
+      'prettier/prettier': 'error',
     },
   },
   {
-    files: ['src/**/*.test.js', 'src/**/*.spec.js'],
+    files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     languageOptions: {
       globals: {
         // Vitest-like globals (works for Vitest and JSDOM tests)
