@@ -3,7 +3,9 @@ import { actions, type Action, runAction, healthCheck } from './tauri'
 
 const app = document.getElementById('app')
 if (!app) {
-  throw new Error('#app container not found')
+  throw new Error(
+    'Application container element with id "app" not found in DOM. Ensure index.html contains <div id="app"></div>.'
+  )
 }
 
 const status = el('div', { id: 'status' })
