@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "tauri:dev": "tauri dev",
     "preflight:webview2": "powershell -ExecutionPolicy Bypass -File ./tools/webview2-preflight.ps1",
+    "format:check": "prettier --check .",
     "lint": "eslint . --ext .js,.ts --max-warnings 0",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "lint:sarif": "eslint . --ext .js,.ts --format node_modules/@microsoft/eslint-formatter-sarif/sarif.js --output-file eslint.sarif",
@@ -19,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "deps:ts-unused": "npx --yes ts-prune -p tsconfig.prune.json",
+    "deps:ts-unused:ci": "npx --yes ts-prune -p tsconfig.prune.json -e",
     "deps:rust-unused": "powershell -ExecutionPolicy Bypass -File ./tools/rust-udeps.ps1",
     "prepare": "husky"
   },
