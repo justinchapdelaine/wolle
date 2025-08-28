@@ -52,10 +52,11 @@ module.exports = [
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.test.json'],
+        project: ['./tsconfig.json'],
         sourceType: 'module',
         ecmaVersion: 'latest',
       },
@@ -80,6 +81,12 @@ module.exports = [
   {
     files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: ['./tsconfig.test.json'],
+        sourceType: 'module',
+        ecmaVersion: 'latest',
+      },
       globals: {
         // Vitest-like globals (works for Vitest and JSDOM tests)
         describe: 'readonly',
@@ -92,6 +99,22 @@ module.exports = [
         afterEach: 'readonly',
         vi: 'readonly',
       },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      import: pluginImport,
+      n: pluginN,
+      promise: pluginPromise,
+      prettier: prettierPlugin,
+    },
+    rules: {
+      ...tseslint.configs['recommended-type-checked'].rules,
+      ...tseslint.configs['stylistic-type-checked'].rules,
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'import/no-unresolved': 'off',
+      'n/prefer-node-protocol': 'error',
+      'prettier/prettier': 'error',
     },
   },
 ]
