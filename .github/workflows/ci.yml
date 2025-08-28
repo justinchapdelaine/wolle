@@ -26,6 +26,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Lint (SARIF)
+        run: npm run lint:sarif
+
+      - name: Upload ESLint SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: eslint.sarif
+
       - name: Typecheck (TypeScript)
         run: npm run typecheck
 
