@@ -17,10 +17,20 @@ actions.forEach((a) =>
 const runBtn = el('button', {}, 'Run')
 const output = el('pre', { id: 'output' })
 
+function isAction(value: string): value is Action {
+  return (actions as readonly string[]).includes(value)
+}
+
 async function handleRunClick(): Promise<void> {
   output.textContent = 'Running...'
   runBtn.disabled = true
-  const action = actionSelect.value as Action
+  const selected = actionSelect.value
+  if (!isAction(selected)) {
+    output.textContent = 'Error: Unknown action selected.'
+    runBtn.disabled = false
+    return
+  }
+  const action: Action = selected
   const text = input.value
   try {
     const res = await runAction(action, text)
