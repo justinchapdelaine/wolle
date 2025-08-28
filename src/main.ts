@@ -8,8 +8,7 @@ if (!app) {
   )
 }
 
-const status = el('div', { id: 'status' })
-status.textContent = 'Checking Ollama...'
+const status = el('div', { id: 'status' }, 'Checking Ollama...')
 const input = el('textarea', { id: 'input', rows: 6, cols: 40 })
 const actionSelect = el('select', {})
 actions.forEach((a) =>
