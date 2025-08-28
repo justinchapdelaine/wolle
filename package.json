@@ -40,11 +40,12 @@
     "lint-staged": "^15.2.10"
   },
   "lint-staged": {
-    "*.{js,ts,css,md,json,yml,yaml}": [
+    "*.{js,ts}": [
+      "eslint --fix",
       "prettier --write"
     ],
-    "*.{js,ts}": [
-      "eslint --fix"
+    "*.{css,md,json,yml,yaml}": [
+      "prettier --write"
     ]
   }
 }
