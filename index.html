@@ -12,6 +12,30 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Preload Fluent design tokens via CSS to avoid theme flash and set brand hooks -->
+    <style>
+      :root {
+        /* Allow UA to render appropriate form controls and scrollbars */
+        color-scheme: light dark;
+        /* Brand hooks */
+        --accent-base-color: #2563eb; /* light default */
+        --control-corner-radius: 6px;
+        /* Typography */
+        --body-font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --base-layer-luminance: 0.15; /* Dark mode */
+          --accent-base-color: #60a5fa; /* slightly lighter accent in dark */
+        }
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --base-layer-luminance: 1; /* Light mode */
+          --accent-base-color: #2563eb;
+        }
+      }
+    </style>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
