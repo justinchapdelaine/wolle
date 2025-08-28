@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-
-import fs from 'fs'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 
 // index.html is at the repository root
 const html = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8')
