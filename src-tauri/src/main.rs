@@ -5,6 +5,7 @@ mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
 use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager, Listener};
+/// Returns true if Windows is using light app mode. Defaults to light on lookup failure.
 #[cfg(target_os = "windows")]
 fn is_light_theme() -> bool {
     use winreg::enums::HKEY_CURRENT_USER;
@@ -21,6 +22,9 @@ fn is_light_theme() -> bool {
     true
 }
 
+/// Decide which URL the webview should load:
+/// - Dev: Vite dev server
+/// - Release: bundled `index.html`
 fn resolve_url() -> WebviewUrl {
     if cfg!(debug_assertions) {
         WebviewUrl::External("http://localhost:5173".parse().unwrap())
@@ -29,6 +33,7 @@ fn resolve_url() -> WebviewUrl {
     }
 }
 
+/// Compute a native-looking background color for the window based on OS theme (Windows only).
 #[cfg(target_os = "windows")]
 fn resolve_bg() -> Color {
     if is_light_theme() {
@@ -36,6 +41,52 @@ fn resolve_bg() -> Color {
     } else {
         Color(0x11, 0x11, 0x11, 0xFF)
     }
+}
+
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+
+/// Wire "hide-until-ready" behavior:
+/// - Listens for the frontend "frontend-ready" event and shows/focuses once.
+/// - Adds a 250ms safety timer to reveal if the event is missed.
+/// This should be called before creating the window to avoid races.
+fn wire_hide_until_ready(app: &tauri::AppHandle<tauri::Wry>, shown: &Arc<AtomicBool>) {
+    let shown_for_event = Arc::clone(shown);
+    let app_for_event = app.clone();
+    app.listen("frontend-ready", move |_e| {
+        if !shown_for_event.swap(true, Ordering::SeqCst) {
+            if let Some(window) = app_for_event.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    });
+
+    // Safety timeout: ensure the window appears even if the event is missed
+    let shown_for_timer = Arc::clone(shown);
+    let app_for_timer = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        if !shown_for_timer.swap(true, Ordering::SeqCst) {
+            if let Some(window) = app_for_timer.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    });
+}
+
+/// Create the primary "main" window with title, visibility and native background color.
+/// The window contents are determined by `resolve_url()`.
+fn create_main_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> tauri::Result<()> {
+    let url = resolve_url();
+    let mut builder = WebviewWindowBuilder::new(app, "main", url)
+        .title("Wolle")
+        .visible(visible);
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.background_color(resolve_bg());
+    }
+    builder.build().map(|_| ())
 }
 
 // Use the concrete runtime type from the wry runtime crate.
@@ -65,52 +116,12 @@ fn main() {
     tauri::Builder::<tauri::Wry>::new()
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
-            // Determine URL (Vite dev server in debug; bundled index.html in release)
-            let url = resolve_url();
-            let mut builder = WebviewWindowBuilder::new(app, "main", url)
-                .title("Wolle")
-                // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
-                .visible(false);
-            // Pre-paint background color to eliminate white flash
-            #[cfg(target_os = "windows")]
-            {
-                builder = builder.background_color(resolve_bg());
-            }
-            // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
-            use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+            // Prepare hide-until-ready signaling BEFORE building the webview
             let shown = Arc::new(AtomicBool::new(false));
-            let shown_for_event = shown.clone();
-            let app_for_event = app.handle().clone();
-            app.listen("frontend-ready", move |_e| {
-                if !shown_for_event.swap(true, Ordering::SeqCst) {
-                    if let Some(window) = app_for_event.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            });
-
-            // Esc close is handled via the `close_app` Tauri command invoked by the frontend.
-
-            // Create the window after listener is registered
-            builder.build()?;
-
+            wire_hide_until_ready(&app.handle(), &shown);
+            // Create the window hidden to avoid any flash
+            create_main_window(&app.handle(), false)?;
             // No window-level menu; Esc close is handled by the frontend invoking `close_app`.
-
-
-
-            // Safety timeout: ensure the window appears even if the event is missed
-            let shown_for_timer = shown.clone();
-            let app_for_timer = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(250));
-                if !shown_for_timer.swap(true, Ordering::SeqCst) {
-                    if let Some(window) = app_for_timer.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            });
             // Build a simple tray menu with a status item and actions
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
@@ -133,30 +144,27 @@ fn main() {
                         let _ = window.set_focus();
                     } else {
                         // Re-create the main window if it was closed.
-                        let url = resolve_url();
-                        let mut builder = WebviewWindowBuilder::new(app_handle, "main", url)
-                            .title("Wolle")
-                            .visible(true);
-                        #[cfg(target_os = "windows")]
-                        {
-                            builder = builder.background_color(resolve_bg());
-                        }
-                        let _ = builder.build();
+                        let _ = create_main_window(app_handle, true);
                     }
                 }
                 _ => {}
             });
 
-            // Spawn background thread to poll Ollama and update tray tooltip
+            // Spawn background thread to poll Ollama and update tray tooltip (debounced)
             let tray_clone = tray.clone();
-            thread::spawn(move || loop {
-                let status_text = match ollama::health() {
-                    Ok(_) => "Ollama: OK".to_string(),
-                    Err(e) => format!("Ollama: {}", e),
-                };
-                // Update the tray tooltip with the status (works cross-platform)
-                let _ = tray_clone.set_tooltip(Some(status_text));
-                thread::sleep(std::time::Duration::from_secs(30));
+            thread::spawn(move || {
+                let mut last = String::new();
+                loop {
+                    let status_text = match ollama::health() {
+                        Ok(_) => "Ollama: OK".to_string(),
+                        Err(e) => format!("Ollama: {}", e),
+                    };
+                    if status_text != last {
+                        let _ = tray_clone.set_tooltip(Some(status_text.clone()));
+                        last = status_text;
+                    }
+                    thread::sleep(std::time::Duration::from_secs(30));
+                }
             });
 
             Ok(())
@@ -174,50 +182,11 @@ fn main() {
     tauri::Builder::<tauri::Wry>::new()
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
-            let url = resolve_url();
-            let mut builder = WebviewWindowBuilder::new(app, "main", url)
-                .title("Wolle")
-                // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
-                .visible(false);
-            #[cfg(target_os = "windows")]
-            {
-                builder = builder.background_color(resolve_bg());
-            }
-            // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
-            use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+            // Prepare hide-until-ready signaling BEFORE building the webview
             let shown = Arc::new(AtomicBool::new(false));
-            let shown_for_event = shown.clone();
-            let app_for_event = app.handle().clone();
-            app.listen("frontend-ready", move |_e| {
-                if !shown_for_event.swap(true, Ordering::SeqCst) {
-                    if let Some(window) = app_for_event.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            });
-
-            // Esc close is handled via the `close_app` Tauri command invoked by the frontend.
-
-            // Create the window after listener is registered
-            builder.build()?;
-
-            // No window-level menu; Esc close is handled by the frontend invoking `close_app`.
-
-
-
-            // Safety timeout: ensure the window appears even if the event is missed
-            let shown_for_timer = shown.clone();
-            let app_for_timer = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(250));
-                if !shown_for_timer.swap(true, Ordering::SeqCst) {
-                    if let Some(window) = app_for_timer.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            });
+            wire_hide_until_ready(&app.handle(), &shown);
+            // Create the window hidden to avoid any flash
+            create_main_window(&app.handle(), false)?;
             Ok(())
         })
         .run(tauri::generate_context!())
