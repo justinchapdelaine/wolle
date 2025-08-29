@@ -6,7 +6,7 @@ vi.mock('@tauri-apps/api/core', () => {
   }
 })
 
-import { actions, runAction, healthCheck, closeApp } from '../tauri'
+import { actions, runAction, healthCheck, closeApp, getStartOnBoot, setStartOnBoot } from '../tauri'
 import { invoke } from '@tauri-apps/api/core'
 
 describe('tauri wrappers', () => {
@@ -37,5 +37,18 @@ describe('tauri wrappers', () => {
     invokeMock.mockResolvedValue(undefined)
     await closeApp()
     expect(invoke).toHaveBeenCalledWith('close_app')
+  })
+
+  it('getStartOnBoot calls invoke with correct command', async () => {
+    invokeMock.mockResolvedValue(true)
+    const v = await getStartOnBoot()
+    expect(v).toBe(true)
+    expect(invoke).toHaveBeenCalledWith('get_start_on_boot')
+  })
+
+  it('setStartOnBoot calls invoke with correct args', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    await setStartOnBoot(true)
+    expect(invoke).toHaveBeenCalledWith('set_start_on_boot', { enable: true })
   })
 })

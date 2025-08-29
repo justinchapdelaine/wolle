@@ -18,9 +18,10 @@ Notes:
 - This is a minimal scaffold for Phase 1. It includes a simple Ollama helper that attempts an HTTP health check at http://127.0.0.1:11434 and falls back to checking the `ollama` CLI.
 - For the full PRD features (context menus, installer, model provisioning, robust positioning), further work is required.
 - Tray-aware behavior:
-  - With tray builds (default for release), pressing Esc hides the window; use the tray menu → Show to bring it back, or tray → Quit to exit.
-  - In dev or non-tray builds, pressing Esc closes the window/app.
-  - The app starts hidden to avoid white flash and reveals once the frontend is ready (with a 250 ms safety fallback).
+  - With tray builds (default for release):
+    - The app starts minimized/hidden. Use the tray menu → Show to open the Action window, or tray → Settings to open the Settings window.
+    - Pressing Esc or clicking the window X hides the window (app remains in tray). Use tray → Quit to exit fully.
+  - In dev or non-tray builds, pressing Esc closes the window/app and windows close normally.
 
 ## WebView2 preflight
 
@@ -36,6 +37,11 @@ npm run tauri:dev
 For installer usage, prefer installing the Evergreen WebView2 runtime system-wide; as a fallback the installer can bundle a Fixed Version WebView2 redistributable and copy `WebView2Loader.dll` into the app folder during install.
 
 # wolle
+
+## Settings
+
+- Open Settings from the tray menu.
+- Run on Windows startup: toggle to add/remove Wolle from HKCU\Software\Microsoft\Windows\CurrentVersion\Run for the current user.
 
 It's a bunch of wolle
 
