@@ -21,7 +21,13 @@ function init(): void {
   // Compact layout: negative density yields smaller controls; adjust to taste (-1, -2)
   density.withDefault(-1)
   // Set initial luminance based on OS theme BEFORE building UI to avoid token flip
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
+  const media: {
+    matches: boolean
+    addEventListener?: (type: string, listener: () => void) => void
+  } =
+    typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)')
+      : { matches: false }
   const initialMode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
   baseLayerLuminance.setValueFor(document.documentElement, initialMode)
   // Brand hooks: subtle corner radius tuning; accent color can be provided by CSS var
@@ -60,7 +66,10 @@ function init(): void {
   )
 
   // Emit readiness early: tokens and container are set, so reveal is safe to avoid flicker.
-  void emit('frontend-ready')
+  void emit('frontend-ready').catch((err) => {
+    // Swallow in tests/jsdom, but leave a breadcrumb for devs
+    if (typeof console !== 'undefined') console.debug('emit(frontend-ready) failed', err)
+  })
 
   const status = el(
     'div',
@@ -197,7 +206,11 @@ function init(): void {
       return
     }
     try {
-      if (navigator.clipboard && (window.isSecureContext ?? false)) {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof (navigator.clipboard as unknown as { writeText?: unknown }).writeText === 'function'
+      ) {
         await navigator.clipboard.writeText(text)
       } else {
         // Fallback to hidden textarea

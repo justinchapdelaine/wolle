@@ -8,6 +8,25 @@ const html = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf-8')
 describe('Copy affordance', () => {
   beforeEach(async () => {
     document.documentElement.innerHTML = html
+    // Polyfill matchMedia for Fluent UI/FAST in jsdom
+    window.matchMedia ||= ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {
+        return
+      },
+      removeListener: () => {
+        return
+      },
+      addEventListener: () => {
+        return
+      },
+      removeEventListener: () => {
+        return
+      },
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
     // Provide a stub for navigator.clipboard in jsdom
     // @ts-expect-error jsdom navigator typing
     global.navigator.clipboard = {

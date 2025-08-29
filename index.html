@@ -52,6 +52,14 @@
         font-family: var(--body-font);
       }
     </style>
+    <script type="module">
+      // In dev, Vite serves this page at /. We want action by default.
+      // If this file loads in prod, it's okay to run main.ts directly.
+      const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+      if (isDev && location.pathname === '/' && !location.pathname.endsWith('/action.html')) {
+        location.replace('/action.html')
+      }
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -78,10 +78,33 @@ fn wire_hide_until_ready(app: &tauri::AppHandle<tauri::Wry>, shown: &Arc<AtomicB
 /// Create the primary "main" window with title, visibility and native background color.
 /// The window contents are determined by `resolve_url()`.
 fn create_main_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> tauri::Result<()> {
-    let url = resolve_url();
+    // In dev, load the explicit multipage entry to avoid redirect logic
+    let url = if cfg!(debug_assertions) {
+        WebviewUrl::External("http://localhost:5173/action.html".parse().unwrap())
+    } else {
+        WebviewUrl::App("action.html".into())
+    };
     let mut builder = WebviewWindowBuilder::new(app, "main", url)
-        .title("Wolle")
+        .title("Wolle — Action")
         .visible(visible);
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.background_color(resolve_bg());
+    }
+    builder.build().map(|_| ())
+}
+
+/// Create the secondary "status" window.
+fn create_status_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> tauri::Result<()> {
+    let url = if cfg!(debug_assertions) {
+        WebviewUrl::External("http://localhost:5173/status.html".parse().unwrap())
+    } else {
+        WebviewUrl::App("status.html".into())
+    };
+    let mut builder = WebviewWindowBuilder::new(app, "status", url)
+        .title("Wolle — Status")
+        .visible(visible)
+        .inner_size(480.0, 360.0);
     #[cfg(target_os = "windows")]
     {
         builder = builder.background_color(resolve_bg());
@@ -132,6 +155,7 @@ fn main() {
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
                 .separator()
+                .text("open_status", "Status/Settings")
                 .text("show", "Show")
                 .text("quit", "Quit")
                 .build()?;
@@ -143,6 +167,14 @@ fn main() {
             tray.on_menu_event(|app_handle, event| match event.id().as_ref() {
                 "quit" => {
                     std::process::exit(0);
+                }
+                "open_status" => {
+                    if let Some(win) = app_handle.get_webview_window("status") {
+                        let _ = win.show();
+                        let _ = win.set_focus();
+                    } else {
+                        let _ = create_status_window(app_handle, true);
+                    }
                 }
                 "show" => {
                     if let Some(window) = app_handle.get_webview_window("main") {
@@ -227,23 +259,15 @@ fn run_action(action: String, input: String) -> Result<String, String> {
 // When the tray feature is enabled, Esc should hide the window so it can be re-shown from the tray.
 #[cfg(feature = "tray")]
 #[tauri::command]
-fn close_app(app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.hide().map_err(|e| e.to_string())
-    } else {
-        // No window to hide; nothing to do.
-        Ok(())
-    }
+fn close_app(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
 }
 
 // Without the tray, Esc fully closes the window; if missing, exit the app as a fallback.
 #[cfg(not(feature = "tray"))]
 #[tauri::command]
-fn close_app(app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.close().map_err(|e| e.to_string())
-    } else {
-        app.exit(0);
-        Ok(())
-    }
+fn close_app(window: tauri::WebviewWindow, app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
+    let _ = window.close();
+    app.exit(0);
+    Ok(())
 }
