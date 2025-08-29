@@ -1,7 +1,6 @@
 import { el } from './dom'
-import { actions, type Action, runAction, healthCheck } from './tauri'
+import { actions, type Action, runAction, healthCheck, closeApp } from './tauri'
 import { emit } from '@tauri-apps/api/event'
-import { closeApp } from './tauri'
 import {
   provideFluentDesignSystem,
   allComponents,
@@ -69,7 +68,6 @@ function init(): void {
     'Checking Ollama...'
   )
   const inputLabel = el('label', { id: 'input-label' }, 'Prompt')
-  // (Esc-to-close handled natively in Rust; no frontend handler needed)
   const input = document.createElement('fluent-text-area')
   input.setAttribute('id', 'input')
   input.setAttribute('aria-labelledby', 'input-label')

@@ -82,13 +82,7 @@ fn main() {
                 }
             });
 
-            // Also listen for a frontend request to close (e.g., Esc key)
-            let app_for_close = app.handle().clone();
-            app.listen("request-close", move |_e| {
-                if let Some(window) = app_for_close.get_webview_window("main") {
-                    let _ = window.close();
-                }
-            });
+            // Esc close is handled via the `close_app` Tauri command invoked by the frontend.
 
             // Create the window after listener is registered
             builder.build()?;
@@ -109,7 +103,7 @@ fn main() {
                     }
                 }
             });
-            // Build a simple menu with a status item and actions
+            // Build a simple tray menu with a status item and actions
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
                 .separator()
@@ -193,13 +187,7 @@ fn main() {
                 }
             });
 
-            // Also listen for a frontend request to close (e.g., Esc key)
-            let app_for_close = app.handle().clone();
-            app.listen("request-close", move |_e| {
-                if let Some(window) = app_for_close.get_webview_window("main") {
-                    let _ = window.close();
-                }
-            });
+            // Esc close is handled via the `close_app` Tauri command invoked by the frontend.
 
             // Create the window after listener is registered
             builder.build()?;

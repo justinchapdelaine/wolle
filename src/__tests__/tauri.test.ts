@@ -6,7 +6,7 @@ vi.mock('@tauri-apps/api/core', () => {
   }
 })
 
-import { actions, runAction, healthCheck } from '../tauri'
+import { actions, runAction, healthCheck, closeApp } from '../tauri'
 import { invoke } from '@tauri-apps/api/core'
 
 describe('tauri wrappers', () => {
@@ -31,5 +31,11 @@ describe('tauri wrappers', () => {
     const res = await healthCheck()
     expect(res).toBe('healthy')
     expect(invoke).toHaveBeenCalledWith('health_check')
+  })
+
+  it('closeApp calls invoke with correct command', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    await closeApp()
+    expect(invoke).toHaveBeenCalledWith('close_app')
   })
 })
