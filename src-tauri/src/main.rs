@@ -123,6 +123,26 @@ fn main() {
                     if let Some(window) = app_handle.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
+                    } else {
+                        // Re-create the main window if it was closed.
+                        let url = if cfg!(debug_assertions) {
+                            WebviewUrl::External("http://localhost:5173".parse().unwrap())
+                        } else {
+                            WebviewUrl::App("index.html".into())
+                        };
+                        let mut builder = WebviewWindowBuilder::new(app_handle, "main", url)
+                            .title("Wolle")
+                            .visible(true);
+                        #[cfg(target_os = "windows")]
+                        {
+                            let bg = if is_light_theme() {
+                                Color(0xFF, 0xFF, 0xFF, 0xFF)
+                            } else {
+                                Color(0x11, 0x11, 0x11, 0xFF)
+                            };
+                            builder = builder.background_color(bg);
+                        }
+                        let _ = builder.build();
                     }
                 }
                 _ => {}
@@ -232,12 +252,25 @@ fn run_action(action: String, input: String) -> Result<String, String> {
     ollama::query(&prompt).map_err(|e| format!("{}", e))
 }
 
+// When the tray feature is enabled, Esc should hide the window so it can be re-shown from the tray.
+#[cfg(feature = "tray")]
+#[tauri::command]
+fn close_app(app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().map_err(|e| e.to_string())
+    } else {
+        // No window to hide; nothing to do.
+        Ok(())
+    }
+}
+
+// Without the tray, Esc fully closes the window; if missing, exit the app as a fallback.
+#[cfg(not(feature = "tray"))]
 #[tauri::command]
 fn close_app(app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         window.close().map_err(|e| e.to_string())
     } else {
-        // If the window isn't found, exit the app as a fallback
         app.exit(0);
         Ok(())
     }
