@@ -114,6 +114,12 @@ fn main() {
 
     // We create the window and the tray during setup so we can use the App as the Manager
     tauri::Builder::<tauri::Wry>::new()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
             // Prepare hide-until-ready signaling BEFORE building the webview
@@ -180,6 +186,12 @@ fn main() {
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
     tauri::Builder::<tauri::Wry>::new()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
             // Prepare hide-until-ready signaling BEFORE building the webview

@@ -20,6 +20,7 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 winreg = "0.52"
+tauri-plugin-single-instance = "2"
 
 [features]
 # Enable Tauri's system-tray API and the tray-icon dependency only when our
