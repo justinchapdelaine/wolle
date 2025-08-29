@@ -21,6 +21,23 @@ fn is_light_theme() -> bool {
     true
 }
 
+fn resolve_url() -> WebviewUrl {
+    if cfg!(debug_assertions) {
+        WebviewUrl::External("http://localhost:5173".parse().unwrap())
+    } else {
+        WebviewUrl::App("index.html".into())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_bg() -> Color {
+    if is_light_theme() {
+        Color(0xFF, 0xFF, 0xFF, 0xFF)
+    } else {
+        Color(0x11, 0x11, 0x11, 0xFF)
+    }
+}
+
 // Use the concrete runtime type from the wry runtime crate.
 // tauri_runtime_wry's Webview type adapts to the platform; on Windows it uses webview2-com
 // under the hood when the webview2-com feature is enabled in `tauri`.
@@ -49,11 +66,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
             // Determine URL (Vite dev server in debug; bundled index.html in release)
-            let url = if cfg!(debug_assertions) {
-                WebviewUrl::External("http://localhost:5173".parse().unwrap())
-            } else {
-                WebviewUrl::App("index.html".into())
-            };
+            let url = resolve_url();
             let mut builder = WebviewWindowBuilder::new(app, "main", url)
                 .title("Wolle")
                 // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
@@ -61,12 +74,7 @@ fn main() {
             // Pre-paint background color to eliminate white flash
             #[cfg(target_os = "windows")]
             {
-                let bg = if is_light_theme() {
-                    Color(0xFF, 0xFF, 0xFF, 0xFF)
-                } else {
-                    Color(0x11, 0x11, 0x11, 0xFF)
-                };
-                builder = builder.background_color(bg);
+                builder = builder.background_color(resolve_bg());
             }
             // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
             use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
@@ -125,22 +133,13 @@ fn main() {
                         let _ = window.set_focus();
                     } else {
                         // Re-create the main window if it was closed.
-                        let url = if cfg!(debug_assertions) {
-                            WebviewUrl::External("http://localhost:5173".parse().unwrap())
-                        } else {
-                            WebviewUrl::App("index.html".into())
-                        };
+                        let url = resolve_url();
                         let mut builder = WebviewWindowBuilder::new(app_handle, "main", url)
                             .title("Wolle")
                             .visible(true);
                         #[cfg(target_os = "windows")]
                         {
-                            let bg = if is_light_theme() {
-                                Color(0xFF, 0xFF, 0xFF, 0xFF)
-                            } else {
-                                Color(0x11, 0x11, 0x11, 0xFF)
-                            };
-                            builder = builder.background_color(bg);
+                            builder = builder.background_color(resolve_bg());
                         }
                         let _ = builder.build();
                     }
@@ -175,23 +174,14 @@ fn main() {
     tauri::Builder::<tauri::Wry>::new()
         .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
-            let url = if cfg!(debug_assertions) {
-                WebviewUrl::External("http://localhost:5173".parse().unwrap())
-            } else {
-                WebviewUrl::App("index.html".into())
-            };
+            let url = resolve_url();
             let mut builder = WebviewWindowBuilder::new(app, "main", url)
                 .title("Wolle")
                 // Start hidden to avoid any flash; will show on frontend-ready or fallback timer
                 .visible(false);
             #[cfg(target_os = "windows")]
             {
-                let bg = if is_light_theme() {
-                    Color(0xFF, 0xFF, 0xFF, 0xFF)
-                } else {
-                    Color(0x11, 0x11, 0x11, 0xFF)
-                };
-                builder = builder.background_color(bg);
+                builder = builder.background_color(resolve_bg());
             }
             // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
             use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
@@ -249,7 +239,8 @@ fn health_check() -> Result<Health, String> {
 fn run_action(action: String, input: String) -> Result<String, String> {
     // Build a prompt using the helper and forward to ollama
     let prompt = utils::format_prompt(&action, &input);
-    ollama::query(&prompt).map_err(|e| format!("{}", e))
+    ollama::query(&prompt)
+        .map_err(|e| format!("Action '{}' failed: {}", action, e))
 }
 
 // When the tray feature is enabled, Esc should hide the window so it can be re-shown from the tray.
