@@ -97,6 +97,24 @@ function init(): void {
   const output = el('pre', { id: 'output', role: 'region' })
   output.setAttribute('aria-labelledby', 'output-label')
 
+  // Copy affordance and live region for announcements
+  const copyBtn = document.createElement('fluent-button')
+  copyBtn.textContent = 'Copy'
+  copyBtn.setAttribute('id', 'copy')
+  copyBtn.disabled = true
+  const live = document.createElement('div')
+  live.id = 'live'
+  live.setAttribute('role', 'status')
+  live.setAttribute('aria-live', 'polite')
+  live.setAttribute('aria-atomic', 'true')
+  // Visually hide but keep accessible
+  live.style.position = 'absolute'
+  live.style.left = '-9999px'
+  live.style.top = 'auto'
+  live.style.width = '1px'
+  live.style.height = '1px'
+  live.style.overflow = 'hidden'
+
   function isAction(value: string): value is Action {
     return (actions as readonly string[]).includes(value)
   }
@@ -104,6 +122,7 @@ function init(): void {
   async function handleRunClick(): Promise<void> {
     output.textContent = 'Running...'
     runBtn.disabled = true
+    copyBtn.disabled = true
     spinner.style.visibility = 'visible'
     const selected = actionSelect.value
     if (!isAction(selected)) {
@@ -121,6 +140,7 @@ function init(): void {
     } finally {
       runBtn.disabled = false
       spinner.style.visibility = 'hidden'
+      updateCopyEnabled()
     }
   }
 
@@ -148,7 +168,11 @@ function init(): void {
 
   // Layout spacing intentionally minimal; Fluent density token provides compact controls.
 
-  app.append(status, inputLabel, input, actionLabel, controlsRow, outputLabel, output)
+  // Output header row: label + copy button
+  const outputHeader = el('div', { id: 'output-header' })
+  outputHeader.append(outputLabel, copyBtn)
+
+  app.append(status, inputLabel, input, actionLabel, controlsRow, outputHeader, output, live)
 
   // Disable Run when input is empty
   const updateRunEnabled = () => {
@@ -157,6 +181,45 @@ function init(): void {
   }
   input.addEventListener('input', updateRunEnabled)
   updateRunEnabled()
+
+  // Enable/disable Copy based on output content
+  const updateCopyEnabled = () => {
+    const text = (output.textContent ?? '').trim()
+    copyBtn.disabled = text.length === 0 || text === 'Running...'
+  }
+  updateCopyEnabled()
+
+  // Clipboard copy with graceful fallbacks and announcement
+  const copyOutput = async () => {
+    const text = output.textContent ?? ''
+    if (!text.trim()) {
+      live.textContent = 'Nothing to copy'
+      return
+    }
+    try {
+      if (navigator.clipboard && (window.isSecureContext ?? false)) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // Fallback to hidden textarea
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'absolute'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!ok) throw new Error('execCommand copy failed')
+      }
+      live.textContent = 'Copied to clipboard'
+    } catch {
+      live.textContent = 'Copy failed'
+    }
+  }
+  copyBtn.addEventListener('click', () => {
+    void copyOutput()
+  })
 
   // Make sure the document/input gains focus when the window is focused or made visible
   window.addEventListener('focus', () => {

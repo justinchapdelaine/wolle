@@ -17,7 +17,10 @@ Notes:
 
 - This is a minimal scaffold for Phase 1. It includes a simple Ollama helper that attempts an HTTP health check at http://127.0.0.1:11434 and falls back to checking the `ollama` CLI.
 - For the full PRD features (context menus, installer, model provisioning, robust positioning), further work is required.
-- Press Esc to close the Wolle window quickly. The app starts hidden to avoid white flash and reveals once the frontend is ready (with a 250 ms safety fallback).
+- Tray-aware behavior:
+  - With tray builds (default for release), pressing Esc hides the window; use the tray menu → Show to bring it back, or tray → Quit to exit.
+  - In dev or non-tray builds, pressing Esc closes the window/app.
+  - The app starts hidden to avoid white flash and reveals once the frontend is ready (with a 250 ms safety fallback).
 
 ## WebView2 preflight
 
