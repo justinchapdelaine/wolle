@@ -4,7 +4,7 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
-use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager, Listener};
+use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager, Listener, WindowEvent};
 /// Returns true if Windows is using light app mode. Defaults to light on lookup failure.
 #[cfg(target_os = "windows")]
 fn is_light_theme() -> bool {
@@ -137,6 +137,13 @@ fn main() {
 
     // We create the window and the tray during setup so we can use the App as the Manager
     tauri::Builder::<tauri::Wry>::new()
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // In tray builds, hide instead of closing when user clicks X
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.show();
@@ -151,10 +158,7 @@ fn main() {
             set_start_on_boot
         ])
         .setup(|app| {
-            // Prepare hide-until-ready signaling BEFORE building the webview
-            let shown = Arc::new(AtomicBool::new(false));
-            wire_hide_until_ready(&app.handle(), &shown);
-            // Create the window hidden to avoid any flash
+            // In tray builds, keep the window hidden at startup (start minimized)
             create_main_window(&app.handle(), false)?;
             // No window-level menu; Esc close is handled by the frontend invoking `close_app`.
             // Build a simple tray menu with a status item and actions
