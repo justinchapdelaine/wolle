@@ -14,3 +14,11 @@ export async function healthCheck(): Promise<unknown> {
 export async function closeApp(): Promise<void> {
   return invoke('close_app')
 }
+
+export async function getStartOnBoot(): Promise<boolean> {
+  return invoke<boolean>('get_start_on_boot')
+}
+
+export async function setStartOnBoot(enable: boolean): Promise<void> {
+  return invoke('set_start_on_boot', { enable })
+}

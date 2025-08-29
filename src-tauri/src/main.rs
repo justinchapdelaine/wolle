@@ -102,7 +102,7 @@ fn create_status_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> ta
         WebviewUrl::App("status.html".into())
     };
     let mut builder = WebviewWindowBuilder::new(app, "status", url)
-        .title("Wolle — Status")
+        .title("Wolle — Settings")
         .visible(visible)
         .inner_size(480.0, 360.0);
     #[cfg(target_os = "windows")]
@@ -143,7 +143,13 @@ fn main() {
                 let _ = win.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
+        .invoke_handler(tauri::generate_handler![
+            health_check,
+            run_action,
+            close_app,
+            get_start_on_boot,
+            set_start_on_boot
+        ])
         .setup(|app| {
             // Prepare hide-until-ready signaling BEFORE building the webview
             let shown = Arc::new(AtomicBool::new(false));
@@ -155,7 +161,7 @@ fn main() {
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
                 .separator()
-                .text("open_status", "Status/Settings")
+                .text("open_status", "Settings")
                 .text("show", "Show")
                 .text("quit", "Quit")
                 .build()?;
@@ -224,7 +230,13 @@ fn main() {
                 let _ = win.set_focus();
             }
         }))
-        .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
+        .invoke_handler(tauri::generate_handler![
+            health_check,
+            run_action,
+            close_app,
+            get_start_on_boot,
+            set_start_on_boot
+        ])
         .setup(|app| {
             // Prepare hide-until-ready signaling BEFORE building the webview
             let shown = Arc::new(AtomicBool::new(false));
@@ -269,5 +281,57 @@ fn close_app(window: tauri::WebviewWindow) -> Result<(), String> {
 fn close_app(window: tauri::WebviewWindow, app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
     let _ = window.close();
     app.exit(0);
+    Ok(())
+}
+
+// Settings: Run on Windows startup (HKCU\...\Run)
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn get_start_on_boot() -> Result<bool, String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    match hkcu.open_subkey(path) {
+        Ok(key) => match key.get_value::<String, _>("Wolle") {
+            Ok(val) => Ok(!val.trim().is_empty()),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(e.to_string()),
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn get_start_on_boot() -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn set_start_on_boot(enable: bool) -> Result<(), String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    let (key, _) = hkcu.create_subkey(path).map_err(|e| e.to_string())?;
+    if enable {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_str = format!("\"{}\"", exe.display());
+        key.set_value("Wolle", &exe_str).map_err(|e| e.to_string())
+    } else {
+        match key.delete_value("Wolle") {
+            Ok(_) => Ok(()),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn set_start_on_boot(_enable: bool) -> Result<(), String> {
     Ok(())
 }
