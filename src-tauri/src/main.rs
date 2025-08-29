@@ -22,16 +22,7 @@ fn is_light_theme() -> bool {
     true
 }
 
-/// Decide which URL the webview should load:
-/// - Dev: Vite dev server
-/// - Release: bundled `index.html`
-fn resolve_url() -> WebviewUrl {
-    if cfg!(debug_assertions) {
-        WebviewUrl::External("http://localhost:5173".parse().unwrap())
-    } else {
-        WebviewUrl::App("index.html".into())
-    }
-}
+//
 
 /// Compute a native-looking background color for the window based on OS theme (Windows only).
 #[cfg(target_os = "windows")]
@@ -165,7 +156,7 @@ fn main() {
             let menu = tauri::menu::MenuBuilder::new(app)
                 .text("status", "Checking Ollama...")
                 .separator()
-                .text("open_status", "Settings")
+                .text("open_settings", "Settings")
                 .text("show", "Show")
                 .text("quit", "Quit")
                 .build()?;
@@ -178,7 +169,7 @@ fn main() {
                 "quit" => {
                     std::process::exit(0);
                 }
-                "open_status" => {
+                "open_settings" => {
                     if let Some(win) = app_handle.get_webview_window("status") {
                         let _ = win.show();
                         let _ = win.set_focus();
