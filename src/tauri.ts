@@ -10,3 +10,7 @@ export async function runAction(action: Action, input: string): Promise<string> 
 export async function healthCheck(): Promise<unknown> {
   return invoke('health_check')
 }
+
+export async function closeApp(): Promise<void> {
+  return invoke('close_app')
+}

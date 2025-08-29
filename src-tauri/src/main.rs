@@ -46,7 +46,7 @@ fn main() {
 
     // We create the window and the tray during setup so we can use the App as the Manager
     tauri::Builder::<tauri::Wry>::new()
-        .invoke_handler(tauri::generate_handler![health_check, run_action])
+        .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
             // Determine URL (Vite dev server in debug; bundled index.html in release)
             let url = if cfg!(debug_assertions) {
@@ -68,9 +68,7 @@ fn main() {
                 };
                 builder = builder.background_color(bg);
             }
-            builder.build()?;
-
-            // Hide-until-ready: show when frontend signals readiness, with a 500ms safety fallback
+            // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
             use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
             let shown = Arc::new(AtomicBool::new(false));
             let shown_for_event = shown.clone();
@@ -83,6 +81,21 @@ fn main() {
                     }
                 }
             });
+
+            // Also listen for a frontend request to close (e.g., Esc key)
+            let app_for_close = app.handle().clone();
+            app.listen("request-close", move |_e| {
+                if let Some(window) = app_for_close.get_webview_window("main") {
+                    let _ = window.close();
+                }
+            });
+
+            // Create the window after listener is registered
+            builder.build()?;
+
+            // No window-level menu; Esc close is handled by the frontend invoking `close_app`.
+
+
 
             // Safety timeout: ensure the window appears even if the event is missed
             let shown_for_timer = shown.clone();
@@ -146,7 +159,7 @@ fn main() {
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
     tauri::Builder::<tauri::Wry>::new()
-        .invoke_handler(tauri::generate_handler![health_check, run_action])
+        .invoke_handler(tauri::generate_handler![health_check, run_action, close_app])
         .setup(|app| {
             let url = if cfg!(debug_assertions) {
                 WebviewUrl::External("http://localhost:5173".parse().unwrap())
@@ -166,9 +179,7 @@ fn main() {
                 };
                 builder = builder.background_color(bg);
             }
-            builder.build()?;
-
-            // Hide-until-ready: show when frontend signals readiness, with a 500ms safety fallback
+            // Prepare hide-until-ready signaling BEFORE the webview loads to avoid races
             use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
             let shown = Arc::new(AtomicBool::new(false));
             let shown_for_event = shown.clone();
@@ -181,6 +192,21 @@ fn main() {
                     }
                 }
             });
+
+            // Also listen for a frontend request to close (e.g., Esc key)
+            let app_for_close = app.handle().clone();
+            app.listen("request-close", move |_e| {
+                if let Some(window) = app_for_close.get_webview_window("main") {
+                    let _ = window.close();
+                }
+            });
+
+            // Create the window after listener is registered
+            builder.build()?;
+
+            // No window-level menu; Esc close is handled by the frontend invoking `close_app`.
+
+
 
             // Safety timeout: ensure the window appears even if the event is missed
             let shown_for_timer = shown.clone();
@@ -216,4 +242,15 @@ fn run_action(action: String, input: String) -> Result<String, String> {
     // Build a prompt using the helper and forward to ollama
     let prompt = utils::format_prompt(&action, &input);
     ollama::query(&prompt).map_err(|e| format!("{}", e))
+}
+
+#[tauri::command]
+fn close_app(app: tauri::AppHandle<tauri::Wry>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.close().map_err(|e| e.to_string())
+    } else {
+        // If the window isn't found, exit the app as a fallback
+        app.exit(0);
+        Ok(())
+    }
 }

@@ -1,7 +1,7 @@
 import { el } from './dom'
 import { actions, type Action, runAction, healthCheck } from './tauri'
 import { emit } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { closeApp } from './tauri'
 import {
   provideFluentDesignSystem,
   allComponents,
@@ -46,6 +46,20 @@ function init(): void {
     )
   }
 
+  // Ensure Escape closes the window from the frontend as well (belt-and-suspenders)
+  // Listen at capture phase so inner components can't swallow it.
+  window.addEventListener(
+    'keydown',
+    (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault()
+        ev.stopImmediatePropagation()
+        void closeApp().catch((e) => console.warn('Failed to close app:', e))
+      }
+    },
+    { capture: true }
+  )
+
   // Emit readiness early: tokens and container are set, so reveal is safe to avoid flicker.
   void emit('frontend-ready')
 
@@ -55,6 +69,7 @@ function init(): void {
     'Checking Ollama...'
   )
   const inputLabel = el('label', { id: 'input-label' }, 'Prompt')
+  // (Esc-to-close handled natively in Rust; no frontend handler needed)
   const input = document.createElement('fluent-text-area')
   input.setAttribute('id', 'input')
   input.setAttribute('aria-labelledby', 'input-label')
@@ -75,6 +90,7 @@ function init(): void {
   runBtn.textContent = 'Run'
   const spinner = document.createElement('fluent-progress-ring')
   spinner.setAttribute('aria-hidden', 'true')
+  spinner.style.visibility = 'hidden'
   const outputLabel = el(
     'div',
     { id: 'output-label', role: 'heading', 'aria-level': '2' },
@@ -144,6 +160,14 @@ function init(): void {
   input.addEventListener('input', updateRunEnabled)
   updateRunEnabled()
 
+  // Make sure the document/input gains focus when the window is focused or made visible
+  window.addEventListener('focus', () => {
+    input.focus()
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') input.focus()
+  })
+
   // Theme responsiveness: follow OS light/dark and update luminance token dynamically
   const applyLuminance = () => {
     const mode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
@@ -169,18 +193,7 @@ function init(): void {
 
   // (ready emitted earlier to make reveal faster)
 
-  // Close affordance: Esc closes the window unless focused element is in a context where
-  // the user expects Escape to be handled differently. Here we allow Esc globally, but
-  // we ignore cases where a native popup could be open (none in our UI) to keep it simple.
-  document.addEventListener('keydown', (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape') {
-      ev.preventDefault()
-      // Fire-and-forget; handle errors without making the handler async
-      void getCurrentWindow()
-        .close()
-        .catch((e) => console.warn('Failed to close window:', e))
-    }
-  })
+  // (Esc handled natively in Rust; no frontend handler here)
 }
 
 // Minimal DOM-ready fallback: if #app is missing while the document is still loading,
