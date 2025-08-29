@@ -12,6 +12,7 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "tauri:dev": "tauri dev",
+    "tauri:dev:tray": "tauri dev -- --features tray",
     "tauri:build": "tauri build -- --features tray",
     "tauri:build:notray": "tauri build",
     "preflight:webview2": "powershell -ExecutionPolicy Bypass -File ./tools/webview2-preflight.ps1",

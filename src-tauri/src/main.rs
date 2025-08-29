@@ -4,7 +4,11 @@ use serde::Serialize;
 mod ollama;
 mod utils;
 use tracing_subscriber::{fmt, EnvFilter};
-use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager, Listener, WindowEvent};
+use tauri::{window::Color, WebviewUrl, WebviewWindowBuilder, Manager};
+#[cfg(not(feature = "tray"))]
+use tauri::Listener;
+#[cfg(feature = "tray")]
+use tauri::WindowEvent;
 /// Returns true if Windows is using light app mode. Defaults to light on lookup failure.
 #[cfg(target_os = "windows")]
 fn is_light_theme() -> bool {
@@ -34,12 +38,35 @@ fn resolve_bg() -> Color {
     }
 }
 
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+#[cfg(not(feature = "tray"))]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::io::Cursor;
+
+fn icon_from_ico_best_fit(desired: u32) -> Option<tauri::image::Image<'static>> {
+    let ico_bytes = include_bytes!("../../icons/icon.ico");
+    let dir = ico::IconDir::read(Cursor::new(ico_bytes)).ok()?;
+    let entry = dir
+        .entries()
+        .iter()
+        .min_by_key(|e| {
+            let size = u32::from(e.width().max(e.height()));
+            if size >= desired { size - desired } else { desired - size }
+        })?;
+    let img = entry.decode().ok()?;
+    let (w, h) = (img.width() as u32, img.height() as u32);
+    let boxed: Box<[u8]> = img.rgba_data().to_vec().into_boxed_slice();
+    let leaked: &'static mut [u8] = Box::leak(boxed);
+    Some(tauri::image::Image::new(leaked, w, h))
+}
 
 /// Wire "hide-until-ready" behavior:
 /// - Listens for the frontend "frontend-ready" event and shows/focuses once.
 /// - Adds a 250ms safety timer to reveal if the event is missed.
 /// This should be called before creating the window to avoid races.
+#[cfg(not(feature = "tray"))]
 fn wire_hide_until_ready(app: &tauri::AppHandle<tauri::Wry>, shown: &Arc<AtomicBool>) {
     let shown_for_event = Arc::clone(shown);
     let app_for_event = app.clone();
@@ -82,10 +109,16 @@ fn create_main_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> taur
     {
         builder = builder.background_color(resolve_bg());
     }
-    builder.build().map(|_| ())
+    let win = builder.build()?;
+    // Prefer a crisp small icon for the title bar (Windows uses 16px there)
+    if let Some(img) = icon_from_ico_best_fit(16) {
+        let _ = win.set_icon(img);
+    }
+    Ok(())
 }
 
 /// Create the secondary "status" window.
+#[cfg(feature = "tray")]
 fn create_status_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> tauri::Result<()> {
     let url = if cfg!(debug_assertions) {
         WebviewUrl::External("http://localhost:5173/status.html".parse().unwrap())
@@ -100,7 +133,11 @@ fn create_status_window(app: &tauri::AppHandle<tauri::Wry>, visible: bool) -> ta
     {
         builder = builder.background_color(resolve_bg());
     }
-    builder.build().map(|_| ())
+    let win = builder.build()?;
+    if let Some(img) = icon_from_ico_best_fit(16) {
+        let _ = win.set_icon(img);
+    }
+    Ok(())
 }
 
 // Use the concrete runtime type from the wry runtime crate.
@@ -124,7 +161,7 @@ fn main() {
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
     use std::thread;
-    use tauri::Manager;
+    // Manager trait already imported at module level
 
     // We create the window and the tray during setup so we can use the App as the Manager
     tauri::Builder::<tauri::Wry>::new()
@@ -161,8 +198,29 @@ fn main() {
                 .text("quit", "Quit")
                 .build()?;
 
-            // Create the tray icon with the menu. Icon is optional here.
+            // Create the tray icon with the menu.
             let tray = tauri::tray::TrayIconBuilder::new().menu(&menu).build(app)?;
+
+            // Explicitly set the tray icon from the bundled icon.ico to keep one source of truth.
+            // We pick the smallest available image (closest to 16x16) for a crisp tray.
+            let ico_bytes = include_bytes!("../../icons/icon.ico");
+            if let Ok(icon) = ico::IconDir::read(std::io::Cursor::new(ico_bytes)) {
+                // Choose the smallest image available.
+                if let Some(entry) = icon.entries().iter().min_by_key(|e| e.width().max(e.height())) {
+                    if let Ok(img) = entry.decode() {
+                        let (w, h) = (img.width(), img.height());
+                        let rgba = img.rgba_data();
+                        // Provide a stable reference; this leaks a tiny buffer (<= 16*16*4 bytes) once per run.
+                        let boxed: Box<[u8]> = rgba.to_vec().into_boxed_slice();
+                        let leaked: &'static mut [u8] = Box::leak(boxed);
+                        let _ = tray.set_icon(Some(tauri::image::Image::new(
+                            leaked,
+                            w as u32,
+                            h as u32,
+                        )));
+                    }
+                }
+            }
 
             // Register menu event handler
             tray.on_menu_event(|app_handle, event| match event.id().as_ref() {

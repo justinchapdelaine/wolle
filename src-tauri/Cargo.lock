@@ -5308,6 +5308,7 @@ name = "wolle-tauri"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ico",
  "once_cell",
  "reqwest",
  "serde",

@@ -9,6 +9,6 @@
     "beforeDevCommand": "npm run dev"
   },
   "bundle": {
-    "icon": ["../icons/tray.ico"]
+    "icon": ["../icons/icon.ico"]
   }
 }
