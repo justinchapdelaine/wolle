@@ -6,10 +6,14 @@ import {
   healthCheck,
   type CliContext,
   type NormalizedPreview,
+  ingestPayload,
+  quickAnalyze,
+  takeLastPayload,
 } from './tauri'
-import { emit } from '@tauri-apps/api/event'
-import { listen } from '@tauri-apps/api/event'
-import { ingestPayload, quickAnalyze, takeLastPayload } from './tauri'
+import { emit, listen } from '@tauri-apps/api/event'
+import { setStatusText } from './a11y'
+import { copyToClipboard } from './clipboard'
+import { emitUiStatus } from './events'
 import { setupFluentBase, wireEscToClose } from './ui'
 
 function init(): void {
@@ -37,14 +41,7 @@ function init(): void {
     // Swallow in tests/jsdom, but leave a breadcrumb for devs
     if (typeof console !== 'undefined') console.debug('emit(frontend-ready) failed', err)
   })
-  // Helper to broadcast UI status to the Debug window
-  const ui = async (msg: string, data?: unknown) => {
-    try {
-      await emit('ui-status', { msg, data })
-    } catch {
-      /* ignore in tests */
-    }
-  }
+  const ui = emitUiStatus
   void ui('init')
 
   const status = el(
@@ -200,37 +197,10 @@ function init(): void {
   }
   updateCopyEnabled()
 
-  // Clipboard copy with graceful fallbacks and announcement
   const copyOutput = async () => {
     const text = output.textContent ?? ''
-    if (!text.trim()) {
-      live.textContent = 'Nothing to copy'
-      return
-    }
-    try {
-      if (
-        typeof navigator !== 'undefined' &&
-        navigator.clipboard &&
-        typeof (navigator.clipboard as unknown as { writeText?: unknown }).writeText === 'function'
-      ) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        // Fallback to hidden textarea
-        const ta = document.createElement('textarea')
-        ta.value = text
-        ta.setAttribute('readonly', '')
-        ta.style.position = 'absolute'
-        ta.style.left = '-9999px'
-        document.body.appendChild(ta)
-        ta.select()
-        const ok = document.execCommand('copy')
-        document.body.removeChild(ta)
-        if (!ok) throw new Error('execCommand copy failed')
-      }
-      live.textContent = 'Copied to clipboard'
-    } catch {
-      live.textContent = 'Copy failed'
-    }
+    const ok = await copyToClipboard(text)
+    live.textContent = ok ? 'Copied to clipboard' : text.trim() ? 'Copy failed' : 'Nothing to copy'
   }
   copyBtn.addEventListener('click', () => {
     void copyOutput()
@@ -249,9 +219,9 @@ function init(): void {
   async function check() {
     try {
       const res = await healthCheck()
-      status.textContent = res.message
+      setStatusText(status, res.message)
     } catch (e) {
-      status.textContent = 'Ollama not reachable: ' + (e instanceof Error ? e.message : String(e))
+      setStatusText(status, 'Ollama not reachable: ' + (e instanceof Error ? e.message : String(e)))
     }
   }
 
@@ -270,10 +240,19 @@ function init(): void {
     source: 'event' | 'pending' | 'poll'
   ): Promise<void> => {
     try {
-      status.textContent = `${source === 'event' ? 'Context received' : source === 'pending' ? 'Pending payload found' : 'Pending payload (polled)'} → ingesting…`
+      setStatusText(
+        status,
+        `${
+          source === 'event'
+            ? 'Context received'
+            : source === 'pending'
+              ? 'Pending payload found'
+              : 'Pending payload (polled)'
+        } → ingesting…`
+      )
       void ui('ingest-start')
       const preview: NormalizedPreview = await ingestPayload(ctx)
-      status.textContent = 'Ingested → analyzing…'
+      setStatusText(status, 'Ingested → analyzing…')
       void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
       anaPre.textContent = '(working…)'
       anaSpinner.style.visibility = 'visible'
@@ -282,13 +261,16 @@ function init(): void {
       const analysis = await quickAnalyze(ctx)
       anaPre.textContent = analysis || '(no analysis)'
       anaSpinner.style.visibility = 'hidden'
-      status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+      setStatusText(
+        status,
+        `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+      )
       void ui('analyze-done')
       input.focus()
     } catch (e) {
       console.warn('Failed to process payload', e)
       const msg = e instanceof Error ? e.message : String(e)
-      status.textContent = 'Failed during ingest/analyze: ' + msg
+      setStatusText(status, 'Failed during ingest/analyze: ' + msg)
       void ui('error', msg)
       anaSpinner.style.visibility = 'hidden'
     }
@@ -307,6 +289,8 @@ function init(): void {
         const ctx = ev.payload
         await processPayload(ctx, 'event')
       })()
+    }).catch((err) => {
+      if (typeof console !== 'undefined') console.debug('listen(load-context) failed', err)
     })
   } catch (err) {
     // In tests/jsdom, @tauri-apps/api/event may not be available; ignore.
@@ -365,7 +349,7 @@ function init(): void {
   // If neither event nor pending payload arrives, leave a hint status
   setTimeout(() => {
     if ((status.textContent ?? '').toLowerCase().includes('reachable')) {
-      status.textContent = 'Waiting for payload…'
+      setStatusText(status, 'Waiting for payload…')
       void ui('waiting-for-payload')
     }
   }, 250)
