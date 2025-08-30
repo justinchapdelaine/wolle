@@ -2,7 +2,7 @@ import { el } from './dom'
 import {
   actions,
   type Action,
-  runAction,
+  runActionStream,
   healthCheck,
   type CliContext,
   type NormalizedPreview,
@@ -61,6 +61,12 @@ function init(): void {
   anaSpinner.style.verticalAlign = 'middle'
   anaSpinner.style.visibility = 'hidden'
   anaSummary.appendChild(anaSpinner)
+  const anaCancelBtn = document.createElement('fluent-button')
+  anaCancelBtn.id = 'analysis-cancel'
+  anaCancelBtn.textContent = 'Cancel'
+  anaCancelBtn.style.marginLeft = '8px'
+  anaCancelBtn.style.visibility = 'hidden'
+  anaSummary.appendChild(anaCancelBtn)
   const anaPre = document.createElement('pre')
   anaPre.id = 'analysis-preview'
   anaDetails.append(anaSummary, anaPre)
@@ -88,6 +94,11 @@ function init(): void {
   const spinner = document.createElement('fluent-progress-ring')
   spinner.setAttribute('aria-hidden', 'true')
   spinner.style.visibility = 'hidden'
+  const runCancelBtn = document.createElement('fluent-button')
+  runCancelBtn.id = 'run-cancel'
+  runCancelBtn.textContent = 'Cancel'
+  runCancelBtn.style.marginLeft = '8px'
+  runCancelBtn.style.visibility = 'hidden'
   const outputLabel = el(
     'div',
     { id: 'output-label', role: 'heading', 'aria-level': '2' },
@@ -118,33 +129,101 @@ function init(): void {
     return (actions as readonly string[]).includes(value)
   }
 
+  // Debounce helpers for streaming append
+  let runCancelRequested = false
+  let runBuffer = ''
+  let runFlushTimer: number | null = null
+  let runLastFlush = 0
+  const flushRunBuffer = () => {
+    if (runBuffer) {
+      const cur = output.textContent ?? ''
+      output.textContent = cur + runBuffer
+      runBuffer = ''
+      updateCopyEnabled()
+    }
+    if (runFlushTimer !== null) {
+      clearTimeout(runFlushTimer)
+      runFlushTimer = null
+    }
+    runLastFlush = performance.now()
+  }
   async function handleRunClick(): Promise<void> {
-    output.textContent = 'Running...'
+    output.textContent = ''
     runBtn.disabled = true
     copyBtn.disabled = true
     spinner.style.visibility = 'visible'
+    runCancelBtn.style.visibility = 'visible'
+    runCancelRequested = false
     const selected = actionSelect.value
     if (!isAction(selected)) {
       output.textContent = 'Error: Unknown action selected.'
       runBtn.disabled = false
+      spinner.style.visibility = 'hidden'
+      runCancelBtn.style.visibility = 'hidden'
       return
     }
     const action: Action = selected
     const text = input.value
     try {
-      const res = await runAction(action, text)
-      output.textContent = res
+      await runActionStream(action, text, ({ chunk, done }) => {
+        if (runCancelRequested) return
+        if (chunk) {
+          runBuffer += chunk
+          const now = performance.now()
+          if (now - runLastFlush >= 50) {
+            flushRunBuffer()
+          } else {
+            runFlushTimer ??= window.setTimeout(() => {
+              flushRunBuffer()
+            }, 50)
+          }
+        }
+        if (done) {
+          flushRunBuffer()
+          spinner.style.visibility = 'hidden'
+          runCancelBtn.style.visibility = 'hidden'
+          runBtn.disabled = false
+          updateCopyEnabled()
+        }
+      })
     } catch (e) {
       output.textContent = 'Error: ' + (e instanceof Error ? e.message : String(e))
     } finally {
+      // If user canceled, reflect that
+      if (runCancelRequested) {
+        spinner.style.visibility = 'hidden'
+        runCancelBtn.style.visibility = 'hidden'
+        // Mark output as canceled only if nothing was produced
+        if ((output.textContent ?? '').trim().length === 0) {
+          output.textContent = '(canceled)'
+        }
+      }
       runBtn.disabled = false
-      spinner.style.visibility = 'hidden'
       updateCopyEnabled()
     }
   }
 
   runBtn.addEventListener('click', () => {
     void handleRunClick()
+  })
+
+  // Cancel the running action: stop appending further chunks and restore UI
+  runCancelBtn.addEventListener('click', () => {
+    runCancelRequested = true
+    // Clear any pending buffered text and cancel scheduled flush
+    runBuffer = ''
+    if (runFlushTimer !== null) {
+      clearTimeout(runFlushTimer)
+      runFlushTimer = null
+    }
+    runLastFlush = performance.now()
+    spinner.style.visibility = 'hidden'
+    runCancelBtn.style.visibility = 'hidden'
+    if ((output.textContent ?? '').trim().length === 0) {
+      output.textContent = '(canceled)'
+    }
+    runBtn.disabled = false
+    updateCopyEnabled()
   })
 
   // Focus prompt on open for quick typing
@@ -163,7 +242,7 @@ function init(): void {
   })
 
   const controlsRow = el('div', { id: 'controls' })
-  controlsRow.append(actionSelect, runBtn, spinner)
+  controlsRow.append(actionSelect, runBtn, spinner, runCancelBtn)
 
   // Layout spacing intentionally minimal; Fluent density token provides compact controls.
 
@@ -259,23 +338,70 @@ function init(): void {
       anaSpinner.style.visibility = 'visible'
       anaDetails.open = true
       void ui('analyze-start')
-      // Streamed analysis via IPC Channel: append chunks as received
+      // Streamed analysis via IPC Channel with cancel + debounced DOM updates
       let initial = true
-      await quickAnalyzeStream(ctx, ({ chunk, done }) => {
-        if (chunk) {
+      let analysisCancelRequested = false
+      let analysisBuffer = ''
+      let analysisFlushTimer: number | null = null
+      let analysisLastFlush = 0
+      const flushAnalysisBuffer = () => {
+        if (analysisBuffer) {
           if (initial && anaPre.textContent === '(working…)') anaPre.textContent = ''
-          anaPre.textContent += chunk
+          const cur = anaPre.textContent ?? ''
+          anaPre.textContent = cur + analysisBuffer
+          analysisBuffer = ''
           initial = false
         }
+        if (analysisFlushTimer !== null) {
+          clearTimeout(analysisFlushTimer)
+          analysisFlushTimer = null
+        }
+        analysisLastFlush = performance.now()
+      }
+      anaSpinner.style.visibility = 'visible'
+      anaCancelBtn.style.visibility = 'visible'
+      const cancelHandler = () => {
+        analysisCancelRequested = true
+        // Clear any pending buffered text and cancel scheduled flush
+        analysisBuffer = ''
+        if (analysisFlushTimer !== null) {
+          clearTimeout(analysisFlushTimer)
+          analysisFlushTimer = null
+        }
+        anaSpinner.style.visibility = 'hidden'
+        anaCancelBtn.style.visibility = 'hidden'
+        if ((anaPre.textContent ?? '').trim().length === 0) anaPre.textContent = '(canceled)'
+      }
+      anaCancelBtn.addEventListener('click', cancelHandler, { once: true })
+      await quickAnalyzeStream(ctx, ({ chunk, done }) => {
+        if (analysisCancelRequested) return
+        if (chunk) {
+          analysisBuffer += chunk
+          const now = performance.now()
+          if (now - analysisLastFlush >= 50) {
+            flushAnalysisBuffer()
+          } else {
+            analysisFlushTimer ??= window.setTimeout(() => {
+              flushAnalysisBuffer()
+            }, 50)
+          }
+        }
         if (done) {
+          flushAnalysisBuffer()
           anaSpinner.style.visibility = 'hidden'
+          anaCancelBtn.style.visibility = 'hidden'
         }
       })
-      setStatusText(
-        status,
-        `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
-      )
-      void ui('analyze-done')
+      if (analysisCancelRequested) {
+        setStatusText(status, 'Analysis canceled')
+        void ui('analyze-cancelled')
+      } else {
+        setStatusText(
+          status,
+          `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+        )
+        void ui('analyze-done')
+      }
       input.focus()
     } catch (e) {
       console.warn('Failed to process payload', e)
@@ -283,6 +409,7 @@ function init(): void {
       setStatusText(status, 'Failed during ingest/analyze: ' + msg)
       void ui('error', msg)
       anaSpinner.style.visibility = 'hidden'
+      anaCancelBtn.style.visibility = 'hidden'
     }
   }
 

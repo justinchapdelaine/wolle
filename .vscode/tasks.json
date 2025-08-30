@@ -6,6 +6,18 @@
       "type": "shell",
       "command": "npm ci",
       "group": "build"
+    },
+    {
+      "label": "npm-checks",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "npm run check ; npm run test -s"
+      ]
     }
   ]
 }

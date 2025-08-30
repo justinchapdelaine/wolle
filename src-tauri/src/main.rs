@@ -411,6 +411,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             health_check,
             run_action,
+            run_action_stream,
             quick_analyze,
             quick_analyze_stream,
             test_ollama,
@@ -598,6 +599,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             health_check,
             run_action,
+            run_action_stream,
             quick_analyze,
             quick_analyze_stream,
             test_ollama,
@@ -656,6 +658,34 @@ async fn run_action(action: String, input: String) -> Result<String, String> {
     .await
     .map_err(|e| format!("join error: {}", e))?;
     res
+}
+
+/// Stream the Run action output via IPC channel for smooth UI updates.
+#[tauri::command]
+async fn run_action_stream(
+    action: String,
+    input: String,
+    channel: tauri::ipc::Channel<StreamChunk>,
+) -> Result<(), String> {
+    // Offload potentially blocking work to a background thread
+    tauri::async_runtime::spawn_blocking(move || {
+        let prompt = utils::format_prompt(&action, &input);
+        let res = crate::ollama::query_stream(&prompt, |s| {
+            let _ = channel.send(StreamChunk { chunk: s.to_string(), done: false });
+        });
+        match res {
+            Ok(()) => {
+                let _ = channel.send(StreamChunk { chunk: String::new(), done: true });
+                Ok(())
+            }
+            Err(e) => {
+                let _ = channel.send(StreamChunk { chunk: format!("[error] {}", e), done: true });
+                Err(e.to_string())
+            }
+        }
+    })
+    .await
+    .map_err(|e| format!("join error: {}", e))?
 }
 
 #[tauri::command]
