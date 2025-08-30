@@ -1,0 +1,12 @@
+{
+  "identifier": "main",
+  "name": "Main UI capabilities",
+  "description": "Permissions required for the app UI windows to communicate via events and invoke commands.",
+  "windows": ["main", "debug", "status"],
+  "permissions": [
+    "core:default",
+    "event:default",
+    { "identifier": "event:allow-listen", "allow": ["ui-status", "frontend-ready", "load-context"] },
+    { "identifier": "event:allow-emit", "allow": ["ui-status", "frontend-ready", "load-context"] }
+  ]
+}

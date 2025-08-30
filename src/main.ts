@@ -1,6 +1,14 @@
 import { el } from './dom'
 import { actions, type Action, runAction, healthCheck, closeApp } from './tauri'
 import { emit } from '@tauri-apps/api/event'
+import { listen } from '@tauri-apps/api/event'
+import {
+  ingestPayload,
+  quickAnalyze,
+  takeLastPayload,
+  type CliContext,
+  type NormalizedPreview,
+} from './tauri'
 import {
   provideFluentDesignSystem,
   allComponents,
@@ -70,12 +78,37 @@ function init(): void {
     // Swallow in tests/jsdom, but leave a breadcrumb for devs
     if (typeof console !== 'undefined') console.debug('emit(frontend-ready) failed', err)
   })
+  // Helper to broadcast UI status to the Debug window
+  const ui = async (msg: string, data?: unknown) => {
+    try {
+      await emit('ui-status', { msg, data })
+    } catch {
+      /* ignore in tests */
+    }
+  }
+  void ui('init')
 
   const status = el(
     'div',
     { id: 'status', role: 'status', 'aria-live': 'polite' },
     'Checking Ollama...'
   )
+  // Collapsible analysis panel (replaces plain source preview)
+  const anaDetails = document.createElement('details')
+  anaDetails.id = 'analysis'
+  const anaSummary = document.createElement('summary')
+  anaSummary.textContent = 'Analysis'
+  const anaSpinner = document.createElement('fluent-progress-ring')
+  anaSpinner.id = 'analysis-spinner'
+  anaSpinner.style.marginLeft = '8px'
+  anaSpinner.style.verticalAlign = 'middle'
+  anaSpinner.style.visibility = 'hidden'
+  anaSummary.appendChild(anaSpinner)
+  const anaPre = document.createElement('pre')
+  anaPre.id = 'analysis-preview'
+  anaDetails.append(anaSummary, anaPre)
+  // Open by default so users can see analysis status/content
+  anaDetails.open = true
   const inputLabel = el('label', { id: 'input-label' }, 'Prompt')
   const input = document.createElement('fluent-text-area')
   input.setAttribute('id', 'input')
@@ -181,7 +214,17 @@ function init(): void {
   const outputHeader = el('div', { id: 'output-header' })
   outputHeader.append(outputLabel, copyBtn)
 
-  app.append(status, inputLabel, input, actionLabel, controlsRow, outputHeader, output, live)
+  app.append(
+    status,
+    anaDetails,
+    inputLabel,
+    input,
+    actionLabel,
+    controlsRow,
+    outputHeader,
+    output,
+    live
+  )
 
   // Disable Run when input is empty
   const updateRunEnabled = () => {
@@ -268,6 +311,130 @@ function init(): void {
   // (ready emitted earlier to make reveal faster)
 
   // (Esc handled natively in Rust; no frontend handler here)
+
+  // Accept load-context events from single-instance launches.
+  // Wrap in try/catch so tests (no Tauri internals) don't hard-fail.
+  try {
+    console.debug('registering load-context listener')
+    void ui('listener-registered')
+    void listen<CliContext>('load-context', (ev) => {
+      // Wrap async work to avoid returning a Promise from the listener callback
+      void (async () => {
+        console.debug('load-context event received', ev)
+        void ui('event-received')
+        try {
+          status.textContent = 'Context received → ingesting…'
+          void ui('ingest-start')
+          const ctx = ev.payload
+          // Optionally still compute preview to show kind/count
+          const preview: NormalizedPreview = await ingestPayload(ctx)
+          status.textContent = 'Ingested → analyzing…'
+          void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
+          anaPre.textContent = '(working…)'
+          anaSpinner.style.visibility = 'visible'
+          anaDetails.open = true
+          // Perform quick analysis (non-streaming MVP)
+          void ui('analyze-start')
+          const analysis = await quickAnalyze(ctx)
+          anaPre.textContent = analysis || '(no analysis)'
+          anaSpinner.style.visibility = 'hidden'
+          status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+          void ui('analyze-done')
+          input.focus()
+        } catch (e) {
+          console.warn('Failed to handle load-context', e)
+          const msg = e instanceof Error ? e.message : String(e)
+          status.textContent = 'Failed during ingest/analyze: ' + msg
+          void ui('error', msg)
+          anaSpinner.style.visibility = 'hidden'
+        }
+      })()
+    })
+  } catch (err) {
+    // In tests/jsdom, @tauri-apps/api/event may not be available; ignore.
+    if (typeof console !== 'undefined') console.debug('listen(load-context) skipped', err)
+  }
+
+  // Fallback: if a payload was stored before our listener registered, pull and handle it once.
+  void (async () => {
+    try {
+      const pending = await takeLastPayload()
+      if (pending) {
+        status.textContent = 'Pending payload found → ingesting…'
+        void ui('ingest-start')
+        const preview: NormalizedPreview = await ingestPayload(pending)
+        status.textContent = 'Ingested → analyzing…'
+        void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
+        anaPre.textContent = '(working…)'
+        anaSpinner.style.visibility = 'visible'
+        anaDetails.open = true
+        void ui('analyze-start')
+        const analysis = await quickAnalyze(pending)
+        anaPre.textContent = analysis || '(no analysis)'
+        anaSpinner.style.visibility = 'hidden'
+        status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+        void ui('analyze-done')
+        input.focus()
+      }
+    } catch (e) {
+      console.warn('Failed to fetch pending payload', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      void ui('error', msg)
+    }
+  })()
+
+  // Additional safety: poll for pending payloads periodically since front-end event listening
+  // may be restricted by ACL in some environments. Stop after handling once or after a timeout.
+  let pollHandled = false
+  let pollTries = 0
+  const handlePendingOnce = async () => {
+    if (pollHandled) return
+    try {
+      const pending = await takeLastPayload()
+      if (pending) {
+        pollHandled = true
+        status.textContent = 'Pending payload (polled) → ingesting…'
+        const preview: NormalizedPreview = await ingestPayload(pending)
+        status.textContent = 'Ingested → analyzing…'
+        anaPre.textContent = '(working…)'
+        anaSpinner.style.visibility = 'visible'
+        anaDetails.open = true
+        const analysis = await quickAnalyze(pending)
+        anaPre.textContent = analysis || '(no analysis)'
+        anaSpinner.style.visibility = 'hidden'
+        status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+        input.focus()
+        return true
+      }
+    } catch (e) {
+      console.warn('Polling takeLastPayload failed', e)
+    }
+    return false
+  }
+  const pollId = setInterval(() => {
+    pollTries++
+    void (async () => {
+      const done = await handlePendingOnce()
+      if (done || pollTries > 120) {
+        clearInterval(pollId)
+      }
+    })()
+  }, 1000)
+  // Opportunistic check on focus/visibility changes
+  window.addEventListener('focus', () => {
+    void handlePendingOnce()
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void handlePendingOnce()
+  })
+
+  // If neither event nor pending payload arrives, leave a hint status
+  setTimeout(() => {
+    if ((status.textContent ?? '').toLowerCase().includes('reachable')) {
+      status.textContent = 'Waiting for payload…'
+      void ui('waiting-for-payload')
+    }
+  }, 250)
 }
 
 // Minimal DOM-ready fallback: if #app is missing while the document is still loading,

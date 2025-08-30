@@ -14,12 +14,43 @@
   <body>
     <div id="app"></div>
     <style>
-      :root { color-scheme: light dark; --accent-base-color:#2563eb; --control-corner-radius:6px; --body-font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif; --wolle-body-bg:#fff; --wolle-body-fg:#111; }
-      @media (prefers-color-scheme: dark) { :root { --base-layer-luminance:0.15; --accent-base-color:#60a5fa; --wolle-body-bg:#111; --wolle-body-fg:#eee; } }
-      @media (prefers-color-scheme: light) { :root { --base-layer-luminance:1; --accent-base-color:#2563eb; --wolle-body-bg:#fff; --wolle-body-fg:#111; } }
-      html, body { height: 100%; }
-      body { background-color: var(--wolle-body-bg); color: var(--wolle-body-fg); margin: 0; font-family: var(--body-font); }
+      :root {
+        color-scheme: light dark;
+        --accent-base-color: #2563eb;
+        --control-corner-radius: 6px;
+        --body-font:
+          system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji',
+          'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+        --wolle-body-bg: #fff;
+        --wolle-body-fg: #111;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --base-layer-luminance: 0.15;
+          --accent-base-color: #60a5fa;
+          --wolle-body-bg: #111;
+          --wolle-body-fg: #eee;
+        }
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --base-layer-luminance: 1;
+          --accent-base-color: #2563eb;
+          --wolle-body-bg: #fff;
+          --wolle-body-fg: #111;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background-color: var(--wolle-body-bg);
+        color: var(--wolle-body-fg);
+        margin: 0;
+        font-family: var(--body-font);
+      }
     </style>
     <script type="module" src="/src/action.ts"></script>
   </body>
-  </html>
+</html>

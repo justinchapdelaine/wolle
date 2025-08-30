@@ -57,14 +57,20 @@ pub fn health() -> Result<String> {
 }
 
 pub fn query(prompt: &str) -> Result<String> {
-    // Minimal MVP: call Ollama REST API generate endpoint with timeouts
+    // Call Ollama REST API generate endpoint with timeouts and non-streaming response
     let client = Client::builder()
-        .connect_timeout(Duration::from_millis(800))
-        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(180))
         .build()?;
 
-    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "max_tokens": 256 });
-    debug!("sending generate request to ollama");
+    // stream=false ensures a single JSON object response instead of a line stream
+    let body = serde_json::json!({
+        "model": "gemma3:4b",
+        "prompt": prompt,
+        "max_tokens": 256,
+        "stream": false
+    });
+    debug!("sending generate request to ollama (stream=false)");
     let res = client
         .post("http://127.0.0.1:11434/api/generate")
         .json(&body)
@@ -75,7 +81,52 @@ pub fn query(prompt: &str) -> Result<String> {
     if !status.is_success() {
         warn!(?status, "ollama generate returned non-success status");
     }
+    // Try to parse the single JSON object and extract the 'response' field
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+        if let Some(s) = v.get("response").and_then(|x| x.as_str()) {
+            return Ok(s.to_string());
+        }
+    }
+    // Fallback: return raw text if parsing failed or field missing
     Ok(txt)
+}
+
+pub fn pull_model(model: &str) -> Result<String> {
+    // Try REST pull first; if not available or times out, fall back to CLI.
+    let client = Client::builder()
+        .connect_timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(600))
+        .build()?;
+
+    let url = format!("http://127.0.0.1:11434/api/pull");
+    let body = serde_json::json!({ "model": model });
+    debug!("pulling model via REST: {}", model);
+    match client.post(&url).json(&body).send() {
+        Ok(res) => {
+            if !res.status().is_success() {
+                warn!(status = ?res.status(), "ollama pull returned non-success status");
+            }
+            // The pull endpoint streams JSONL; read the whole body for now
+            let status = res.status();
+            let txt = res.text().unwrap_or_default();
+            return Ok(format!("pull via REST completed with status {}\n{}", status, txt));
+        }
+        Err(e) => {
+            warn!(error = %e, "ollama REST pull failed; falling back to CLI");
+        }
+    }
+
+    // Fallback to CLI pull
+    debug!("pulling model via CLI: {}", model);
+    let out = Command::new("ollama").args(["pull", model]).output()?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+    } else {
+        Err(anyhow::anyhow!(
+            "ollama pull failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ))
+    }
 }
 
 #[cfg(test)]

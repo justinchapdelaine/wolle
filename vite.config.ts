@@ -7,6 +7,7 @@ export default defineConfig({
         index: 'index.html',
         action: 'action.html',
         status: 'status.html',
+        debug: 'debug.html',
       },
     },
   },
