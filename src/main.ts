@@ -4,49 +4,17 @@ import {
   type Action,
   runAction,
   healthCheck,
-  closeApp,
   type CliContext,
   type NormalizedPreview,
 } from './tauri'
 import { emit } from '@tauri-apps/api/event'
 import { listen } from '@tauri-apps/api/event'
 import { ingestPayload, quickAnalyze, takeLastPayload } from './tauri'
-import {
-  provideFluentDesignSystem,
-  allComponents,
-  density,
-  baseLayerLuminance,
-  StandardLuminance,
-  controlCornerRadius,
-  bodyFont,
-  // foregroundOnAccentRest,
-  // neutralForegroundRest,
-  // neutralFillRest,
-  // neutralStrokeRest,
-} from '@fluentui/web-components'
+import { setupFluentBase, wireEscToClose } from './ui'
 
 function init(): void {
-  // Register Fluent components once and set core design tokens
-  provideFluentDesignSystem().register(allComponents)
-  // Compact layout: negative density yields smaller controls; adjust to taste (-1, -2)
-  density.withDefault(-1)
-  // Set initial luminance based on OS theme BEFORE building UI to avoid token flip
-  const media: {
-    matches: boolean
-    addEventListener?: (type: string, listener: () => void) => void
-  } =
-    typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-color-scheme: dark)')
-      : { matches: false }
-  const initialMode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
-  baseLayerLuminance.setValueFor(document.documentElement, initialMode)
-  // Brand hooks: subtle corner radius tuning; accent color can be provided by CSS var
-  document.documentElement.style.setProperty('--accent-base-color', '#2563eb')
-  controlCornerRadius.withDefault(6)
-  // Typography and surface/foreground tokens
-  bodyFont.withDefault(
-    "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif"
-  )
+  // Centralized Fluent base setup
+  setupFluentBase()
   // Foreground & neutrals can be left to Fluent defaults; leave hooks here if needed later
   // Examples of reading/writing CSS vars to tokens if desired:
   // neutralForegroundRest.withDefault('#111')
@@ -61,19 +29,8 @@ function init(): void {
     )
   }
 
-  // Ensure Escape closes the window from the frontend as well (belt-and-suspenders)
-  // Listen at capture phase so inner components can't swallow it.
-  window.addEventListener(
-    'keydown',
-    (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') {
-        ev.preventDefault()
-        ev.stopImmediatePropagation()
-        void closeApp().catch((e) => console.warn('Failed to close app:', e))
-      }
-    },
-    { capture: true }
-  )
+  // Global Esc to close
+  wireEscToClose()
 
   // Emit readiness early: tokens and container are set, so reveal is safe to avoid flicker.
   void emit('frontend-ready').catch((err) => {
@@ -287,14 +244,7 @@ function init(): void {
     if (document.visibilityState === 'visible') input.focus()
   })
 
-  // Theme responsiveness: follow OS light/dark and update luminance token dynamically
-  const applyLuminance = () => {
-    const mode = media.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode
-    // Set on the document element to apply globally
-    baseLayerLuminance.setValueFor(document.documentElement, mode)
-  }
-  // Listen for OS theme changes
-  media.addEventListener?.('change', applyLuminance)
+  // Optional: page-level theme responsiveness can be added here if needed
 
   async function check() {
     try {
