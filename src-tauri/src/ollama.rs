@@ -1,5 +1,6 @@
 use anyhow::Result;
 use reqwest::blocking::Client;
+use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -89,6 +90,59 @@ pub fn query(prompt: &str) -> Result<String> {
     }
     // Fallback: return raw text if parsing failed or field missing
     Ok(txt)
+}
+
+/// Stream tokens from Ollama's generate endpoint (JSONL) and invoke the provided callback for each chunk.
+/// The callback receives the `response` field string from each JSON line; an empty string chunks are ignored.
+/// Streaming ends when a line with { done: true } is observed or the connection closes.
+pub fn query_stream<F>(prompt: &str, mut on_chunk: F) -> Result<()>
+where
+    F: FnMut(&str),
+{
+    let client = Client::builder()
+        .connect_timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(180))
+        .build()?;
+
+    let body = serde_json::json!({
+        "model": "gemma3:4b",
+        "prompt": prompt,
+        "max_tokens": 256,
+        "stream": true
+    });
+    debug!("sending generate request to ollama (stream=true)");
+    let res = client
+        .post("http://127.0.0.1:11434/api/generate")
+        .json(&body)
+        .send()?;
+
+    let status = res.status();
+    if !status.is_success() {
+        warn!(?status, "ollama generate (stream) returned non-success status");
+    }
+
+    // Stream JSONL lines
+    let mut reader = BufReader::new(res);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let n = reader.read_line(&mut line)?;
+        if n == 0 {
+            break;
+        }
+        // Parse JSON line, extract response and done
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim_end()) {
+            if let Some(s) = v.get("response").and_then(|x| x.as_str()) {
+                if !s.is_empty() {
+                    on_chunk(s);
+                }
+            }
+            if v.get("done").and_then(|d| d.as_bool()).unwrap_or(false) {
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn pull_model(model: &str) -> Result<String> {

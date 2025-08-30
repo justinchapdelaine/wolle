@@ -7,7 +7,8 @@ import {
   type CliContext,
   type NormalizedPreview,
   ingestPayload,
-  quickAnalyze,
+  // quickAnalyze,
+  quickAnalyzeStream,
   takeLastPayload,
 } from './tauri'
 import { emit, listen } from '@tauri-apps/api/event'
@@ -258,9 +259,18 @@ function init(): void {
       anaSpinner.style.visibility = 'visible'
       anaDetails.open = true
       void ui('analyze-start')
-      const analysis = await quickAnalyze(ctx)
-      anaPre.textContent = analysis || '(no analysis)'
-      anaSpinner.style.visibility = 'hidden'
+      // Streamed analysis via IPC Channel: append chunks as received
+      let initial = true
+      await quickAnalyzeStream(ctx, ({ chunk, done }) => {
+        if (chunk) {
+          if (initial && anaPre.textContent === '(working…)') anaPre.textContent = ''
+          anaPre.textContent += chunk
+          initial = false
+        }
+        if (done) {
+          anaSpinner.style.visibility = 'hidden'
+        }
+      })
       setStatusText(
         status,
         `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`

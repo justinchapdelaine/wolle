@@ -315,6 +315,14 @@ struct Health {
     message: String,
 }
 
+#[derive(serde::Serialize, Clone)]
+struct StreamChunk {
+    /// Token or partial text chunk
+    chunk: String,
+    /// True if this is the final message
+    done: bool,
+}
+
 #[tauri::command]
 fn take_last_payload(state: tauri::State<PayloadStore>) -> Option<LaunchPayload> {
     let mut guard = state.last.lock().ok()?;
@@ -404,6 +412,7 @@ fn main() {
             health_check,
             run_action,
             quick_analyze,
+            quick_analyze_stream,
             test_ollama,
             pull_ollama_model,
             close_app,
@@ -590,6 +599,7 @@ fn main() {
             health_check,
             run_action,
             quick_analyze,
+            quick_analyze_stream,
             test_ollama,
             close_app,
             get_start_on_boot,
@@ -729,6 +739,83 @@ async fn quick_analyze(app: tauri::AppHandle<tauri::Wry>, payload: ingest::Launc
     .map_err(|e| format!("join error: {}", e))?;
 
     res
+}
+
+/// Stream analysis: prepares the analysis prompt like `quick_analyze` but streams the
+/// generated tokens to the frontend via the `analysis-stream` event. Returns Ok(()) when
+/// the stream is complete or errors.
+#[tauri::command]
+async fn quick_analyze_stream(
+    app: tauri::AppHandle<tauri::Wry>,
+    payload: ingest::LaunchPayload,
+    channel: tauri::ipc::Channel<StreamChunk>,
+) -> Result<(), String> {
+    use ingest::{prepare_analysis, AnalysisSource};
+    let _guard = AnalysisBusyGuard::try_acquire()?;
+
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        // Check health first
+        if let Err(e) = crate::ollama::health() {
+            push_log(&app_clone, format!("quick_analyze_stream: ollama not reachable: {}", e));
+            let _ = channel.send(StreamChunk { chunk: format!("[error] {}", e), done: true });
+            return Err(e.to_string());
+        }
+
+        let src = match prepare_analysis(payload) {
+            Ok(s) => s,
+            Err(e) => {
+                push_log(&app_clone, format!("quick_analyze_stream: prepare_analysis failed: {}", e));
+                let _ = channel.send(StreamChunk { chunk: format!("[error] {}", e), done: true });
+                return Err(e.to_string());
+            }
+        };
+
+        let prompt = match src {
+            AnalysisSource::Text { text, names } => {
+                let header = if names.is_empty() {
+                    "Analyze the following text. Describe briefly what it contains in 1-2 sentences.".to_string()
+                } else {
+                    format!(
+                        "Analyze the following text from files ({}). Describe briefly what it contains in 1-2 sentences.",
+                        names.join(", ")
+                    )
+                };
+                format!("{}\n\n---\n\n{}", header, text)
+            }
+            AnalysisSource::Images { images_b64: _, names } => {
+                format!(
+                    "Analyze the provided images ({}). Briefly describe what they contain in 1-2 sentences.",
+                    names.join(", ")
+                )
+            }
+        };
+
+        push_log(&app_clone, "quick_analyze_stream: querying ollama (stream)".to_string());
+        let mut had_any = false;
+        let res = crate::ollama::query_stream(&prompt, |s| {
+            had_any = true;
+            let _ = channel.send(StreamChunk { chunk: s.to_string(), done: false });
+        });
+        match res {
+            Ok(()) => {
+                let _ = channel.send(StreamChunk { chunk: String::new(), done: true });
+                push_log(&app_clone, "quick_analyze_stream: complete".to_string());
+                if !had_any {
+                    // Provide a tiny hint if nothing streamed
+                    let _ = channel.send(StreamChunk { chunk: "(no analysis)".to_string(), done: true });
+                }
+                Ok(())
+            }
+            Err(e) => {
+                push_log(&app_clone, format!("quick_analyze_stream: error: {}", e));
+                let _ = channel.send(StreamChunk { chunk: format!("[error] {}", e), done: true });
+                Err(e.to_string())
+            }
+        }
+    })
+    .await
+    .map_err(|e| format!("join error: {}", e))?
 }
 
 // When the tray feature is enabled, Esc should hide the window so it can be re-shown from the tray.

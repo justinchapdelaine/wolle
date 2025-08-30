@@ -41,6 +41,18 @@ export async function quickAnalyze(payload: CliContext): Promise<string> {
   return await invoke('quick_analyze', { payload })
 }
 
+export async function quickAnalyzeStream(
+  payload: CliContext,
+  onChunk: (c: { chunk: string; done: boolean }) => void
+): Promise<void> {
+  const channel = new (await import('@tauri-apps/api/core')).Channel<{
+    chunk: string
+    done: boolean
+  }>()
+  channel.onmessage = onChunk
+  return await invoke('quick_analyze_stream', { payload, channel })
+}
+
 export async function getStartOnBoot(): Promise<boolean> {
   return invoke<boolean>('get_start_on_boot')
 }
