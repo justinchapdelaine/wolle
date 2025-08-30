@@ -82,6 +82,7 @@ struct LaunchPayload {
     coords: Option<Coords>,
 }
 
+#[cfg(feature = "tray")]
 fn parse_cli_json_inner(args: &[String]) -> Result<LaunchPayload, String> {
     // Be tolerant of how Windows/PowerShell may pass the JSON. Try, in order:
     // 1) Any arg that starts with @file => read and parse
@@ -126,10 +127,12 @@ fn parse_cli_json_inner(args: &[String]) -> Result<LaunchPayload, String> {
     Err("no JSON payload found".into())
 }
 
+#[cfg(feature = "tray")]
 fn parse_cli_json(args: &[String]) -> Option<LaunchPayload> {
     parse_cli_json_inner(args).ok()
 }
 
+#[cfg(feature = "tray")]
 fn clamp_position(app: &tauri::AppHandle<tauri::Wry>, x: i32, y: i32) -> (i32, i32) {
     // Best-effort: clamp to primary monitor work area; if API not available, return as-is.
     // Tauri v2 exposes monitor info via app path APIs; keep it simple here.
@@ -141,6 +144,7 @@ fn clamp_position(app: &tauri::AppHandle<tauri::Wry>, x: i32, y: i32) -> (i32, i
     (x.clamp(pos.x, max_x), y.clamp(pos.y, max_y))
 }
 
+#[cfg(feature = "tray")]
 fn show_main_with_payload(app: &tauri::AppHandle<tauri::Wry>, payload: LaunchPayload) {
     // Create or fetch the main window
     let win = if let Some(w) = app.get_webview_window("main") {
@@ -181,6 +185,7 @@ fn show_main_with_payload(app: &tauri::AppHandle<tauri::Wry>, payload: LaunchPay
 struct PayloadStore {
     last: Mutex<Option<LaunchPayload>>,
     logs: Mutex<VecDeque<String>>,
+    #[cfg(feature = "tray")]
     activation_args: Mutex<Vec<String>>,
 }
 
@@ -316,6 +321,7 @@ fn take_last_payload(state: tauri::State<PayloadStore>) -> Option<LaunchPayload>
     guard.take()
 }
 
+#[cfg(feature = "tray")]
 #[derive(Serialize)]
 struct DebugSnapshot {
     logs: Vec<String>,
@@ -323,6 +329,7 @@ struct DebugSnapshot {
     activation_args: Vec<String>,
 }
 
+#[cfg(feature = "tray")]
 #[tauri::command]
 fn dbg_snapshot(state: tauri::State<PayloadStore>) -> DebugSnapshot {
     let logs = state.logs.lock().unwrap().iter().cloned().collect::<Vec<_>>();
@@ -331,6 +338,7 @@ fn dbg_snapshot(state: tauri::State<PayloadStore>) -> DebugSnapshot {
     DebugSnapshot { logs, last_payload, activation_args }
 }
 
+#[cfg(feature = "tray")]
 #[tauri::command]
 fn dbg_reemit(app: tauri::AppHandle<tauri::Wry>, state: tauri::State<PayloadStore>) -> Result<bool, String> {
     if let Some(p) = state.last.lock().unwrap().clone() {
@@ -373,7 +381,7 @@ fn main() {
                 let _ = window.hide();
             }
         })
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // _args: full command line after executable; Explorer passes one JSON arg
             // Skip the executable path; parse remainder
             if let Some(store) = app.try_state::<PayloadStore>() {
@@ -420,9 +428,13 @@ fn main() {
             // If this is the first process with a JSON payload (Explorer launch), handle it now.
             if let Some(ctx) = {
                 let args: Vec<String> = std::env::args().skip(1).collect();
-                if let Some(store) = app.try_state::<PayloadStore>() { *store.activation_args.lock().unwrap() = args.clone(); }
+                if let Some(store) = app.try_state::<PayloadStore>() { #[allow(unused_variables)] let _ = &store; #[cfg(feature = "tray")] { *store.activation_args.lock().unwrap() = args.clone(); } }
                 push_log(app.handle(), format!("startup args: {:?}", args));
-                match parse_cli_json_inner(&args) { Ok(v) => Some(v), Err(e) => { push_log(app.handle(), format!("startup parse error: {}", e)); None } }
+                #[cfg(feature = "tray")] {
+                    match parse_cli_json_inner(&args) { Ok(v) => Some(v), Err(e) => { push_log(app.handle(), format!("startup parse error: {}", e)); None } }
+                }
+                #[cfg(not(feature = "tray"))]
+                { None }
             } {
                 push_log(app.handle(), "startup parsed payload".to_string());
                 show_main_with_payload(&app.handle(), ctx);
@@ -613,12 +625,12 @@ fn main() {
 }
 
 #[tauri::command]
-fn health_check() -> Result<Health, String> {
-    match ollama::health() {
-        Ok(msg) => Ok(Health {
-            ok: true,
-            message: msg,
-        }),
+async fn health_check() -> Result<Health, String> {
+    let res = tauri::async_runtime::spawn_blocking(|| ollama::health())
+        .await
+        .map_err(|e| format!("join error: {}", e))?;
+    match res {
+        Ok(msg) => Ok(Health { ok: true, message: msg }),
         Err(e) => Err(format!("{}", e)),
     }
 }
@@ -637,11 +649,10 @@ async fn run_action(action: String, input: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn ingest_payload(payload: ingest::LaunchPayload) -> Result<ingest::NormalizedPreview, String> {
-    // Log basic ingest info for debugging
-    // We can't access AppHandle here directly; use a small closure invoked via tauri::async_runtime::spawn if needed.
-    // For simplicity, just perform ingest and rely on quick_analyze logs for now.
-    ingest::ingest(payload).map_err(|e| e.to_string())
+async fn ingest_payload(payload: ingest::LaunchPayload) -> Result<ingest::NormalizedPreview, String> {
+    tauri::async_runtime::spawn_blocking(move || ingest::ingest(payload).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| format!("join error: {}", e))?
 }
 
 #[tauri::command]
@@ -814,6 +825,7 @@ async fn test_ollama() -> Result<String, String> {
         .map_err(|e| format!("join error: {}", e))?
 }
 
+#[cfg(feature = "tray")]
 #[tauri::command]
 async fn pull_ollama_model(model: Option<String>) -> Result<String, String> {
     let m = model.unwrap_or_else(|| "gemma3:4b".to_string());

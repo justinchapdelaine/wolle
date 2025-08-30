@@ -1,14 +1,16 @@
 import { el } from './dom'
-import { actions, type Action, runAction, healthCheck, closeApp } from './tauri'
-import { emit } from '@tauri-apps/api/event'
-import { listen } from '@tauri-apps/api/event'
 import {
-  ingestPayload,
-  quickAnalyze,
-  takeLastPayload,
+  actions,
+  type Action,
+  runAction,
+  healthCheck,
+  closeApp,
   type CliContext,
   type NormalizedPreview,
 } from './tauri'
+import { emit } from '@tauri-apps/api/event'
+import { listen } from '@tauri-apps/api/event'
+import { ingestPayload, quickAnalyze, takeLastPayload } from './tauri'
 import {
   provideFluentDesignSystem,
   allComponents,
@@ -297,7 +299,7 @@ function init(): void {
   async function check() {
     try {
       const res = await healthCheck()
-      status.textContent = typeof res === 'string' ? res : JSON.stringify(res)
+      status.textContent = res.message
     } catch (e) {
       status.textContent = 'Ollama not reachable: ' + (e instanceof Error ? e.message : String(e))
     }
@@ -312,6 +314,36 @@ function init(): void {
 
   // (Esc handled natively in Rust; no frontend handler here)
 
+  // Unified payload handler to avoid duplicated logic across sources
+  const processPayload = async (
+    ctx: CliContext,
+    source: 'event' | 'pending' | 'poll'
+  ): Promise<void> => {
+    try {
+      status.textContent = `${source === 'event' ? 'Context received' : source === 'pending' ? 'Pending payload found' : 'Pending payload (polled)'} → ingesting…`
+      void ui('ingest-start')
+      const preview: NormalizedPreview = await ingestPayload(ctx)
+      status.textContent = 'Ingested → analyzing…'
+      void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
+      anaPre.textContent = '(working…)'
+      anaSpinner.style.visibility = 'visible'
+      anaDetails.open = true
+      void ui('analyze-start')
+      const analysis = await quickAnalyze(ctx)
+      anaPre.textContent = analysis || '(no analysis)'
+      anaSpinner.style.visibility = 'hidden'
+      status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
+      void ui('analyze-done')
+      input.focus()
+    } catch (e) {
+      console.warn('Failed to process payload', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      status.textContent = 'Failed during ingest/analyze: ' + msg
+      void ui('error', msg)
+      anaSpinner.style.visibility = 'hidden'
+    }
+  }
+
   // Accept load-context events from single-instance launches.
   // Wrap in try/catch so tests (no Tauri internals) don't hard-fail.
   try {
@@ -322,32 +354,8 @@ function init(): void {
       void (async () => {
         console.debug('load-context event received', ev)
         void ui('event-received')
-        try {
-          status.textContent = 'Context received → ingesting…'
-          void ui('ingest-start')
-          const ctx = ev.payload
-          // Optionally still compute preview to show kind/count
-          const preview: NormalizedPreview = await ingestPayload(ctx)
-          status.textContent = 'Ingested → analyzing…'
-          void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
-          anaPre.textContent = '(working…)'
-          anaSpinner.style.visibility = 'visible'
-          anaDetails.open = true
-          // Perform quick analysis (non-streaming MVP)
-          void ui('analyze-start')
-          const analysis = await quickAnalyze(ctx)
-          anaPre.textContent = analysis || '(no analysis)'
-          anaSpinner.style.visibility = 'hidden'
-          status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
-          void ui('analyze-done')
-          input.focus()
-        } catch (e) {
-          console.warn('Failed to handle load-context', e)
-          const msg = e instanceof Error ? e.message : String(e)
-          status.textContent = 'Failed during ingest/analyze: ' + msg
-          void ui('error', msg)
-          anaSpinner.style.visibility = 'hidden'
-        }
+        const ctx = ev.payload
+        await processPayload(ctx, 'event')
       })()
     })
   } catch (err) {
@@ -360,21 +368,7 @@ function init(): void {
     try {
       const pending = await takeLastPayload()
       if (pending) {
-        status.textContent = 'Pending payload found → ingesting…'
-        void ui('ingest-start')
-        const preview: NormalizedPreview = await ingestPayload(pending)
-        status.textContent = 'Ingested → analyzing…'
-        void ui('ingest-done', { kind: preview.kind, count: preview.file_count })
-        anaPre.textContent = '(working…)'
-        anaSpinner.style.visibility = 'visible'
-        anaDetails.open = true
-        void ui('analyze-start')
-        const analysis = await quickAnalyze(pending)
-        anaPre.textContent = analysis || '(no analysis)'
-        anaSpinner.style.visibility = 'hidden'
-        status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
-        void ui('analyze-done')
-        input.focus()
+        await processPayload(pending, 'pending')
       }
     } catch (e) {
       console.warn('Failed to fetch pending payload', e)
@@ -393,17 +387,7 @@ function init(): void {
       const pending = await takeLastPayload()
       if (pending) {
         pollHandled = true
-        status.textContent = 'Pending payload (polled) → ingesting…'
-        const preview: NormalizedPreview = await ingestPayload(pending)
-        status.textContent = 'Ingested → analyzing…'
-        anaPre.textContent = '(working…)'
-        anaSpinner.style.visibility = 'visible'
-        anaDetails.open = true
-        const analysis = await quickAnalyze(pending)
-        anaPre.textContent = analysis || '(no analysis)'
-        anaSpinner.style.visibility = 'hidden'
-        status.textContent = `${preview.kind === 'text' ? 'Text' : 'Images'} • ${preview.file_count} item(s)`
-        input.focus()
+        await processPayload(pending, 'poll')
         return true
       }
     } catch (e) {

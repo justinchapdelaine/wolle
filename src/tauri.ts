@@ -1,14 +1,19 @@
 import { invoke } from '@tauri-apps/api/core'
 
 export const actions = ['summarize', 'rewrite', 'translate'] as const
-export type Action = 'summarize' | 'rewrite' | 'translate' | 'analyze'
+export type Action = (typeof actions)[number]
+
+export interface Health {
+  ok: boolean
+  message: string
+}
 
 export async function runAction(action: Action, input: string): Promise<string> {
   return invoke<string>('run_action', { action, input })
 }
 
-export async function healthCheck(): Promise<unknown> {
-  return invoke('health_check')
+export async function healthCheck(): Promise<Health> {
+  return invoke<Health>('health_check')
 }
 
 export async function closeApp(): Promise<void> {
