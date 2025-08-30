@@ -41,10 +41,7 @@ fn resolve_bg() -> Color {
 }
 
 #[cfg(not(feature = "tray"))]
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 use std::io::Cursor;
 
 fn icon_from_ico_best_fit(desired: u32) -> Option<tauri::image::Image<'static>> {
@@ -627,11 +624,16 @@ fn health_check() -> Result<Health, String> {
 }
 
 #[tauri::command]
-fn run_action(action: String, input: String) -> Result<String, String> {
-    // Build a prompt using the helper and forward to ollama
-    let prompt = utils::format_prompt(&action, &input);
-    ollama::query(&prompt)
-        .map_err(|e| format!("Action '{}' failed: {}", action, e))
+async fn run_action(action: String, input: String) -> Result<String, String> {
+    // Offload potentially blocking work to a background thread
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let prompt = utils::format_prompt(&action, &input);
+        ollama::query(&prompt)
+            .map_err(|e| format!("Action '{}' failed: {}", action, e))
+    })
+    .await
+    .map_err(|e| format!("join error: {}", e))?;
+    res
 }
 
 #[tauri::command]
@@ -643,72 +645,79 @@ fn ingest_payload(payload: ingest::LaunchPayload) -> Result<ingest::NormalizedPr
 }
 
 #[tauri::command]
-fn quick_analyze(app: tauri::AppHandle<tauri::Wry>, payload: ingest::LaunchPayload) -> Result<String, String> {
+async fn quick_analyze(app: tauri::AppHandle<tauri::Wry>, payload: ingest::LaunchPayload) -> Result<String, String> {
     use ingest::{prepare_analysis, AnalysisSource};
     let _guard = AnalysisBusyGuard::try_acquire()?;
 
-    // Short-circuit if Ollama isn't reachable
-    if let Err(e) = crate::ollama::health() {
-        push_log(&app, format!("quick_analyze: ollama not reachable: {}", e));
-        return Err(e.to_string());
-    }
-
-    let src = match prepare_analysis(payload) {
-        Ok(s) => s,
-        Err(e) => {
-            push_log(&app, format!("quick_analyze: prepare_analysis failed: {}", e));
+    // Offload all potentially blocking work to a background thread
+    let app_clone = app.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        // Short-circuit if Ollama isn't reachable
+        if let Err(e) = crate::ollama::health() {
+            push_log(&app_clone, format!("quick_analyze: ollama not reachable: {}", e));
             return Err(e.to_string());
         }
-    };
-    match &src {
-        AnalysisSource::Text { text, names } => {
-            push_log(&app, format!("quick_analyze: prepared text; bytes={}, files={}", text.len(), names.len()));
+
+        let src = match prepare_analysis(payload) {
+            Ok(s) => s,
+            Err(e) => {
+                push_log(&app_clone, format!("quick_analyze: prepare_analysis failed: {}", e));
+                return Err(e.to_string());
+            }
+        };
+        match &src {
+            AnalysisSource::Text { text, names } => {
+                push_log(&app_clone, format!("quick_analyze: prepared text; bytes={}, files={}", text.len(), names.len()));
+            }
+            AnalysisSource::Images { images_b64, names } => {
+                push_log(&app_clone, format!("quick_analyze: prepared images; count={}, names={}", images_b64.len(), names.len()));
+            }
         }
-        AnalysisSource::Images { images_b64, names } => {
-            push_log(&app, format!("quick_analyze: prepared images; count={}, names={}", images_b64.len(), names.len()));
-        }
-    }
-    // Build a concise analysis prompt that explains what the payload is
-    let prompt = match src {
-        AnalysisSource::Text { text, names } => {
-            let header = if names.is_empty() {
-                "Analyze the following text. Describe briefly what it contains in 1-2 sentences.".to_string()
-            } else {
+        // Build a concise analysis prompt that explains what the payload is
+        let prompt = match src {
+            AnalysisSource::Text { text, names } => {
+                let header = if names.is_empty() {
+                    "Analyze the following text. Describe briefly what it contains in 1-2 sentences.".to_string()
+                } else {
+                    format!(
+                        "Analyze the following text from files ({}). Describe briefly what it contains in 1-2 sentences.",
+                        names.join(", ")
+                    )
+                };
+                format!("{}\n\n---\n\n{}", header, text)
+            }
+            AnalysisSource::Images { images_b64: _, names } => {
+                // For vision input, we'll include a short textual instruction and send images separately in the body.
+                // For now, we fall back to a text-only summary indicating which images are present. In step 4 we can call the vision path if required.
                 format!(
-                    "Analyze the following text from files ({}). Describe briefly what it contains in 1-2 sentences.",
+                    "Analyze the provided images ({}). Briefly describe what they contain in 1-2 sentences.",
                     names.join(", ")
                 )
-            };
-            format!("{}\n\n---\n\n{}", header, text)
-        }
-        AnalysisSource::Images { images_b64: _, names } => {
-            // For vision input, we'll include a short textual instruction and send images separately in the body.
-            // For now, we fall back to a text-only summary indicating which images are present. In step 4 we can call the vision path if required.
-            format!(
-                "Analyze the provided images ({}). Briefly describe what they contain in 1-2 sentences.",
-                names.join(", ")
-            )
-        }
-    };
-    // Reuse blocking client for now (non-streaming quick analysis)
-    push_log(&app, "quick_analyze: querying ollama".to_string());
-    match ollama::query(&prompt) {
-        Ok(s) => {
-            push_log(&app, "quick_analyze: success".to_string());
-            Ok(s)
-        }
-        Err(e) => {
-            // Include nested error causes when available
-            let mut msg = format!("{}", e);
-            let mut source = e.source();
-            while let Some(cause) = source {
-                msg.push_str(&format!("; caused by: {}", cause));
-                source = cause.source();
             }
-            push_log(&app, format!("quick_analyze: error: {}", msg));
-            Err(msg)
+        };
+        push_log(&app_clone, "quick_analyze: querying ollama".to_string());
+        match ollama::query(&prompt) {
+            Ok(s) => {
+                push_log(&app_clone, "quick_analyze: success".to_string());
+                Ok(s)
+            }
+            Err(e) => {
+                // Include nested error causes when available
+                let mut msg = format!("{}", e);
+                let mut source = e.source();
+                while let Some(cause) = source {
+                    msg.push_str(&format!("; caused by: {}", cause));
+                    source = cause.source();
+                }
+                push_log(&app_clone, format!("quick_analyze: error: {}", msg));
+                Err(msg)
+            }
         }
-    }
+    })
+    .await
+    .map_err(|e| format!("join error: {}", e))?;
+
+    res
 }
 
 // When the tray feature is enabled, Esc should hide the window so it can be re-shown from the tray.
@@ -799,12 +808,16 @@ impl Drop for AnalysisBusyGuard {
 }
 
 #[tauri::command]
-fn test_ollama() -> Result<String, String> {
-    crate::ollama::query("Say OK.").map_err(|e| e.to_string())
+async fn test_ollama() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| crate::ollama::query("Say OK.").map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| format!("join error: {}", e))?
 }
 
 #[tauri::command]
-fn pull_ollama_model(model: Option<String>) -> Result<String, String> {
+async fn pull_ollama_model(model: Option<String>) -> Result<String, String> {
     let m = model.unwrap_or_else(|| "gemma3:4b".to_string());
-    crate::ollama::pull_model(&m).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || crate::ollama::pull_model(&m).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| format!("join error: {}", e))?
 }
