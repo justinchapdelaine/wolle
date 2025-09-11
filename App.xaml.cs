@@ -14,12 +14,21 @@ namespace wolle
             {
                 string filePath = e.Args[0];
                 
-                // Create main window and process the file
-                var mainWindow = new MainWindow();
-                mainWindow.Show();
-                
-                // Process the file after window is shown
-                mainWindow.ProcessFile(filePath);
+                try
+                {
+                    // Create main window and process the file
+                    var mainWindow = new MainWindow();
+                    mainWindow.Show();
+                    
+                    // Process the file after window is shown
+                    mainWindow.ProcessFile(filePath);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to start application: {ex.Message}", 
+                        "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Shutdown();
+                }
             }
             else
             {

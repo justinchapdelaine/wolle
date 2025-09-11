@@ -23,7 +23,7 @@ namespace wolle.Services
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
-        private readonly string _modelName = "gemma3:4b";
+        private readonly string _modelName;
         private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1); // For thread-safe API calls
         private readonly object _processLock = new object(); // For thread-safe process operations
@@ -43,9 +43,9 @@ namespace wolle.Services
         {
             _settingsService = settingsService;
             _logger = logger ?? new LoggerService();
-            _modelName = "gemma3:4b";
 
             var settings = _settingsService.LoadSettings();
+            _modelName = settings.ModelName;
             _httpClient = new HttpClient();
             _httpClient.BaseAddress = new Uri(settings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(settings.ApiTimeoutSeconds);
@@ -408,23 +408,43 @@ namespace wolle.Services
                 return string.Empty;
             }
 
-            // Remove dangerous characters that could lead to command injection
-            var sanitized = arguments
-                .Replace("&", "")
-                .Replace("|", "")
-                .Replace("<", "")
-                .Replace(">", "")
-                .Replace("$", "")
-                .Replace("`", "")
-                .Replace(";", "")
-                .Replace("\"", "")
-                .Replace("'", "")
-                .Replace("\n", "")
-                .Replace("\r", "")
-                .Replace("\t", "")
-                .Trim();
+            // Validate that arguments don't contain dangerous command sequences
+            // Instead of removing characters, we'll validate and properly escape
+            var dangerousPatterns = new[] { "&&", "||", ";", "&", "|", "`", "$(", "$`", "\n", "\r" };
+            
+            foreach (var pattern in dangerousPatterns)
+            {
+                if (arguments.Contains(pattern))
+                {
+                    throw new ArgumentException($"Arguments contain dangerous pattern: {pattern}", nameof(arguments));
+                }
+            }
 
-            return sanitized;
+            // Properly escape arguments for command line
+            return EscapeCommandLineArgument(arguments);
+        }
+
+        /// <summary>
+        /// Escapes a command line argument to prevent injection.
+        /// </summary>
+        /// <param name="argument">The argument to escape.</param>
+        /// <returns>Escaped argument string.</returns>
+        private string EscapeCommandLineArgument(string argument)
+        {
+            if (string.IsNullOrEmpty(argument))
+            {
+                return "\"\"";
+            }
+
+            // If argument contains spaces or special characters, wrap in quotes
+            if (argument.Contains(" ") || argument.Contains("\"") || argument.Contains("\\"))
+            {
+                // Escape existing quotes and backslashes
+                var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                return $"\"{escaped}\"";
+            }
+
+            return argument;
         }
 
         /// <summary>
@@ -438,10 +458,9 @@ namespace wolle.Services
 
             try
             {
-                using (var httpClient = new HttpClient())
-                {
-                    httpClient.BaseAddress = new Uri("http://127.0.0.1:11434");
-                    httpClient.Timeout = TimeSpan.FromMinutes(30);
+                // Use shared HttpClient instance instead of creating new one
+                var originalTimeout = _httpClient.Timeout;
+                _httpClient.Timeout = TimeSpan.FromMinutes(30);
 
                     // Create Ollama API pull request
                     var request = new
@@ -457,7 +476,7 @@ namespace wolle.Services
 
                     _logger?.LogInfo("Sending pull request to Ollama API");
 
-                    var response = await httpClient.PostAsync("/api/pull", content);
+                    var response = await _httpClient.PostAsync("/api/pull", content);
                     response.EnsureSuccessStatusCode();
 
                     _logger?.LogInfo("Pull response received from Ollama API");
@@ -513,8 +532,10 @@ namespace wolle.Services
                             }
                         }
                     }
+                    
+                    // Restore original timeout
+                    _httpClient.Timeout = originalTimeout;
                 }
-            }
             catch (Exception ex)
             {
                 _logger?.LogError($"Ollama API pull error: {ex.Message}");
@@ -573,10 +594,9 @@ namespace wolle.Services
 
             try
             {
-                using (var httpClient = new HttpClient())
-                {
-                    httpClient.BaseAddress = new Uri("http://127.0.0.1:11434");
-                    httpClient.Timeout = TimeSpan.FromMinutes(10);
+                // Use shared HttpClient instance instead of creating new one
+                var originalTimeout = _httpClient.Timeout;
+                _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
                     // Create Ollama API request
                     var request = new OllamaApiRequest
@@ -594,14 +614,14 @@ namespace wolle.Services
                     _logger?.LogInfo("Sending request to Ollama API");
 
                     // Check if model is ready before sending generate request
-                    if (!await IsModelReadyAsync(httpClient, _modelName))
+                    if (!await IsModelReadyAsync(_httpClient, _modelName))
                     {
                         _logger?.LogError("Model is not ready for generation");
                         OnErrorReceived?.Invoke("Model is not ready for generation. Please try again.");
                         return;
                     }
 
-                    var response = await httpClient.PostAsync("/api/generate", content);
+                    var response = await _httpClient.PostAsync("/api/generate", content);
                     response.EnsureSuccessStatusCode();
 
                     _logger?.LogInfo("Response received from Ollama API");
@@ -644,8 +664,10 @@ namespace wolle.Services
                             }
                         }
                     }
+                    
+                    // Restore original timeout
+                    _httpClient.Timeout = originalTimeout;
                 }
-            }
             catch (Exception ex)
             {
                 _logger?.LogError($"Ollama API error: {ex.Message}");

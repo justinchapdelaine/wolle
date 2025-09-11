@@ -19,6 +19,7 @@ namespace wolle
         private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
+        private readonly object _stateLock = new object();
         private string _accumulatedResponseText = "";
 
         public MainWindow()
@@ -126,7 +127,7 @@ namespace wolle
 
         private void OnOllamaProgressUpdate(OllamaProgress progress)
         {
-            if (!_isClosing)
+            if (!_isClosing && _ollamaService != null)
             {
                 // Only log progress at major milestones to drastically reduce log spam
                 if (progress.percent == 0 || progress.percent == 50 || progress.percent == 100 ||
@@ -182,7 +183,7 @@ namespace wolle
 
         private void OnOllamaStatusUpdate(string status)
         {
-            if (!_isClosing)
+            if (!_isClosing && _ollamaService != null)
             {
                 _logger?.LogInfo($"Status update: {status}");
 
@@ -195,7 +196,7 @@ namespace wolle
 
         private void OnOllamaOutputReceived(string output)
         {
-            if (!_isClosing)
+            if (!_isClosing && _ollamaService != null)
             {
                 Dispatcher.Invoke(() => 
                 {
@@ -211,7 +212,7 @@ namespace wolle
 
         private void OnOllamaErrorReceived(string error)
         {
-            if (!_isClosing)
+            if (!_isClosing && _ollamaService != null)
             {
                 Dispatcher.Invoke(() => ShowError(error));
             }
@@ -219,7 +220,7 @@ namespace wolle
 
         private void OnOllamaProcessComplete()
         {
-            if (!_isClosing)
+            if (!_isClosing && _ollamaService != null)
             {
                 _logger?.LogInfo("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
@@ -342,7 +343,7 @@ namespace wolle
             _logger.LogInfo($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
 
             // Prevent closing if processing is not complete
-            lock (this) // Add lock to prevent race condition
+            lock (_stateLock)
             {
                 if (!_isProcessingComplete && !_isClosing)
                 {
@@ -350,6 +351,9 @@ namespace wolle
                     e.Cancel = true;
                     return;
                 }
+                
+                // Mark that we're attempting to close
+                _isClosing = true;
             }
 
             _logger.LogInfo("Window closing allowed");
@@ -359,7 +363,7 @@ namespace wolle
         protected override void OnClosed(EventArgs e)
         {
             _logger.LogInfo($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
-            lock (this) // Add lock for thread safety
+            lock (_stateLock)
             {
                 _isClosing = true;
             }

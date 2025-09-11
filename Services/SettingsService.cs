@@ -262,6 +262,11 @@ namespace wolle.Services
         public string OllamaEndpoint { get; set; } = "http://127.0.0.1:11434";
 
         /// <summary>
+        /// Gets or sets Ollama model name to use.
+        /// </summary>
+        public string ModelName { get; set; } = "gemma3:4b";
+
+        /// <summary>
         /// Gets or sets the maximum file size in bytes for processing.
         /// </summary>
         public long MaxFileSize { get; set; } = 10 * 1024 * 1024; // 10MB
