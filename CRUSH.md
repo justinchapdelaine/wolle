@@ -85,7 +85,7 @@ Theme: Automatic light/dark mode using Fluent ThemeMode APIs
 - Configurable API timeouts (default 5 minutes, max 30 minutes)
 
 ## Development Documentation
-All development debugging notes and research documentation are located in `Docs/` folder. These files document various debugging sessions, fixes, and research findings during development.
+All development debugging notes and research documentation are located in `Docs/` folder. These files document various debugging sessions, fixes, and research findings during development, including the logging system implementation.
 
 ## Recent Improvements and Fixes
 ### Critical Issues Fixed:
