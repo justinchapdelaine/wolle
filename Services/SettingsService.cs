@@ -351,6 +351,16 @@ namespace wolle.Services
         public int ApiTimeoutSeconds { get; set; } = 300; // 5 minutes
 
         /// <summary>
+        /// Gets or sets maximum log file size in bytes.
+        /// </summary>
+        public long MaxLogSizeBytes { get; set; } = 10 * 1024 * 1024; // 10MB
+
+        /// <summary>
+        /// Gets or sets maximum number of log files to keep.
+        /// </summary>
+        public int MaxLogFiles { get; set; } = 5;
+
+        /// <summary>
         /// Gets or sets the prompt settings.
         /// </summary>
         public PromptSettings Prompts { get; set; } = new();

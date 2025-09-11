@@ -4,6 +4,8 @@
   "ModelName": "gemma3:4b",
   "MaxFileSize": 10485760,
   "ApiTimeoutSeconds": 300,
+  "MaxLogSizeBytes": 10485760,
+  "MaxLogFiles": 5,
   "Prompts": {
     "Image": "Explain this image to me? {0}",
     "Text": "Summarize this text for me? {0}",

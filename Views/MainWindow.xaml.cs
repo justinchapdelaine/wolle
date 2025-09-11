@@ -15,7 +15,7 @@ namespace wolle
         private readonly SettingsService _settingsService;
         private readonly OllamaService _ollamaService;
         private readonly MarkdownService _markdownService;
-        private readonly LoggerService _logger = new LoggerService();
+        private readonly LoggerService? _logger;
         private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
@@ -28,6 +28,7 @@ namespace wolle
             {
                 // Initialize services and logger first
                 _settingsService = new SettingsService();
+                _logger = new LoggerService(_settingsService);
                 _ollamaService = new OllamaService(_settingsService, _logger);
                 _markdownService = new MarkdownService();
 
@@ -340,14 +341,14 @@ namespace wolle
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            _logger.LogInfo($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
+            _logger?.LogInfo($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
 
             // Prevent closing if processing is not complete
             lock (_stateLock)
             {
                 if (!_isProcessingComplete && !_isClosing)
                 {
-                    _logger.LogInfo("Preventing window close - processing still active");
+                    _logger?.LogInfo("Preventing window close - processing still active");
                     e.Cancel = true;
                     return;
                 }
@@ -356,13 +357,13 @@ namespace wolle
                 _isClosing = true;
             }
 
-            _logger.LogInfo("Window closing allowed");
+            _logger?.LogInfo("Window closing allowed");
             base.OnClosing(e);
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            _logger.LogInfo($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
+            _logger?.LogInfo($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
             lock (_stateLock)
             {
                 _isClosing = true;
@@ -372,22 +373,22 @@ namespace wolle
             // Let it continue in the background
             if (!_isProcessingComplete)
             {
-                _logger.LogInfo("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
+                _logger?.LogInfo("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
             }
             else
             {
-                _logger.LogInfo("Processing complete - disposing OllamaService");
+                _logger?.LogInfo("Processing complete - disposing OllamaService");
             }
             
             // Always dispose OllamaService to prevent memory leaks
             try
             {
                 _ollamaService?.Dispose();
-                _logger.LogInfo("OllamaService disposed successfully");
+                _logger?.LogInfo("OllamaService disposed successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error disposing OllamaService: {ex.Message}");
+                _logger?.LogError($"Error disposing OllamaService: {ex.Message}");
             }
 
             base.OnClosed(e);

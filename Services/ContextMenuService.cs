@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
-using System.Text.RegularExpressions;
+
 using System.Windows;
 using Microsoft.Win32;
 using wolle.Services;

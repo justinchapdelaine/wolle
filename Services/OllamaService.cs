@@ -42,7 +42,7 @@ namespace wolle.Services
         public OllamaService(SettingsService settingsService, LoggerService? logger = null)
         {
             _settingsService = settingsService;
-            _logger = logger ?? new LoggerService();
+            _logger = logger ?? new LoggerService(_settingsService);
 
             var settings = _settingsService.LoadSettings();
             _modelName = settings.ModelName;
@@ -463,8 +463,8 @@ namespace wolle.Services
                     // Create Ollama API pull request
                     var request = new
                     {
-                        model = modelName,
-                        stream = true
+                        Model = modelName,
+                        Stream = true
                     };
 
                     var content = new StringContent(
@@ -595,9 +595,9 @@ namespace wolle.Services
                     // Create Ollama API request
                     var request = new OllamaApiRequest
                     {
-                        model = _modelName,
-                        prompt = prompt,
-                        stream = true
+                        Model = _modelName,
+                        Prompt = prompt,
+                        Stream = true
                     };
 
                     var content = new StringContent(
@@ -1119,17 +1119,17 @@ namespace wolle.Services
         /// <summary>
         /// Gets or sets model name.
         /// </summary>
-        public string model { get; set; } = "";
+        public string Model { get; set; } = "";
 
         /// <summary>
         /// Gets or sets prompt.
         /// </summary>
-        public string prompt { get; set; } = "";
+        public string Prompt { get; set; } = "";
 
         /// <summary>
         /// Gets or sets a value indicating whether to stream response.
         /// </summary>
-        public bool stream { get; set; } = true;
+        public bool Stream { get; set; } = true;
     }
 
     // Progress tracking data classes

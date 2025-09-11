@@ -12,14 +12,20 @@ namespace wolle.Services
     {
         private readonly string _logFilePath;
         private static readonly object _lock = new object();
-        private readonly long _maxLogSize = 10 * 1024 * 1024; // 10MB max log size
-        private readonly int _maxLogFiles = 5; // Keep max 5 log files
+        private readonly long _maxLogSize;
+        private readonly int _maxLogFiles;
 
         /// <summary>
         /// Initializes a new instance of LoggerService class.
         /// </summary>
-        public LoggerService()
+        /// <param name="settingsService">Optional settings service for configuration.</param>
+        public LoggerService(SettingsService? settingsService = null)
         {
+            // Get settings or use defaults
+            var settings = settingsService?.LoadSettings() ?? new AppSettings();
+            _maxLogSize = settings.MaxLogSizeBytes;
+            _maxLogFiles = settings.MaxLogFiles;
+
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string logDir = Path.Combine(appDataPath, "wolle", "logs");
 
