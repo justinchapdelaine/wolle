@@ -71,7 +71,24 @@ namespace wolle.Services
                 }
                 catch
                 {
-                    // If even fallback fails, we can't do anything
+                    // If even fallback fails, show error to user via MessageBox
+                    try
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            System.Windows.MessageBox.Show(
+                                "Logging system has failed. The application will continue running but debug information will not be recorded.",
+                                "Logging System Error",
+                                System.Windows.MessageBoxButton.OK,
+                                System.Windows.MessageBoxImage.Warning);
+                        });
+                    }
+                    catch
+                    {
+                        // If we can't even show MessageBox, we're in a very bad state
+                        // At least try to write to console if available
+                        Console.Error.WriteLine($"CRITICAL: Logging system completely failed: {ex.Message}");
+                    }
                 }
             }
         }

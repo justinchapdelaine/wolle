@@ -372,14 +372,22 @@ namespace wolle
             // Let it continue in the background
             if (!_isProcessingComplete)
             {
-                _logger.LogInfo("Window closing but processing not complete - OllamaService will continue in background");
-                // Don't dispose here - let it run to completion
-                // The process will continue running even after app exits
+                _logger.LogInfo("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
             }
             else
             {
                 _logger.LogInfo("Processing complete - disposing OllamaService");
+            }
+            
+            // Always dispose OllamaService to prevent memory leaks
+            try
+            {
                 _ollamaService?.Dispose();
+                _logger.LogInfo("OllamaService disposed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error disposing OllamaService: {ex.Message}");
             }
 
             base.OnClosed(e);

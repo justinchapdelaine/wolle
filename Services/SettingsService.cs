@@ -78,6 +78,43 @@ namespace wolle.Services
                         settings.ApiTimeoutSeconds = 300; // 5 minutes
                     }
 
+                    // Validate model name
+                    if (string.IsNullOrWhiteSpace(settings.ModelName))
+                    {
+                        System.Diagnostics.Debug.WriteLine("Empty model name in settings, resetting to default");
+                        settings.ModelName = "gemma3:4b";
+                    }
+                    else if (!ValidateModelName(settings.ModelName))
+                    {
+                        System.Diagnostics.Debug.WriteLine("Invalid model name in settings, resetting to default");
+                        settings.ModelName = "gemma3:4b";
+                    }
+
+                    // Validate prompts
+                    if (settings.Prompts == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Null prompts in settings, resetting to default");
+                        settings.Prompts = new PromptSettings();
+                    }
+                    else
+                    {
+                        if (string.IsNullOrWhiteSpace(settings.Prompts.Image))
+                        {
+                            System.Diagnostics.Debug.WriteLine("Empty image prompt in settings, resetting to default");
+                            settings.Prompts.Image = "Explain this image to me? {0}";
+                        }
+                        if (string.IsNullOrWhiteSpace(settings.Prompts.Text))
+                        {
+                            System.Diagnostics.Debug.WriteLine("Empty text prompt in settings, resetting to default");
+                            settings.Prompts.Text = "Summarize this text for me? {0}";
+                        }
+                        if (string.IsNullOrWhiteSpace(settings.Prompts.Code))
+                        {
+                            System.Diagnostics.Debug.WriteLine("Empty code prompt in settings, resetting to default");
+                            settings.Prompts.Code = "Analyze this code and explain what it does? {0}";
+                        }
+                    }
+
                     return settings;
                 }
             }
@@ -146,6 +183,43 @@ namespace wolle.Services
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Validates Ollama model name.
+        /// </summary>
+        /// <param name="modelName">The model name to validate.</param>
+        /// <returns>True if model name is valid, false otherwise.</returns>
+        private bool ValidateModelName(string modelName)
+        {
+            if (string.IsNullOrWhiteSpace(modelName))
+            {
+                return false;
+            }
+
+            // Check for dangerous characters
+            var dangerousChars = new[] { '&', '|', ';', '`', '$', '<', '>', '"', '\'' };
+            if (modelName.IndexOfAny(dangerousChars) >= 0)
+            {
+                return false;
+            }
+
+            // Basic format validation - should contain colon and have reasonable length
+            if (!modelName.Contains(':') || modelName.Length < 3 || modelName.Length > 100)
+            {
+                return false;
+            }
+
+            // Check for valid model name pattern (alphanumeric, colons, hyphens, underscores, dots)
+            foreach (char c in modelName)
+            {
+                if (!char.IsLetterOrDigit(c) && c != ':' && c != '-' && c != '_' && c != '.')
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

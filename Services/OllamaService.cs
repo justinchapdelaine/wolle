@@ -1022,7 +1022,7 @@ namespace wolle.Services
         {
             _logger?.LogInfo("OllamaService Dispose called");
 
-            lock (this) // Add lock for thread safety
+            lock (_processLock) // Use dedicated lock object for thread safety
             {
                 if (_isDisposed)
                 {
