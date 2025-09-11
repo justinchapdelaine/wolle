@@ -87,6 +87,25 @@ Theme: Automatic light/dark mode using Fluent ThemeMode APIs
 ## Development Documentation
 All development debugging notes and research documentation are located in `Docs/` folder. These files document various debugging sessions, fixes, and research findings during development, including the logging system implementation.
 
+## Important Architecture Notes
+### .NET 9 Theming System
+**CRITICAL:** This application uses .NET 9's built-in Fluent theming system with `ThemeMode="System"` in App.xaml.
+
+**Key Points:**
+- All DynamicResource references (e.g., `SolidBackgroundFillColorBaseBrush`, `TextFillColorPrimaryBrush`) are **official .NET 9 Fluent theme resources**
+- `ThemeMode="System"` automatically loads and manages Fluent theme resources
+- Resources automatically adapt to Windows light/dark theme changes
+- Built-in fallbacks and accessibility support are included
+- **DO NOT** attempt to add manual fallback values or replace DynamicResource with StaticResource
+- This is a strength, not an issue - provides modern, adaptive theming out of the box
+
+**Resources Used:**
+- Background brushes: `SolidBackgroundFillColorBaseBrush`, `CardBackgroundFillColorDefaultBrush`, etc.
+- Text brushes: `TextFillColorPrimaryBrush`, `TextFillColorSecondaryBrush`, etc.
+- Accent brushes: `AccentFillColorDefaultBrush`, etc.
+
+**Reference:** See `Docs/WPF_ADAPTIVE_BRUSHES.md` for complete list of available Fluent theme brushes.
+
 ## Recent Improvements and Fixes
 ### Critical Issues Fixed:
 1. **Grid Layout Issue**: Fixed XAML Grid.Row conflicts where ResponseScrollViewer and ErrorPanel were incorrectly placed in Row="0" instead of Row="1"
