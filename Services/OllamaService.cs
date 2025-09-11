@@ -458,9 +458,7 @@ namespace wolle.Services
 
             try
             {
-                // Use shared HttpClient instance instead of creating new one
-                var originalTimeout = _httpClient.Timeout;
-                _httpClient.Timeout = TimeSpan.FromMinutes(30);
+                // Use shared HttpClient instance with configured timeout
 
                     // Create Ollama API pull request
                     var request = new
@@ -532,9 +530,6 @@ namespace wolle.Services
                             }
                         }
                     }
-                    
-                    // Restore original timeout
-                    _httpClient.Timeout = originalTimeout;
                 }
             catch (Exception ex)
             {
@@ -595,8 +590,7 @@ namespace wolle.Services
             try
             {
                 // Use shared HttpClient instance instead of creating new one
-                var originalTimeout = _httpClient.Timeout;
-                _httpClient.Timeout = TimeSpan.FromMinutes(10);
+                // Use shared HttpClient instance with configured timeout
 
                     // Create Ollama API request
                     var request = new OllamaApiRequest
@@ -664,9 +658,6 @@ namespace wolle.Services
                             }
                         }
                     }
-                    
-                    // Restore original timeout
-                    _httpClient.Timeout = originalTimeout;
                 }
             catch (Exception ex)
             {
