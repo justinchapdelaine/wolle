@@ -1,0 +1,156 @@
+<Window x:Class="wolle.MainWindow"
+                      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                      xmlns:local="clr-namespace:wolle"
+                      mc:Ignorable="d"
+                      Title="" 
+                      Width="350" 
+                      SizeToContent="Height"
+                      MaxHeight="400"
+                      WindowStyle="None" 
+                      ResizeMode="NoResize"
+                      Background="Transparent"
+                      AllowsTransparency="True"
+                      Topmost="True"
+                      WindowStartupLocation="CenterScreen"
+                      ThemeMode="System">
+    
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="0" 
+                         UseAeroCaptionButtons="False"
+                         NonClientFrameEdges="None"
+                         ResizeBorderThickness="4"
+                         CaptionHeight="0"/>
+    </WindowChrome.WindowChrome>
+    
+    <Border CornerRadius="8" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" 
+            ClipToBounds="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Title Bar -->
+            <Grid Grid.Row="0" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" 
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                  Margin="0,0,0,1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Grid.Clip>
+                    <RectangleGeometry RadiusX="8" RadiusY="8">
+                        <RectangleGeometry.Rect>
+                            <Rect X="0" Y="0" Width="350" Height="40"/>
+                        </RectangleGeometry.Rect>
+                    </RectangleGeometry>
+                </Grid.Clip>
+                
+                <TextBlock Grid.Column="0" 
+                           Text="Wolle" 
+                           Margin="12,8,8,8" 
+                           VerticalAlignment="Center"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                
+                <Button Grid.Column="1" 
+                        Content="✕" 
+                        Click="CloseButton_Click" 
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Width="32" 
+                        Height="32"
+                        Margin="0,0,8,0"
+                        Padding="0"
+                        FontSize="16"
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+            
+            <!-- Content Area -->
+            <Border Grid.Row="1" Margin="8,8,8,8" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" ClipToBounds="True">
+                <Grid Margin="12,12,12,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                
+                <!-- Progress Section -->
+                <StackPanel x:Name="ProgressSection" Grid.Row="0">
+                    <!-- Indeterminate Progress Bar -->
+                    <ProgressBar x:Name="ProgressRing" 
+                                     Minimum="0" 
+                                     Maximum="100" 
+                                     Value="50"
+                                     IsIndeterminate="True"
+                                     Visibility="Visible"
+                                     Height="20"
+                                     Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                     Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                                     BorderThickness="0"/>
+                        
+                    <!-- Determinate Progress Bar -->
+                    <ProgressBar x:Name="ProgressBar" 
+                                   Minimum="0" 
+                                   Maximum="100" 
+                                   Value="0"
+                                   Visibility="Collapsed"
+                                   Height="20"
+                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                   Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                                   BorderThickness="0"/>
+                    
+                    <!-- Progress Details -->
+                    <TextBlock x:Name="ProgressDetails" 
+                               Text="This may take a few minutes on first run..." 
+                               FontSize="12" 
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                </StackPanel>
+                
+                <!-- Response Area -->
+                <FlowDocumentScrollViewer x:Name="ResponseScrollViewer" 
+                            Grid.Row="1"
+                            MaxHeight="300"
+                            VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled"
+                            Visibility="Collapsed"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            Zoom="100"/>
+                
+                <!-- Error Area -->
+                <TextBlock x:Name="ErrorTextBlock" 
+                           Grid.Row="2"
+                           TextWrapping="Wrap" 
+                           FontSize="14"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           Visibility="Collapsed"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
