@@ -161,6 +161,7 @@ namespace wolle.Services
             {
                 OllamaPath = "",
                 OllamaEndpoint = "http://127.0.0.1:11434",
+                ContextWindowSize = 128000, // 128K tokens for Gemma3:4b
                 MaxFileSize = 10 * 1024 * 1024, // 10MB
                 ApiTimeoutSeconds = 300, // 5 minutes
                 Prompts = new PromptSettings
@@ -199,6 +200,11 @@ namespace wolle.Services
         /// Gets or sets the Ollama API endpoint.
         /// </summary>
         public string OllamaEndpoint { get; set; } = "http://127.0.0.1:11434";
+
+        /// <summary>
+        /// Gets or sets the context window size for Ollama model.
+        /// </summary>
+        public int ContextWindowSize { get; set; } = 128000; // 128K tokens for Gemma3:4b
 
         /// <summary>
         /// Gets or sets Ollama model name to use.

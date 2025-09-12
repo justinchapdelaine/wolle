@@ -2,6 +2,7 @@
   "OllamaPath": "",
   "OllamaEndpoint": "http://127.0.0.1:11434",
   "ModelName": "gemma3:4b",
+  "ContextWindowSize": 128000,
   "MaxFileSize": 10485760,
   "ApiTimeoutSeconds": 600,
   "MaxLogSizeBytes": 10485760,

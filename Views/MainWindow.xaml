@@ -193,6 +193,26 @@
                                  VerticalAlignment="Center"/>
                     </Grid>
                     
+                    <Grid Margin="0,8,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Text="Context Window Size:" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        
+                        <ComboBox x:Name="ContextWindowSizeComboBox" 
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  SelectedIndex="2">
+                            <ComboBoxItem Content="32K" Tag="32000"/>
+                            <ComboBoxItem Content="64K" Tag="64000"/>
+                            <ComboBoxItem Content="128K" Tag="128000"/>
+                        </ComboBox>
+                    </Grid>
+                    
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
                         <Button Content="Save" 
                                 Click="SaveSettingsButton_Click" 

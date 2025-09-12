@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
+using System.Text.Json.Serialization;
 
 namespace wolle.Services
 {
@@ -289,8 +290,16 @@ namespace wolle.Services
                         // Don't log server config messages even if they contain "error" in the log level
                         if (!e.Data.Contains("server config", StringComparison.OrdinalIgnoreCase))
                         {
-                            _logger?.LogError($"Ollama server error: {e.Data}");
-                            OnErrorReceived?.Invoke($"Ollama server error: {e.Data}");
+                            // Don't treat "truncating input prompt" as an error - it's expected behavior
+                            if (e.Data.Contains("truncating input prompt", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _logger?.LogInfo($"Ollama server info: {e.Data}");
+                            }
+                            else
+                            {
+                                _logger?.LogError($"Ollama server error: {e.Data}");
+                                OnErrorReceived?.Invoke($"Ollama server error: {e.Data}");
+                            }
                         }
                     }
                     // Log important status messages at info level
@@ -539,6 +548,9 @@ namespace wolle.Services
                     return;
                 }
 
+                // Load settings to get context window size
+                var settings = _settingsService.LoadSettings();
+
                 // Use shared HttpClient instance with configured timeout
                 await _apiLock.WaitAsync();
                 try
@@ -550,12 +562,14 @@ namespace wolle.Services
                         OnErrorReceived?.Invoke("Service is shutting down");
                         return;
                     }
+
                     // Create Ollama API request
                     var request = new OllamaApiRequest
                     {
                         Model = _modelName,
                         Prompt = prompt,
-                        Stream = true
+                        Stream = true,
+                        Options = new OllamaOptions { NumCtx = settings.ContextWindowSize } // Use configurable context window size
                     };
 
                     // Handle image if provided
@@ -888,12 +902,8 @@ namespace wolle.Services
                     _logger?.LogInfo($"Reading text file content: {filePath}");
                     string fileContent = await File.ReadAllTextAsync(filePath);
 
-                    // Limit content size to prevent overly large prompts (max ~50k characters)
-                    if (fileContent.Length > 50000)
-                    {
-                        fileContent = fileContent.Substring(0, 50000) + "\n\n[Content truncated due to length...]";
-                        _logger?.LogInfo("File content truncated to 50k characters");
-                    }
+                    // Let Ollama handle context window management via NumCtx parameter
+                    // No need to manually truncate content - Ollama will handle it gracefully
 
                     return fileExtension switch
                     {
@@ -1124,6 +1134,23 @@ namespace wolle.Services
         /// Gets or sets list of base64-encoded images for multimodal models.
         /// </summary>
         public List<string>? Images { get; set; }
+
+        /// <summary>
+        /// Gets or sets the context window size (num_ctx).
+        /// </summary>
+        public OllamaOptions? Options { get; set; }
+    }
+
+    /// <summary>
+    /// Represents Ollama API options.
+    /// </summary>
+    public class OllamaOptions
+    {
+        /// <summary>
+        /// Gets or sets the context window size.
+        /// </summary>
+        [JsonPropertyName("num_ctx")]
+        public int NumCtx { get; set; } = 128000; // Gemma3:4b supports 128K context window
     }
 
     // Progress tracking data classes

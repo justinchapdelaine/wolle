@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
@@ -25,6 +26,7 @@ namespace wolle
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
+        private int? _pendingContextWindowSize = null;
 
         public MainWindow()
         {
@@ -352,9 +354,18 @@ namespace wolle
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Load current timeout value into settings UI
+            // Load current settings values into settings UI
             var settings = _settingsService.LoadSettings();
             ApiTimeoutTextBox.Text = settings.ApiTimeoutSeconds.ToString();
+
+            // Set context window size combobox
+            int contextSize = settings.ContextWindowSize;
+            if (contextSize == 32000)
+                ContextWindowSizeComboBox.SelectedIndex = 0;
+            else if (contextSize == 64000)
+                ContextWindowSizeComboBox.SelectedIndex = 1;
+            else // 128000 or any other value
+                ContextWindowSizeComboBox.SelectedIndex = 2;
 
             // Show settings panel, hide other content
             SettingsPanel.Visibility = Visibility.Visible;
@@ -367,44 +378,49 @@ namespace wolle
             try
             {
                 // Validate and queue timeout setting
+                bool timeoutValid = false;
                 if (int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
                 {
                     if (timeoutSeconds > 0 && timeoutSeconds <= 1800) // Max 30 minutes
                     {
-                        if (!_isProcessingActive)
-                        {
-                            // If not processing, apply immediately
-                            _pendingApiTimeoutSeconds = timeoutSeconds;
-                            ApplyPendingSettings();
-                            return; // Exit early
-                        }
-                        else
-                        {
-                            // If processing, queue for later
-                            _pendingApiTimeoutSeconds = timeoutSeconds;
+                        timeoutValid = true;
+                    }
+                }
 
-                            // Hide settings panel
-                            SettingsPanel.Visibility = Visibility.Collapsed;
-                            ResponseScrollViewer.Visibility = Visibility.Visible;
+                // Get context window size from combobox
+                var selectedItem = ContextWindowSizeComboBox.SelectedItem as ComboBoxItem;
+                int contextWindowSize = selectedItem != null ? Convert.ToInt32(selectedItem.Tag) : 128000;
 
-                            // Show queued message
-                            var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
-                            ShowTemporaryMessage("Settings queued and will apply after current processing completes.", successBrush);
-
-                            return; // Exit early to prevent old code from running
-                        }
+                if (timeoutValid)
+                {
+                    if (!_isProcessingActive)
+                    {
+                        // If not processing, apply immediately
+                        _pendingApiTimeoutSeconds = timeoutSeconds;
+                        _pendingContextWindowSize = contextWindowSize;
+                        ApplyPendingSettings();
+                        return; // Exit early
                     }
                     else
                     {
-                        ErrorTextBlock.Text = "Timeout must be between 1 and 1800 seconds (30 minutes).";
-                        ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCautionBrush");
-                        ErrorTextBlock.Visibility = Visibility.Visible;
+                        // If processing, queue for later
+                        _pendingApiTimeoutSeconds = timeoutSeconds;
+                        _pendingContextWindowSize = contextWindowSize;
+
+                        // Hide settings panel
+                        SettingsPanel.Visibility = Visibility.Collapsed;
+                        ResponseScrollViewer.Visibility = Visibility.Visible;
+
+                        // Show queued message
+                        var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
+                        ShowTemporaryMessage("Settings queued and will apply after current processing completes.", successBrush);
+
                         return; // Exit early to prevent old code from running
                     }
                 }
                 else
                 {
-                    ErrorTextBlock.Text = "Please enter a valid number for timeout.";
+                    ErrorTextBlock.Text = "Timeout must be between 1 and 1800 seconds (30 minutes).";
                     ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCautionBrush");
                     ErrorTextBlock.Visibility = Visibility.Visible;
                     return; // Exit early to prevent old code from running
@@ -450,6 +466,8 @@ namespace wolle
 
         private void ApplyPendingSettings()
         {
+            bool settingsApplied = false;
+
             if (_pendingApiTimeoutSeconds.HasValue)
             {
                 try
@@ -459,26 +477,12 @@ namespace wolle
                     var settings = _settingsService.LoadSettings();
                     settings.ApiTimeoutSeconds = _pendingApiTimeoutSeconds.Value;
                     _settingsService.SaveSettings(settings);
-
-                    // Restart OllamaService with new timeout
-                    _ollamaService?.Dispose();
-                    _ollamaService = new OllamaService(_settingsService, _logger);
-
-                    // Re-subscribe to events with new service
-                    _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
-                    _ollamaService.OnStatusUpdate += OnOllamaStatusUpdate;
-                    _ollamaService.OnOutputReceived += OnOllamaOutputReceived;
-                    _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
-                    _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
-
-                    // Show success message
-                    var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
-                    ShowTemporaryMessage("Settings applied successfully!", successBrush);
+                    settingsApplied = true;
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError($"Error applying pending settings: {ex.Message}");
-                    ErrorTextBlock.Text = $"Error applying settings: {ex.Message}";
+                    _logger?.LogError($"Error applying ApiTimeoutSeconds setting: {ex.Message}");
+                    ErrorTextBlock.Text = $"Error applying timeout setting: {ex.Message}";
                     ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
                     ErrorTextBlock.Visibility = Visibility.Visible;
                 }
@@ -486,6 +490,48 @@ namespace wolle
                 {
                     _pendingApiTimeoutSeconds = null;
                 }
+            }
+
+            if (_pendingContextWindowSize.HasValue)
+            {
+                try
+                {
+                    _logger?.LogInfo($"Applying pending settings change: ContextWindowSize = {_pendingContextWindowSize.Value}");
+
+                    var settings = _settingsService.LoadSettings();
+                    settings.ContextWindowSize = _pendingContextWindowSize.Value;
+                    _settingsService.SaveSettings(settings);
+                    settingsApplied = true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error applying ContextWindowSize setting: {ex.Message}");
+                    ErrorTextBlock.Text = $"Error applying context window setting: {ex.Message}";
+                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
+                    ErrorTextBlock.Visibility = Visibility.Visible;
+                }
+                finally
+                {
+                    _pendingContextWindowSize = null;
+                }
+            }
+
+            if (settingsApplied)
+            {
+                // Restart OllamaService with new settings
+                _ollamaService?.Dispose();
+                _ollamaService = new OllamaService(_settingsService, _logger);
+
+                // Re-subscribe to events with new service
+                _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
+                _ollamaService.OnStatusUpdate += OnOllamaStatusUpdate;
+                _ollamaService.OnOutputReceived += OnOllamaOutputReceived;
+                _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
+                _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
+
+                // Show success message
+                var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
+                ShowTemporaryMessage("Settings applied successfully!", successBrush);
             }
         }
 
