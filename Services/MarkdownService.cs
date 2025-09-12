@@ -12,6 +12,22 @@ namespace wolle.Services
     /// </summary>
     public class MarkdownService
     {
+        /// <summary>
+        /// Creates a consistently styled FlowDocument.
+        /// </summary>
+        /// <returns>A styled FlowDocument.</returns>
+        private FlowDocument CreateStyledFlowDocument()
+        {
+            return new FlowDocument
+            {
+                FontSize = 14,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
+                TextAlignment = System.Windows.TextAlignment.Left,
+                LineHeight = 20,
+                PagePadding = new System.Windows.Thickness(10, 5, 14, 5) // Right padding for scrollbar
+            };
+        }
+
         private readonly MarkdownPipeline _pipeline;
 
         public MarkdownService()
@@ -38,7 +54,7 @@ namespace wolle.Services
                 // Convert Markdown to FlowDocument using Neo.Markdig.Xaml
                 var flowDocument = MarkdownXaml.ToFlowDocument(markdown, _pipeline);
 
-                // Apply consistent styling with right padding for scrollbar
+                // Apply consistent styling
                 flowDocument.FontSize = 14;
                 flowDocument.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
                 flowDocument.TextAlignment = System.Windows.TextAlignment.Left;
@@ -59,14 +75,7 @@ namespace wolle.Services
         /// </summary>
         private FlowDocument CreatePlainTextDocument(string text)
         {
-            var flowDocument = new FlowDocument
-            {
-                FontSize = 14,
-                FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
-                TextAlignment = System.Windows.TextAlignment.Left,
-                LineHeight = 20,
-                PagePadding = new System.Windows.Thickness(10, 5, 14, 5) // Right padding for scrollbar
-            };
+            var flowDocument = CreateStyledFlowDocument();
 
             var paragraph = new Paragraph();
             paragraph.Inlines.Add(new Run(text));

@@ -5,9 +5,8 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
 using wolle.Services;
-using wolle.Extensions;
 
-#pragma warning disable WPF0001 // Experimental API
+
 
 namespace wolle
 {
@@ -56,17 +55,6 @@ namespace wolle
                 {
                     _logger?.LogError($"Unhandled dispatcher exception: {e.Exception}");
                     e.Handled = true;
-                };
-
-                // Add window state change handlers for debugging
-                this.StateChanged += (sender, e) =>
-                {
-                    _logger?.LogInfo($"Window state changed: {this.WindowState}");
-                };
-
-                this.IsVisibleChanged += (sender, e) =>
-                {
-                    _logger?.LogInfo($"Window visibility changed: {this.IsVisible}");
                 };
 
                 _logger?.LogInfo("MainWindow constructor - Constructor completed successfully");
@@ -130,8 +118,6 @@ namespace wolle
                 Dispatcher.Invoke(() =>
                 {
                     _isProcessingComplete = true;
-                    // Optionally close after completion
-                    // Close();
                 });
             });
         }
@@ -244,9 +230,6 @@ namespace wolle
 
                     // Apply any pending settings changes
                     ApplyPendingSettings();
-
-                    // Optionally close after a delay
-                    // Task.Delay(5000).ContinueWith(_ => Close());
                 });
             }
         }
@@ -354,6 +337,19 @@ namespace wolle
             Close();
         }
 
+        /// <summary>
+        /// Gets a brush from application resources with fallback.
+        /// </summary>
+        /// <param name="resourceKey">The resource key.</param>
+        /// <param name="fallbackKey">The fallback resource key.</param>
+        /// <returns>The brush or fallback brush.</returns>
+        private Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush")
+        {
+            return Application.Current.Resources[resourceKey] as Brush ??
+                   Application.Current.Resources[fallbackKey] as Brush ??
+                   new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Black);
+        }
+
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             // Load current timeout value into settings UI
@@ -392,18 +388,8 @@ namespace wolle
                             ResponseScrollViewer.Visibility = Visibility.Visible;
 
                             // Show queued message
-                            ErrorTextBlock.Text = "Settings queued and will apply after current processing completes.";
-                            ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorSuccessBrush"] as Brush;
-                            ErrorTextBlock.Visibility = Visibility.Visible;
-
-                            // Hide message after 3 seconds
-                            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                            timer.Tick += (s, args) =>
-                            {
-                                timer.Stop();
-                                ErrorTextBlock.Visibility = Visibility.Collapsed;
-                            };
-                            timer.Start();
+                            var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
+                            ShowTemporaryMessage("Settings queued and will apply after current processing completes.", successBrush);
 
                             return; // Exit early to prevent old code from running
                         }
@@ -411,7 +397,7 @@ namespace wolle
                     else
                     {
                         ErrorTextBlock.Text = "Timeout must be between 1 and 1800 seconds (30 minutes).";
-                        ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCautionBrush"] as Brush;
+                        ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCautionBrush");
                         ErrorTextBlock.Visibility = Visibility.Visible;
                         return; // Exit early to prevent old code from running
                     }
@@ -419,7 +405,7 @@ namespace wolle
                 else
                 {
                     ErrorTextBlock.Text = "Please enter a valid number for timeout.";
-                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCautionBrush"] as Brush;
+                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCautionBrush");
                     ErrorTextBlock.Visibility = Visibility.Visible;
                     return; // Exit early to prevent old code from running
                 }
@@ -428,7 +414,7 @@ namespace wolle
             {
                 _logger?.LogError($"Error saving settings: {ex.Message}");
                 ErrorTextBlock.Text = $"Error saving settings: {ex.Message}";
-                ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Brush;
+                ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
                 ErrorTextBlock.Visibility = Visibility.Visible;
             }
         }
@@ -439,6 +425,27 @@ namespace wolle
             SettingsPanel.Visibility = Visibility.Collapsed;
             ResponseScrollViewer.Visibility = Visibility.Visible;
             ErrorTextBlock.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Shows a temporary message that automatically hides after a specified time.
+        /// </summary>
+        /// <param name="message">The message to display.</param>
+        /// <param name="brush">The foreground brush for the message.</param>
+        /// <param name="seconds">The number of seconds to show the message.</param>
+        private void ShowTemporaryMessage(string message, Brush brush, int seconds = 3)
+        {
+            ErrorTextBlock.Text = message;
+            ErrorTextBlock.Foreground = brush ?? Application.Current.Resources["TextFillColorPrimaryBrush"] as Brush;
+            ErrorTextBlock.Visibility = Visibility.Visible;
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
+            timer.Tick += (s, args) =>
+            {
+                timer.Stop();
+                ErrorTextBlock.Visibility = Visibility.Collapsed;
+            };
+            timer.Start();
         }
 
         private void ApplyPendingSettings()
@@ -465,24 +472,14 @@ namespace wolle
                     _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
 
                     // Show success message
-                    ErrorTextBlock.Text = "Settings applied successfully!";
-                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorSuccessBrush"] as Brush;
-                    ErrorTextBlock.Visibility = Visibility.Visible;
-
-                    // Hide success message after 3 seconds
-                    var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-                    timer.Tick += (s, args) =>
-                    {
-                        timer.Stop();
-                        ErrorTextBlock.Visibility = Visibility.Collapsed;
-                    };
-                    timer.Start();
+                    var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
+                    ShowTemporaryMessage("Settings applied successfully!", successBrush);
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError($"Error applying pending settings: {ex.Message}");
                     ErrorTextBlock.Text = $"Error applying settings: {ex.Message}";
-                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Brush;
+                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
                     ErrorTextBlock.Visibility = Visibility.Visible;
                 }
                 finally
@@ -555,37 +552,7 @@ namespace wolle
         /// <returns>True if path is valid, false otherwise.</returns>
         private bool ValidateFilePath(string filePath, out string sanitizedPath)
         {
-            sanitizedPath = string.Empty;
-
-            try
-            {
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-
-                // Check for path traversal attacks
-                if (filePath.Contains("..") || filePath.Contains("|") || filePath.Contains("<") || filePath.Contains(">"))
-                {
-                    return false;
-                }
-
-                // Get full path to resolve relative paths
-                string fullPath = System.IO.Path.GetFullPath(filePath);
-
-                // Check if file exists
-                if (!System.IO.File.Exists(fullPath))
-                {
-                    return false;
-                }
-
-                sanitizedPath = fullPath;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return ValidationService.ValidateFilePath(filePath, out sanitizedPath);
         }
     }
 }

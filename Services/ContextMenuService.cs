@@ -127,34 +127,7 @@ namespace wolle.Services
         /// <returns>True if path is valid, false otherwise.</returns>
         private bool IsValidExecutablePath(string path)
         {
-            try
-            {
-                // Check if path is absolute
-                if (!Path.IsPathRooted(path))
-                {
-                    return false;
-                }
-
-                // Check for suspicious characters that could indicate path injection
-                if (path.Contains("..") || path.Contains("|") || path.Contains("<") || path.Contains(">"))
-                {
-                    return false;
-                }
-
-                // Check file extension
-                if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                // Check if file exists and is actually executable
-                var fileInfo = new FileInfo(path);
-                return fileInfo.Exists && fileInfo.Length > 0;
-            }
-            catch
-            {
-                return false;
-            }
+            return ValidationService.ValidateExecutablePath(path);
         }
 
         /// <summary>

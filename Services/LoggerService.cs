@@ -209,9 +209,10 @@ namespace wolle.Services
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If cleanup fails, continue
+                // If cleanup fails, continue but log the error
+                System.Diagnostics.Debug.WriteLine($"Logger cleanup error: {ex.Message}");
             }
         }
     }

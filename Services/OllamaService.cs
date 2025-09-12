@@ -200,7 +200,7 @@ namespace wolle.Services
             _logger?.LogInfo("StartOllamaServerAsync started");
 
             // Validate and sanitize Ollama path
-            if (!ValidateOllamaPath(ollamaPath))
+            if (!ValidationService.ValidateExecutablePath(ollamaPath, _logger))
             {
                 _logger?.LogError("Invalid Ollama path");
                 OnErrorReceived?.Invoke("Invalid Ollama executable path.");
@@ -302,99 +302,7 @@ namespace wolle.Services
             return Task.FromResult(true);
         }
 
-        /// <summary>
-        /// Validates Ollama executable path.
-        /// </summary>
-        /// <param name="path">The path to validate.</param>
-        /// <returns>True if path is valid, false otherwise.</returns>
-        private bool ValidateOllamaPath(string path)
-        {
-            try
-            {
-                _logger?.LogInfo($"Validating Ollama path: {path}");
 
-                if (string.IsNullOrEmpty(path))
-                {
-                    _logger?.LogError("Path validation failed: path is null or empty");
-                    return false;
-                }
-
-                // Check if file exists
-                if (!File.Exists(path))
-                {
-                    _logger?.LogError($"Path validation failed: file does not exist at {path}");
-                    return false;
-                }
-
-                // Check if it's actually an executable
-                if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger?.LogError($"Path validation failed: not an .exe file: {path}");
-                    return false;
-                }
-
-                // Check if file is accessible and has reasonable size
-                var fileInfo = new FileInfo(path);
-
-                if (fileInfo.Length == 0 || fileInfo.Length > 100 * 1024 * 1024) // 100MB max
-                {
-                    _logger?.LogError($"Path validation failed: invalid file size: {fileInfo.Length} bytes");
-                    return false;
-                }
-
-                // Try to get file version to validate it's a proper executable
-                try
-                {
-                    var versionInfo = FileVersionInfo.GetVersionInfo(path);
-
-                    // For some executables (like Go binaries), version info might be minimal
-                    // Accept if it has any version info OR if it's a reasonable executable size
-                    if (!string.IsNullOrEmpty(versionInfo.FileDescription) ||
-                        !string.IsNullOrEmpty(versionInfo.ProductName) ||
-                        !string.IsNullOrEmpty(versionInfo.CompanyName) ||
-                        !string.IsNullOrEmpty(versionInfo.OriginalFilename))
-                    {
-                        _logger?.LogInfo("Path validation passed: has version information");
-                    }
-                    else
-                    {
-                        // If no version info, check if it's a reasonable size for an executable
-                        // Ollama executable is typically around 30-50MB
-                        if (fileInfo.Length > 10 * 1024 * 1024) // At least 10MB
-                        {
-                            _logger?.LogInfo("Path validation passed: reasonable executable size with no version info");
-                        }
-                        else
-                        {
-                            _logger?.LogError("Path validation failed: no version information and too small to be valid executable");
-                            return false;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogInfo($"Version info access failed (continuing anyway): {ex.Message}");
-                    // If we can't get version info, check file size as fallback
-                    if (fileInfo.Length > 10 * 1024 * 1024) // At least 10MB
-                    {
-                        _logger?.LogInfo("Path validation passed: reasonable executable size (version info access failed)");
-                    }
-                    else
-                    {
-                        _logger?.LogError($"Path validation failed: cannot access version info and file too small: {fileInfo.Length} bytes");
-                        return false;
-                    }
-                }
-
-                _logger?.LogInfo("Path validation passed");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError($"Path validation exception: {ex.Message}");
-                return false;
-            }
-        }
 
         /// <summary>
         /// Sanitizes process arguments to prevent injection attacks.
@@ -411,7 +319,7 @@ namespace wolle.Services
             // Validate that arguments don't contain dangerous command sequences
             // Instead of removing characters, we'll validate and properly escape
             var dangerousPatterns = new[] { "&&", "||", ";", "&", "|", "`", "$(", "$`", "\n", "\r" };
-            
+
             foreach (var pattern in dangerousPatterns)
             {
                 if (arguments.Contains(pattern))
@@ -460,77 +368,77 @@ namespace wolle.Services
             {
                 // Use shared HttpClient instance with configured timeout
 
-                    // Create Ollama API pull request
-                    var request = new
+                // Create Ollama API pull request
+                var request = new
+                {
+                    Model = modelName,
+                    Stream = true
+                };
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(request, options: new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
+                    System.Text.Encoding.UTF8,
+                    "application/json");
+
+                _logger?.LogInfo("Sending pull request to Ollama API");
+
+                var response = await _httpClient.PostAsync("/api/pull", content);
+                response.EnsureSuccessStatusCode();
+
+                _logger?.LogInfo("Pull response received from Ollama API");
+
+                // Read streaming response
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                using (var reader = new StreamReader(stream))
+                {
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) != null)
                     {
-                        Model = modelName,
-                        Stream = true
-                    };
-
-                    var content = new StringContent(
-                        JsonSerializer.Serialize(request, options: new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                        System.Text.Encoding.UTF8,
-                        "application/json");
-
-                    _logger?.LogInfo("Sending pull request to Ollama API");
-
-                    var response = await _httpClient.PostAsync("/api/pull", content);
-                    response.EnsureSuccessStatusCode();
-
-                    _logger?.LogInfo("Pull response received from Ollama API");
-
-                    // Read streaming response
-                    using (var stream = await response.Content.ReadAsStreamAsync())
-                    using (var reader = new StreamReader(stream))
-                    {
-                        string? line;
-                        while ((line = await reader.ReadLineAsync()) != null)
+                        if (!string.IsNullOrEmpty(line))
                         {
-                            if (!string.IsNullOrEmpty(line))
+                            // Don't log every pull response - this creates huge log files
+                            // Only log errors or important events
+
+                            // Parse JSON response for progress
+                            try
                             {
-                                // Don't log every pull response - this creates huge log files
-                                // Only log errors or important events
-
-                                // Parse JSON response for progress
-                                try
+                                var json = JsonDocument.Parse(line);
+                                if (json.RootElement.TryGetProperty("status", out var statusElement))
                                 {
-                                    var json = JsonDocument.Parse(line);
-                                    if (json.RootElement.TryGetProperty("status", out var statusElement))
+                                    string status = statusElement.GetString() ?? "";
+
+                                    // Only log important status changes, not every percentage update
+                                    if (status.Contains("error") || status.Contains("failed") ||
+                                        status.Contains("success") || status.Contains("manifest") ||
+                                        status.Contains("verifying") || status.Contains("pulling manifest"))
                                     {
-                                        string status = statusElement.GetString() ?? "";
-
-                                        // Only log important status changes, not every percentage update
-                                        if (status.Contains("error") || status.Contains("failed") ||
-                                            status.Contains("success") || status.Contains("manifest") ||
-                                            status.Contains("verifying") || status.Contains("pulling manifest"))
-                                        {
-                                            _logger?.LogInfo($"Pull status: {status}");
-                                        }
-
-                                        // Parse progress from API response (not text)
-                                        var progress = ParseProgressFromApiResponse(json.RootElement);
-                                        if (progress != null)
-                                        {
-                                            OnProgressUpdate?.Invoke(progress);
-                                        }
+                                        _logger?.LogInfo($"Pull status: {status}");
                                     }
 
-                                    // Check if done
-                                    if (json.RootElement.TryGetProperty("status", out var doneStatusElement) &&
-                                        doneStatusElement.GetString() == "success")
+                                    // Parse progress from API response (not text)
+                                    var progress = ParseProgressFromApiResponse(json.RootElement);
+                                    if (progress != null)
                                     {
-                                        _logger?.LogInfo("Ollama pull completed successfully");
-                                        break;
+                                        OnProgressUpdate?.Invoke(progress);
                                     }
                                 }
-                                catch (JsonException ex)
+
+                                // Check if done
+                                if (json.RootElement.TryGetProperty("status", out var doneStatusElement) &&
+                                    doneStatusElement.GetString() == "success")
                                 {
-                                    _logger?.LogError($"Error parsing JSON response: {ex.Message}");
+                                    _logger?.LogInfo("Ollama pull completed successfully");
+                                    break;
                                 }
+                            }
+                            catch (JsonException ex)
+                            {
+                                _logger?.LogError($"Error parsing JSON response: {ex.Message}");
                             }
                         }
                     }
                 }
+            }
             catch (Exception ex)
             {
                 _logger?.LogError($"Ollama API pull error: {ex.Message}");
@@ -568,13 +476,25 @@ namespace wolle.Services
             string? ollamaPath = GetOllamaPath();
 
             string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
-            string prompt = GetPromptForFileType(fileExtension, filePath);
+            string prompt = await GetPromptForFileTypeAsync(fileExtension, filePath);
 
             _logger?.LogInfo($"Processing {fileExtension} file with prompt: {prompt}");
             OnStatusUpdate?.Invoke("Starting Ollama analysis...");
 
-            // Use Ollama API instead of CLI with redirected input
-            await RunOllamaApiAsync(prompt);
+            // Check if this is an image file
+            if (IsImageFile(filePath))
+            {
+                _logger?.LogInfo("File is an image - will use multimodal processing");
+                OnStatusUpdate?.Invoke("Processing image with multimodal model...");
+                await RunOllamaApiAsync(prompt, filePath);
+            }
+            else
+            {
+                _logger?.LogInfo("File is not an image - will use text-only processing");
+                OnStatusUpdate?.Invoke("Processing text file...");
+                await RunOllamaApiAsync(prompt);
+            }
+
             _logger?.LogInfo("ProcessFileAsync completed");
         }
 
@@ -582,16 +502,18 @@ namespace wolle.Services
         /// Runs Ollama API asynchronously with a given prompt.
         /// </summary>
         /// <param name="prompt">The prompt to send to Ollama.</param>
+        /// <param name="imagePath">Optional path to image file for multimodal analysis.</param>
         /// <returns>A task representing asynchronous operation.</returns>
-        private async Task RunOllamaApiAsync(string prompt)
+        private async Task RunOllamaApiAsync(string prompt, string? imagePath = null)
         {
             _logger?.LogInfo($"RunOllamaApiAsync started with prompt: {prompt}");
 
             try
             {
-                // Use shared HttpClient instance instead of creating new one
                 // Use shared HttpClient instance with configured timeout
-
+                await _apiLock.WaitAsync();
+                try
+                {
                     // Create Ollama API request
                     var request = new OllamaApiRequest
                     {
@@ -599,6 +521,23 @@ namespace wolle.Services
                         Prompt = prompt,
                         Stream = true
                     };
+
+                    // Handle image if provided
+                    if (!string.IsNullOrEmpty(imagePath) && IsImageFile(imagePath))
+                    {
+                        _logger?.LogInfo($"Processing image file: {imagePath}");
+                        string? base64Image = await ConvertImageToBase64Async(imagePath);
+
+                        if (!string.IsNullOrEmpty(base64Image))
+                        {
+                            request.Images = new List<string> { base64Image };
+                            _logger?.LogInfo("Image successfully converted to base64 and added to request");
+                        }
+                        else
+                        {
+                            _logger?.LogError("Failed to convert image to base64 - continuing without image");
+                        }
+                    }
 
                     var content = new StringContent(
                         JsonSerializer.Serialize(request, options: new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
@@ -659,6 +598,11 @@ namespace wolle.Services
                         }
                     }
                 }
+                finally
+                {
+                    _apiLock.Release();
+                }
+            }
             catch (Exception ex)
             {
                 _logger?.LogError($"Ollama API error: {ex.Message}");
@@ -721,7 +665,7 @@ namespace wolle.Services
                 _logger?.LogInfo($"Found configured Ollama path: {settings.OllamaPath}");
 
                 // Validate the path before returning
-                if (ValidateOllamaPath(settings.OllamaPath))
+                if (ValidationService.ValidateExecutablePath(settings.OllamaPath, _logger))
                 {
                     return settings.OllamaPath;
                 }
@@ -743,7 +687,7 @@ namespace wolle.Services
                     _logger?.LogInfo($"Found Ollama in PATH: {ollamaPath}");
 
                     // Validate the path before returning
-                    if (ValidateOllamaPath(ollamaPath))
+                    if (ValidationService.ValidateExecutablePath(ollamaPath, _logger))
                     {
                         return ollamaPath;
                     }
@@ -776,48 +720,68 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Checks if a file is an image based on its extension.
+        /// </summary>
+        /// <param name="filePath">The file path to check.</param>
+        /// <returns>True if the file is an image, false otherwise.</returns>
+        private bool IsImageFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return false;
+
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp" };
+
+            return Array.Exists(imageExtensions, ext => ext == extension);
+        }
+
+        /// <summary>
+        /// Converts an image file to base64-encoded string.
+        /// </summary>
+        /// <param name="filePath">The path to the image file.</param>
+        /// <returns>Base64-encoded string representation of the image.</returns>
+        private async Task<string?> ConvertImageToBase64Async(string filePath)
+        {
+            try
+            {
+                _logger?.LogInfo($"Converting image to base64: {filePath}");
+
+                if (!IsImageFile(filePath))
+                {
+                    _logger?.LogError($"File is not a supported image format: {filePath}");
+                    return null;
+                }
+
+                // Check file size (limit to 10MB for performance)
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length > 10 * 1024 * 1024) // 10MB
+                {
+                    _logger?.LogError($"Image file too large: {fileInfo.Length} bytes (max: 10MB)");
+                    return null;
+                }
+
+                // Read image bytes and convert to base64
+                byte[] imageBytes = await File.ReadAllBytesAsync(filePath);
+                string base64String = Convert.ToBase64String(imageBytes);
+
+                _logger?.LogInfo($"Successfully converted image to base64 ({imageBytes.Length} bytes)");
+                return base64String;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error converting image to base64: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Validates file path for security.
         /// </summary>
         /// <param name="filePath">The file path to validate.</param>
         /// <returns>True if path is valid, false otherwise.</returns>
         private bool ValidateFilePath(string filePath)
         {
-            try
-            {
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-
-                // Check for path traversal attacks
-                if (filePath.Contains("..") || filePath.Contains("|") || filePath.Contains("<") || filePath.Contains(">"))
-                {
-                    return false;
-                }
-
-                // Check if file exists
-                if (!File.Exists(filePath))
-                {
-                    return false;
-                }
-
-                // Get full path to resolve relative paths
-                string fullPath = Path.GetFullPath(filePath);
-
-                // Check if path is accessible
-                var fileInfo = new FileInfo(fullPath);
-                if (!fileInfo.Exists)
-                {
-                    return false;
-                }
-
-                // Additional security checks can be added here
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return ValidationService.ValidateFilePath(filePath, out _);
         }
 
         /// <summary>
@@ -849,89 +813,59 @@ namespace wolle.Services
         /// <param name="fileExtension">The file extension.</param>
         /// <param name="filePath">The file path.</param>
         /// <returns>A prompt string suitable for file type.</returns>
-        private string GetPromptForFileType(string fileExtension, string filePath)
+        private async Task<string> GetPromptForFileTypeAsync(string fileExtension, string filePath)
         {
-            _logger?.LogInfo($"GetPromptForFileType called for: {fileExtension}");
+            _logger?.LogInfo($"GetPromptForFileTypeAsync called for: {fileExtension}");
 
             // Sanitize file path for prompt to prevent injection
             string sanitizedFilePath = SanitizeForPrompt(filePath);
 
-            return fileExtension switch
+            // For text files, read the content and include it in the prompt
+            if (!IsImageFile(filePath))
             {
-                ".md" or ".txt" => $"Summarize this text for me? {sanitizedFilePath}",
-                ".cs" or ".py" or ".js" or ".ts" or ".java" or ".cpp" or ".c" => $"Analyze this code file and explain what it does: {sanitizedFilePath}",
-                ".json" or ".xml" or ".yaml" or ".yml" => $"Analyze this data structure file: {sanitizedFilePath}",
-                ".sql" => $"Analyze this SQL query and explain its purpose: {sanitizedFilePath}",
-                ".html" or ".css" or ".scss" => $"Analyze this web file: {sanitizedFilePath}",
-                ".log" => $"Analyze this log file and identify any issues: {sanitizedFilePath}",
-                ".bat" or ".sh" or ".ps1" => $"Analyze this script and explain what it does: {sanitizedFilePath}",
-                _ => $"Analyze this file and provide insights: {sanitizedFilePath}"
-            };
-        }
-
-        /// <summary>
-        /// Parses progress information from text output.
-        /// </summary>
-        /// <param name="line">The line to parse.</param>
-        /// <returns>OllamaProgress object if successful, null otherwise.</returns>
-        private OllamaProgress? ParseProgressFromText(string line)
-        {
-            if (string.IsNullOrEmpty(line))
-                return null;
-
-            // Parse progress from text output like:
-            // "pulling 8b5d3a5a..."
-            // "100%|██████████| 1.2k/1.2k [00:00<00:00, 12.3kB/s]"
-            // " 50%|█████     | 615MB/1.2GB [00:15<00:15, 41.2MB/s]"
-            // "writing manifest" 
-            // "success"
-
-            var progress = new OllamaProgress();
-
-            // Check for initial pulling message
-            if (line.Contains("pulling") && !line.Contains("%"))
-            {
-                progress.status = line;
-                progress.percent = 0;
-                return progress;
-            }
-
-            // Check for progress with percentage
-            var percentMatch = Regex.Match(line, @"(\d+)%");
-            if (percentMatch.Success && int.TryParse(percentMatch.Groups[1].Value, out int percent))
-            {
-                progress.percent = percent;
-                progress.status = line;
-
-                // Try to extract total and completed sizes
-                var sizeMatch = Regex.Match(line, @"([\d.]+)([KMGT]?i?B)/([\d.]+)([KMGT]?i?B)");
-                if (sizeMatch.Success)
+                try
                 {
-                    // This is a simplified version - in a real implementation you'd parse sizes properly
-                    progress.total = 100; // Placeholder
-                    progress.completed = percent;
+                    _logger?.LogInfo($"Reading text file content: {filePath}");
+                    string fileContent = await File.ReadAllTextAsync(filePath);
+
+                    // Limit content size to prevent overly large prompts (max ~50k characters)
+                    if (fileContent.Length > 50000)
+                    {
+                        fileContent = fileContent.Substring(0, 50000) + "\n\n[Content truncated due to length...]";
+                        _logger?.LogInfo("File content truncated to 50k characters");
+                    }
+
+                    return fileExtension switch
+                    {
+                        ".md" or ".txt" => $"Summarize this text:\n\n{fileContent}",
+                        ".cs" or ".py" or ".js" or ".ts" or ".java" or ".cpp" or ".c" => $"Analyze this code file and explain what it does:\n\n{fileContent}",
+                        ".json" or ".xml" or ".yaml" or ".yml" => $"Analyze this data structure file:\n\n{fileContent}",
+                        ".sql" => $"Analyze this SQL query and explain its purpose:\n\n{fileContent}",
+                        ".html" or ".css" or ".scss" => $"Analyze this web file:\n\n{fileContent}",
+                        ".log" => $"Analyze this log file and identify any issues:\n\n{fileContent}",
+                        ".bat" or ".sh" or ".ps1" => $"Analyze this script and explain what it does:\n\n{fileContent}",
+                        _ => $"Analyze this file and provide insights:\n\n{fileContent}"
+                    };
                 }
-
-                return progress;
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error reading file content: {ex.Message}");
+                    return $"Analyze this file: {sanitizedFilePath}";
+                }
             }
-
-            // Check for completion messages
-            if (line.Contains("writing manifest") || line.Contains("success"))
+            else
             {
-                progress.status = line;
-                progress.percent = 100;
-                return progress;
+                // For image files, just return the prompt (image will be handled separately)
+                return fileExtension switch
+                {
+                    ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tiff" or ".webp" =>
+                        $"Analyze this image and provide a detailed description: {sanitizedFilePath}",
+                    _ => $"Analyze this file and provide insights: {sanitizedFilePath}"
+                };
             }
-
-            // Check for status messages
-            if (line.Contains("manifest") || line.Contains("verifying") || line.Contains("creating"))
-            {
-                progress.status = line;
-                return progress;
-            }
-
-            return null;
         }
+
+
 
         /// <summary>
         /// Parses progress information from API response.
@@ -1016,6 +950,31 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Safely kills a process with logging and error handling.
+        /// </summary>
+        /// <param name="process">The process to kill.</param>
+        /// <param name="processName">The name of the process for logging.</param>
+        private void SafeKillProcess(Process? process, string processName)
+        {
+            if (process == null)
+                return;
+
+            try
+            {
+                if (!process.HasExited)
+                {
+                    _logger?.LogInfo($"Killing {processName} process");
+                    process.Kill(true); // Force kill with entire process tree
+                    process.WaitForExit(5000); // Wait up to 5 seconds
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error killing {processName} process: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Disposes resources used by OllamaService.
         /// </summary>
         public void Dispose()
@@ -1034,47 +993,17 @@ namespace wolle.Services
                 // Clean up Ollama server process
                 if (_ollamaServerProcess != null)
                 {
-                    try
-                    {
-                        if (!_ollamaServerProcess.HasExited)
-                        {
-                            _logger?.LogInfo("Killing Ollama server process during disposal");
-                            _ollamaServerProcess.Kill(true); // Force kill with entire process tree
-                            _ollamaServerProcess.WaitForExit(5000); // Wait up to 5 seconds
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError($"Error killing Ollama server process: {ex.Message}");
-                    }
-                    finally
-                    {
-                        _ollamaServerProcess.Dispose();
-                        _ollamaServerProcess = null;
-                    }
+                    SafeKillProcess(_ollamaServerProcess, "Ollama server");
+                    _ollamaServerProcess.Dispose();
+                    _ollamaServerProcess = null;
                 }
 
                 // Clean up Ollama process
                 if (_ollamaProcess != null)
                 {
-                    try
-                    {
-                        if (!_ollamaProcess.HasExited)
-                        {
-                            _logger?.LogInfo("Killing Ollama process during disposal");
-                            _ollamaProcess.Kill(true); // Force kill with entire process tree
-                            _ollamaProcess.WaitForExit(5000); // Wait up to 5 seconds
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError($"Error killing Ollama process: {ex.Message}");
-                    }
-                    finally
-                    {
-                        _ollamaProcess.Dispose();
-                        _ollamaProcess = null;
-                    }
+                    SafeKillProcess(_ollamaProcess, "Ollama");
+                    _ollamaProcess.Dispose();
+                    _ollamaProcess = null;
                 }
 
                 // Clean up HttpClient and SemaphoreSlim
@@ -1130,6 +1059,11 @@ namespace wolle.Services
         /// Gets or sets a value indicating whether to stream response.
         /// </summary>
         public bool Stream { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets list of base64-encoded images for multimodal models.
+        /// </summary>
+        public List<string>? Images { get; set; }
     }
 
     // Progress tracking data classes

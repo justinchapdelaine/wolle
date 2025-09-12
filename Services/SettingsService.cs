@@ -47,7 +47,7 @@ namespace wolle.Services
                     // Validate Ollama path if configured
                     if (!string.IsNullOrEmpty(settings.OllamaPath))
                     {
-                        if (!ValidateOllamaPath(settings.OllamaPath))
+                        if (!ValidationService.ValidateExecutablePath(settings.OllamaPath))
                         {
                             System.Diagnostics.Debug.WriteLine("Invalid Ollama path in settings, resetting to default");
                             settings.OllamaPath = "";
@@ -57,7 +57,7 @@ namespace wolle.Services
                     // Validate Ollama endpoint
                     if (!string.IsNullOrEmpty(settings.OllamaEndpoint))
                     {
-                        if (!ValidateOllamaEndpoint(settings.OllamaEndpoint))
+                        if (!ValidationService.ValidateOllamaEndpoint(settings.OllamaEndpoint))
                         {
                             System.Diagnostics.Debug.WriteLine("Invalid Ollama endpoint in settings, resetting to default");
                             settings.OllamaEndpoint = "http://127.0.0.1:11434";
@@ -65,14 +65,14 @@ namespace wolle.Services
                     }
 
                     // Validate max file size
-                    if (settings.MaxFileSize <= 0 || settings.MaxFileSize > 100 * 1024 * 1024) // Max 100MB
+                    if (!ValidationService.ValidateFileSize(settings.MaxFileSize))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid max file size in settings, resetting to default");
                         settings.MaxFileSize = 10 * 1024 * 1024; // 10MB
                     }
 
                     // Validate API timeout
-                    if (settings.ApiTimeoutSeconds <= 0 || settings.ApiTimeoutSeconds > 1800) // Max 30 minutes
+                    if (!ValidationService.ValidateApiTimeout(settings.ApiTimeoutSeconds))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid API timeout in settings, resetting to default");
                         settings.ApiTimeoutSeconds = 600; // 10 minutes
@@ -84,7 +84,7 @@ namespace wolle.Services
                         System.Diagnostics.Debug.WriteLine("Empty model name in settings, resetting to default");
                         settings.ModelName = "gemma3:4b";
                     }
-                    else if (!ValidateModelName(settings.ModelName))
+                    else if (!ValidationService.ValidateModelName(settings.ModelName))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid model name in settings, resetting to default");
                         settings.ModelName = "gemma3:4b";
@@ -127,146 +127,11 @@ namespace wolle.Services
             return GetDefaultSettings();
         }
 
-        /// <summary>
-        /// Validates Ollama executable path.
-        /// </summary>
-        /// <param name="path">The path to validate.</param>
-        /// <returns>True if path is valid, false otherwise.</returns>
-        private bool ValidateOllamaPath(string path)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(path))
-                {
-                    return false;
-                }
 
-                // Check if file exists
-                if (!File.Exists(path))
-                {
-                    return false;
-                }
 
-                // Check if it's actually an executable
-                if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
 
-                // Check if file is accessible and has reasonable size
-                var fileInfo = new FileInfo(path);
-                if (fileInfo.Length == 0 || fileInfo.Length > 100 * 1024 * 1024) // 100MB max
-                {
-                    return false;
-                }
 
-                // Try to get file version to validate it's a proper executable
-                try
-                {
-                    var versionInfo = FileVersionInfo.GetVersionInfo(path);
-                    if (string.IsNullOrEmpty(versionInfo.FileDescription) &&
-                        string.IsNullOrEmpty(versionInfo.ProductName))
-                    {
-                        // Might not be a valid executable
-                        return false;
-                    }
-                }
-                catch
-                {
-                    // If we can't get version info, still allow it
-                    // Some executables might not have version info
-                }
 
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Validates Ollama model name.
-        /// </summary>
-        /// <param name="modelName">The model name to validate.</param>
-        /// <returns>True if model name is valid, false otherwise.</returns>
-        private bool ValidateModelName(string modelName)
-        {
-            if (string.IsNullOrWhiteSpace(modelName))
-            {
-                return false;
-            }
-
-            // Check for dangerous characters
-            var dangerousChars = new[] { '&', '|', ';', '`', '$', '<', '>', '"', '\'' };
-            if (modelName.IndexOfAny(dangerousChars) >= 0)
-            {
-                return false;
-            }
-
-            // Basic format validation - should contain colon and have reasonable length
-            if (!modelName.Contains(':') || modelName.Length < 3 || modelName.Length > 100)
-            {
-                return false;
-            }
-
-            // Check for valid model name pattern (alphanumeric, colons, hyphens, underscores, dots)
-            foreach (char c in modelName)
-            {
-                if (!char.IsLetterOrDigit(c) && c != ':' && c != '-' && c != '_' && c != '.')
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Validates Ollama API endpoint.
-        /// </summary>
-        /// <param name="endpoint">The endpoint to validate.</param>
-        /// <returns>True if endpoint is valid, false otherwise.</returns>
-        private bool ValidateOllamaEndpoint(string endpoint)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(endpoint))
-                {
-                    return false;
-                }
-
-                // Must be a valid URI
-                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out Uri? uri))
-                {
-                    return false;
-                }
-
-                // Must be HTTP or HTTPS
-                if (uri.Scheme != "http" && uri.Scheme != "https")
-                {
-                    return false;
-                }
-
-                // Must be localhost or loopback for security
-                if (uri.Host != "localhost" && uri.Host != "127.0.0.1" && uri.Host != "::1")
-                {
-                    return false;
-                }
-
-                // Must have a valid port
-                if (uri.Port <= 0 || uri.Port > 65535)
-                {
-                    return false;
-                }
-
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
 
         /// <summary>
         /// Saves application settings to file.
