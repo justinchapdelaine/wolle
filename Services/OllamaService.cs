@@ -92,7 +92,7 @@ namespace wolle.Services
     public class OllamaService : IDisposable
     {
         private readonly SettingsService _settingsService;
-        private readonly LoggerService? _logger;
+        private readonly ILogger<OllamaService> _logger;
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
@@ -132,7 +132,7 @@ namespace wolle.Services
         /// </summary>
         /// <param name="settingsService">The settings service for configuration.</param>
         /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaService(SettingsService settingsService, LoggerService logger)
+        public OllamaService(SettingsService settingsService, ILogger<OllamaService> logger)
         {
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -142,7 +142,7 @@ namespace wolle.Services
             _httpClient = new HttpClient();
             _httpClient.BaseAddress = new Uri(settings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(settings.ApiTimeoutSeconds);
-            _logger.LogInfo("OllamaService created");
+            _logger.LogInformation("OllamaService created");
         }
 
         /// <summary>
@@ -151,10 +151,10 @@ namespace wolle.Services
         /// <returns>True if Ollama is ready, false otherwise.</returns>
         public async Task<bool> EnsureOllamaReadyAsync(CancellationToken cancellationToken = default)
         {
-            _logger?.LogInfo("EnsureOllamaReadyAsync started");
+            _logger?.LogInformation("EnsureOllamaReadyAsync started");
             string? ollamaPath = GetOllamaPath();
 
-            _logger?.LogInfo($"Ollama path: {ollamaPath ?? "null"}");
+            _logger?.LogInformation($"Ollama path: {ollamaPath ?? "null"}");
 
             if (string.IsNullOrEmpty(ollamaPath))
             {
@@ -165,7 +165,7 @@ namespace wolle.Services
 
             // Step 1: Start Ollama server if not already running
             OnStatusUpdate?.Invoke("Starting Ollama server...");
-            _logger?.LogInfo("Starting Ollama server");
+            _logger?.LogInformation("Starting Ollama server");
             bool serverStarted = await StartOllamaServerAsync(ollamaPath, cancellationToken);
             if (!serverStarted)
             {
@@ -176,21 +176,21 @@ namespace wolle.Services
 
             // Step 2: Check if model already exists
             OnStatusUpdate?.Invoke($"Checking {_modelName} model availability...");
-            _logger?.LogInfo($"Checking if {_modelName} model exists");
+            _logger?.LogInformation($"Checking if {_modelName} model exists");
             if (await ModelExistsAsync(_modelName, cancellationToken))
             {
                 OnStatusUpdate?.Invoke($"{_modelName} model ready");
-                _logger?.LogInfo($"{_modelName} model already exists");
+                _logger?.LogInformation($"{_modelName} model already exists");
                 return true;
             }
 
             // Step 3: Pull model with progress tracking
             OnStatusUpdate?.Invoke($"Pulling {_modelName} model...");
-            _logger?.LogInfo($"Pulling {_modelName} model");
+            _logger?.LogInformation($"Pulling {_modelName} model");
             await PullModelWithProgressApiAsync(_modelName);
 
             OnStatusUpdate?.Invoke($"{_modelName} model pull completed");
-            _logger?.LogInfo($"{_modelName} model pull completed");
+            _logger?.LogInformation($"{_modelName} model pull completed");
             return true;
         }
 
@@ -202,7 +202,7 @@ namespace wolle.Services
         /// <returns>True if model exists, false otherwise.</returns>
         private async Task<bool> ModelExistsAsync(string modelName, CancellationToken cancellationToken = default)
         {
-            _logger?.LogInfo($"Checking if model exists: {modelName}");
+            _logger?.LogInformation($"Checking if model exists: {modelName}");
 
             try
             {
@@ -232,16 +232,16 @@ namespace wolle.Services
                     {
                         try
                         {
-                            _logger?.LogInfo($"Sending list request to Ollama API (attempt {retryCount + 1})");
+                            _logger?.LogInformation($"Sending list request to Ollama API (attempt {retryCount + 1})");
 
                             var response = await _httpClient.GetAsync("/api/tags", cancellationToken);
                             response.EnsureSuccessStatusCode();
 
-                            _logger?.LogInfo("List response received from Ollama API");
+                            _logger?.LogInformation("List response received from Ollama API");
                             success = true;
 
                             var responseContent = await response.Content.ReadAsStringAsync();
-                            _logger?.LogInfo($"Ollama list response: {responseContent}");
+                            _logger?.LogInformation($"Ollama list response: {responseContent}");
 
                             var json = JsonDocument.Parse(responseContent);
 
@@ -256,14 +256,14 @@ namespace wolle.Services
                                         if (name.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
                                             name.Equals($"{modelName}:latest", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            _logger?.LogInfo($"Model {modelName} exists: {name}");
+                                            _logger?.LogInformation($"Model {modelName} exists: {name}");
                                             return true;
                                         }
                                     }
                                 }
                             }
 
-                            _logger?.LogInfo($"Model {modelName} not found");
+                            _logger?.LogInformation($"Model {modelName} not found");
                             return false;
                         }
                         catch (HttpRequestException ex)
@@ -328,7 +328,7 @@ namespace wolle.Services
         /// <returns>True if server started successfully, false otherwise.</returns>
         private Task<bool> StartOllamaServerAsync(string ollamaPath, CancellationToken cancellationToken = default)
         {
-            _logger?.LogInfo("StartOllamaServerAsync started");
+            _logger?.LogInformation("StartOllamaServerAsync started");
 
             // Validate and sanitize Ollama path
             if (!ValidationService.ValidateExecutablePath(ollamaPath))
@@ -374,7 +374,7 @@ namespace wolle.Services
                         // Don't log verbose server config messages that contain long environment maps
                         if (!e.Data.Contains("env=\"map[", StringComparison.OrdinalIgnoreCase))
                         {
-                            _logger?.LogInfo($"Ollama server status: {e.Data}");
+                            _logger?.LogInformation($"Ollama server status: {e.Data}");
                         }
                     }
 
@@ -402,7 +402,7 @@ namespace wolle.Services
                             // Don't treat "truncating input prompt" as an error - it's expected behavior
                             if (e.Data.Contains("truncating input prompt", StringComparison.OrdinalIgnoreCase))
                             {
-                                _logger?.LogInfo($"Ollama server info: {e.Data}");
+                                _logger?.LogInformation($"Ollama server info: {e.Data}");
                             }
                             else
                             {
@@ -416,7 +416,7 @@ namespace wolle.Services
                              e.Data.Contains("server config", StringComparison.OrdinalIgnoreCase) ||
                              e.Data.Contains("total blobs", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger?.LogInfo($"Ollama server status: {e.Data}");
+                        _logger?.LogInformation($"Ollama server status: {e.Data}");
                     }
                 }
             };
@@ -425,7 +425,7 @@ namespace wolle.Services
             {
                 if (!_isDisposed)
                 {
-                    _logger?.LogInfo("Ollama server process exited");
+                    _logger?.LogInformation("Ollama server process exited");
                 }
             };
 
@@ -437,7 +437,7 @@ namespace wolle.Services
                 _ollamaServerProcess = process;
             }
 
-            _logger?.LogInfo("Ollama server started successfully");
+            _logger?.LogInformation("Ollama server started successfully");
             return Task.FromResult(true);
         }
 
@@ -501,7 +501,7 @@ namespace wolle.Services
         /// <returns>A task representing of asynchronous operation.</returns>
         private async Task PullModelWithProgressApiAsync(string modelName)
         {
-            _logger?.LogInfo($"Pulling model with progress (API): {modelName}");
+            _logger?.LogInformation($"Pulling model with progress (API): {modelName}");
 
             try
             {
@@ -519,12 +519,12 @@ namespace wolle.Services
                     System.Text.Encoding.UTF8,
                     "application/json");
 
-                _logger?.LogInfo("Sending pull request to Ollama API");
+                _logger?.LogInformation("Sending pull request to Ollama API");
 
                 var response = await _httpClient.PostAsync("/api/pull", content);
                 response.EnsureSuccessStatusCode();
 
-                _logger?.LogInfo("Pull response received from Ollama API");
+                _logger?.LogInformation("Pull response received from Ollama API");
 
                 // Read streaming response
                 using (var stream = await response.Content.ReadAsStreamAsync())
@@ -551,7 +551,7 @@ namespace wolle.Services
                                         status.Contains("success") || status.Contains("manifest") ||
                                         status.Contains("verifying") || status.Contains("pulling manifest"))
                                     {
-                                        _logger?.LogInfo($"Pull status: {status}");
+                                        _logger?.LogInformation($"Pull status: {status}");
                                     }
 
                                     // Parse progress from API response (not text)
@@ -566,7 +566,7 @@ namespace wolle.Services
                                 if (json.RootElement.TryGetProperty("status", out var doneStatusElement) &&
                                     doneStatusElement.GetString() == "success")
                                 {
-                                    _logger?.LogInfo("Ollama pull completed successfully");
+                                    _logger?.LogInformation("Ollama pull completed successfully");
                                     break;
                                 }
                             }
@@ -593,7 +593,7 @@ namespace wolle.Services
         /// <returns>A task representing asynchronous operation.</returns>
         public async Task ProcessFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            _logger?.LogInfo($"ProcessFileAsync started for: {filePath}");
+            _logger?.LogInformation($"ProcessFileAsync started for: {filePath}");
             _totalFilesProcessed++;
             _lastOperationTime = DateTime.Now;
 
@@ -621,25 +621,25 @@ namespace wolle.Services
             string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
             string prompt = await GetPromptForFileTypeAsync(fileExtension, filePath);
 
-            _logger?.LogInfo($"Processing {fileExtension} file with prompt: {prompt}");
+            _logger?.LogInformation($"Processing {fileExtension} file with prompt: {prompt}");
             OnStatusUpdate?.Invoke($"Starting analysis of {Path.GetFileName(filePath)}...");
 
             // Check if this is an image file
             if (IsImageFile(filePath))
             {
-                _logger?.LogInfo("File is an image - will use multimodal processing");
+                _logger?.LogInformation("File is an image - will use multimodal processing");
                 OnStatusUpdate?.Invoke($"Processing image ({new FileInfo(filePath).Length / 1024}KB) with multimodal model...");
                 await RunOllamaApiAsync(prompt, filePath, cancellationToken);
             }
             else
             {
-                _logger?.LogInfo("File is not an image - will use text-only processing");
+                _logger?.LogInformation("File is not an image - will use text-only processing");
                 OnStatusUpdate?.Invoke($"Processing text file ({new FileInfo(filePath).Length / 1024}KB)...");
                 await RunOllamaApiAsync(prompt, null, cancellationToken);
             }
 
             _successfulOperations++;
-            _logger?.LogInfo("ProcessFileAsync completed successfully");
+            _logger?.LogInformation("ProcessFileAsync completed successfully");
         }
 
         /// <summary>
@@ -651,7 +651,7 @@ namespace wolle.Services
         /// <returns>A task representing asynchronous operation.</returns>
         private async Task RunOllamaApiAsync(string prompt, string? imagePath = null, CancellationToken cancellationToken = default)
         {
-            _logger?.LogInfo($"RunOllamaApiAsync started with prompt: {prompt}");
+            _logger?.LogInformation($"RunOllamaApiAsync started with prompt: {prompt}");
 
             try
             {
@@ -690,13 +690,13 @@ namespace wolle.Services
                     // Handle image if provided
                     if (!string.IsNullOrEmpty(imagePath) && IsImageFile(imagePath))
                     {
-                        _logger?.LogInfo($"Processing image file: {imagePath}");
+                        _logger?.LogInformation($"Processing image file: {imagePath}");
                         string? base64Image = await ConvertImageToBase64Async(imagePath, cancellationToken);
 
                         if (!string.IsNullOrEmpty(base64Image))
                         {
                             request.Images = new List<string> { base64Image };
-                            _logger?.LogInfo("Image successfully converted to base64 and added to request");
+                            _logger?.LogInformation("Image successfully converted to base64 and added to request");
                         }
                         else
                         {
@@ -709,7 +709,7 @@ namespace wolle.Services
                         System.Text.Encoding.UTF8,
                         "application/json");
 
-                    _logger?.LogInfo("Sending request to Ollama API");
+                    _logger?.LogInformation("Sending request to Ollama API");
 
                     // Check if model is ready before sending generate request
                     if (!await IsModelReadyAsync(_httpClient, _modelName))
@@ -722,7 +722,7 @@ namespace wolle.Services
                     var response = await _httpClient.PostAsync("/api/generate", content);
                     response.EnsureSuccessStatusCode();
 
-                    _logger?.LogInfo("Response received from Ollama API");
+                    _logger?.LogInformation("Response received from Ollama API");
 
                     // Read streaming response
                     using (var stream = await response.Content.ReadAsStreamAsync())
@@ -750,7 +750,7 @@ namespace wolle.Services
                                     if (json.RootElement.TryGetProperty("done", out var doneElement) &&
                                         doneElement.GetBoolean())
                                     {
-                                        _logger?.LogInfo("Ollama API processing completed");
+                                        _logger?.LogInformation("Ollama API processing completed");
                                         OnProcessComplete?.Invoke();
                                         break;
                                     }
@@ -784,7 +784,7 @@ namespace wolle.Services
                 OnProcessComplete?.Invoke();
             }
 
-            _logger?.LogInfo("RunOllamaApiAsync completed");
+            _logger?.LogInformation("RunOllamaApiAsync completed");
         }
 
         private async Task<bool> IsModelReadyAsync(HttpClient httpClient, string modelName)
@@ -798,7 +798,7 @@ namespace wolle.Services
 
             try
             {
-                _logger?.LogInfo($"Checking if model {modelName} is ready...");
+                _logger?.LogInformation($"Checking if model {modelName} is ready...");
 
                 // Check if model exists
                 var listResponse = await httpClient.GetAsync("/api/tags");
@@ -815,7 +815,7 @@ namespace wolle.Services
                         if (model.TryGetProperty("name", out var nameElement) &&
                             nameElement.GetString() == modelName)
                         {
-                            _logger?.LogInfo($"Model {modelName} found and ready");
+                            _logger?.LogInformation($"Model {modelName} found and ready");
                             return true;
                         }
                     }
@@ -845,13 +845,13 @@ namespace wolle.Services
         /// <returns>The path to Ollama executable, or null if not found.</returns>
         private string? GetOllamaPath()
         {
-            _logger?.LogInfo("GetOllamaPath started");
+            _logger?.LogInformation("GetOllamaPath started");
             var settings = _settingsService.LoadSettings();
 
             // Check configured path first
             if (!string.IsNullOrEmpty(settings.OllamaPath) && File.Exists(settings.OllamaPath))
             {
-                _logger?.LogInfo($"Found configured Ollama path: {settings.OllamaPath}");
+                _logger?.LogInformation($"Found configured Ollama path: {settings.OllamaPath}");
 
                 // Validate the path before returning
                 if (ValidationService.ValidateExecutablePath(settings.OllamaPath))
@@ -873,7 +873,7 @@ namespace wolle.Services
                 var ollamaPath = Path.Combine(dir, "ollama.exe");
                 if (File.Exists(ollamaPath))
                 {
-                    _logger?.LogInfo($"Found Ollama in PATH: {ollamaPath}");
+                    _logger?.LogInformation($"Found Ollama in PATH: {ollamaPath}");
 
                     // Validate the path before returning
                     if (ValidationService.ValidateExecutablePath(ollamaPath))
@@ -899,7 +899,7 @@ namespace wolle.Services
             {
                 if (File.Exists(commonPath))
                 {
-                    _logger?.LogInfo($"Found Ollama in common path: {commonPath}");
+                    _logger?.LogInformation($"Found Ollama in common path: {commonPath}");
                     return commonPath;
                 }
             }
@@ -934,7 +934,7 @@ namespace wolle.Services
         {
             try
             {
-                _logger?.LogInfo($"Converting image to base64: {filePath}");
+                _logger?.LogInformation($"Converting image to base64: {filePath}");
 
                 if (!IsImageFile(filePath))
                 {
@@ -960,7 +960,7 @@ namespace wolle.Services
 
                 string base64String = Convert.ToBase64String(imageBytes);
 
-                _logger?.LogInfo($"Successfully converted image to base64 ({imageBytes.Length} bytes)");
+                _logger?.LogInformation($"Successfully converted image to base64 ({imageBytes.Length} bytes)");
                 return base64String;
             }
             catch (Exception ex)
@@ -991,7 +991,7 @@ namespace wolle.Services
             _successfulOperations = 0;
             _failedOperations = 0;
             _lastOperationTime = DateTime.MinValue;
-            _logger?.LogInfo("Operation statistics reset");
+            _logger?.LogInformation("Operation statistics reset");
         }
 
         /// <summary>
@@ -1002,13 +1002,13 @@ namespace wolle.Services
         {
             try
             {
-                _logger?.LogInfo("Performing Ollama health check");
+                _logger?.LogInformation("Performing Ollama health check");
 
                 // Try to reach the Ollama API tags endpoint
                 var response = await _httpClient.GetAsync("/api/tags", cancellationToken);
                 response.EnsureSuccessStatusCode();
 
-                _logger?.LogInfo("Ollama health check passed");
+                _logger?.LogInformation("Ollama health check passed");
                 return true;
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
@@ -1059,7 +1059,7 @@ namespace wolle.Services
         /// <returns>A prompt string suitable for file type.</returns>
         private async Task<string> GetPromptForFileTypeAsync(string fileExtension, string filePath)
         {
-            _logger?.LogInfo($"GetPromptForFileTypeAsync called for: {fileExtension}");
+            _logger?.LogInformation($"GetPromptForFileTypeAsync called for: {fileExtension}");
 
             // Sanitize file path for prompt to prevent injection
             string sanitizedFilePath = SanitizeForPrompt(filePath);
@@ -1069,7 +1069,7 @@ namespace wolle.Services
             {
                 try
                 {
-                    _logger?.LogInfo($"Reading text file content: {filePath}");
+                    _logger?.LogInformation($"Reading text file content: {filePath}");
                     string fileContent = await File.ReadAllTextAsync(filePath);
 
                     // Let Ollama handle context window management via NumCtx parameter
@@ -1150,12 +1150,12 @@ namespace wolle.Services
                              progress.status.Contains("success") || progress.status.Contains("manifest") ||
                              progress.status.Contains("verifying")))
                         {
-                            _logger?.LogInfo($"Progress: {progress.percent}% - {progress.status}");
+                            _logger?.LogInformation($"Progress: {progress.percent}% - {progress.status}");
                         }
                     }
                     else
                     {
-                        _logger?.LogInfo($"Progress calculation skipped - total is 0");
+                        _logger?.LogInformation($"Progress calculation skipped - total is 0");
                     }
                 }
 
@@ -1203,7 +1203,7 @@ namespace wolle.Services
             {
                 if (!process.HasExited)
                 {
-                    _logger?.LogInfo($"Killing {processName} process");
+                    _logger?.LogInformation($"Killing {processName} process");
                     process.Kill(true); // Force kill with entire process tree
                     process.WaitForExit(5000); // Wait up to 5 seconds
                 }
@@ -1270,7 +1270,7 @@ namespace wolle.Services
                 _serviceStartTime = DateTime.Now;
                 _totalBytesProcessed = 0;
                 _totalProcessingTime = TimeSpan.Zero;
-                _logger?.LogInfo("Performance metrics cleared");
+                _logger?.LogInformation("Performance metrics cleared");
             }
         }
 
@@ -1303,7 +1303,7 @@ namespace wolle.Services
                     }
 
                     File.WriteAllLines(exportPath, lines);
-                    _logger?.LogInfo($"Performance metrics exported to {exportPath}");
+                    _logger?.LogInformation($"Performance metrics exported to {exportPath}");
                     return true;
                 }
             }
@@ -1403,7 +1403,7 @@ namespace wolle.Services
                 _errorHistory.Clear();
                 _consecutiveErrors = 0;
                 _lastErrorTime = null;
-                _logger?.LogInfo("Error history cleared");
+                _logger?.LogInformation("Error history cleared");
             }
         }
 
@@ -1420,7 +1420,7 @@ namespace wolle.Services
                 {
                     var json = JsonSerializer.Serialize(_errorHistory.ToList(), new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(exportPath, json);
-                    _logger?.LogInfo($"Error history exported to {exportPath}");
+                    _logger?.LogInformation($"Error history exported to {exportPath}");
                     return true;
                 }
             }
@@ -1499,7 +1499,7 @@ namespace wolle.Services
                 return false;
 
             var recoveryStartTime = DateTime.Now;
-            _logger?.LogInfo($"Attempting recovery for {errorEvent.ErrorType}...");
+            _logger?.LogInformation($"Attempting recovery for {errorEvent.ErrorType}...");
 
             try
             {
@@ -1512,7 +1512,7 @@ namespace wolle.Services
                         errorEvent.WasRecovered = true;
                         errorEvent.RecoveryTime = DateTime.Now - recoveryStartTime;
 
-                        _logger?.LogInfo($"Successfully recovered from {errorEvent.ErrorType} on attempt {attempt}");
+                        _logger?.LogInformation($"Successfully recovered from {errorEvent.ErrorType} on attempt {attempt}");
                         return true;
                     }
                     catch (Exception recoveryEx)
@@ -1544,7 +1544,7 @@ namespace wolle.Services
         public void RegisterRecoveryStrategy(string errorType, ErrorRecoveryStrategy strategy)
         {
             _errorRecoveryStrategies[errorType] = strategy;
-            _logger?.LogInfo($"Registered recovery strategy for {errorType}");
+            _logger?.LogInformation($"Registered recovery strategy for {errorType}");
         }
 
         private double CalculateErrorRate()
@@ -1562,7 +1562,7 @@ namespace wolle.Services
         /// </summary>
         public void Dispose()
         {
-            _logger?.LogInfo("OllamaService Dispose called");
+            _logger?.LogInformation("OllamaService Dispose called");
 
             lock (_processLock) // Use dedicated lock object for thread safety
             {
@@ -1609,7 +1609,7 @@ namespace wolle.Services
                 }
             }
 
-            _logger?.LogInfo("OllamaService Dispose completed");
+            _logger?.LogInformation("OllamaService Dispose completed");
         }
 
         /// <summary>

@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using wolle.Services;
 
@@ -16,7 +17,8 @@ namespace wolle
         private readonly SettingsService _settingsService;
         private OllamaService _ollamaService;
         private readonly MarkdownService _markdownService;
-        private readonly LoggerService? _logger;
+        private readonly ILogger<MainWindow> _logger = null!;
+        private IServiceProvider? _serviceProvider;
         private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
@@ -29,7 +31,7 @@ namespace wolle
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, LoggerService logger)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider)
         {
             try
             {
@@ -38,6 +40,7 @@ namespace wolle
                 _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
                 _markdownService = markdownService ?? throw new ArgumentNullException(nameof(markdownService));
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+                _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
                 InitializeComponent();
 
@@ -60,7 +63,7 @@ namespace wolle
                     e.Handled = true;
                 };
 
-                _logger?.LogInfo("MainWindow constructor - Constructor completed successfully");
+                _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
             }
             catch (Exception ex)
             {
@@ -72,7 +75,7 @@ namespace wolle
 
         public void ProcessFile(string filePath)
         {
-            _logger?.LogInfo($"ProcessFile called with: {filePath}");
+            _logger?.LogInformation($"ProcessFile called with: {filePath}");
 
             // Validate and sanitize file path
             if (!ValidateFilePath(filePath, out string sanitizedPath))
@@ -85,7 +88,7 @@ namespace wolle
             _filePath = sanitizedPath;
             ShowLoading();
 
-            _logger?.LogInfo("Starting file processing task");
+            _logger?.LogInformation("Starting file processing task");
 
             // Set processing flags
             _isProcessingComplete = false;
@@ -108,7 +111,7 @@ namespace wolle
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger?.LogInfo("Processing was cancelled");
+                    _logger?.LogInformation("Processing was cancelled");
                     Dispatcher.Invoke(() => ShowError("Processing was cancelled"));
                 }
                 catch (Exception ex)
@@ -125,7 +128,7 @@ namespace wolle
             // Keep main thread alive until processing completes
             processingTask.ContinueWith(task =>
             {
-                _logger?.LogInfo("Processing task completed - window can now close");
+                _logger?.LogInformation("Processing task completed - window can now close");
                 Dispatcher.Invoke(() =>
                 {
                     _isProcessingComplete = true;
@@ -143,7 +146,7 @@ namespace wolle
                      progress.status.Contains("success") || progress.status.Contains("manifest") ||
                      progress.status.Contains("verifying")))
                 {
-                    _logger?.LogInfo($"Progress: {progress.percent}% - {progress.status}");
+                    _logger?.LogInformation($"Progress: {progress.percent}% - {progress.status}");
                 }
 
                 Dispatcher.Invoke(() =>
@@ -193,7 +196,7 @@ namespace wolle
         {
             if (!_isClosing && _ollamaService != null)
             {
-                _logger?.LogInfo($"Status update: {status}");
+                _logger?.LogInformation($"Status update: {status}");
 
                 Dispatcher.Invoke(() =>
                 {
@@ -230,7 +233,7 @@ namespace wolle
         {
             if (!_isClosing && _ollamaService != null)
             {
-                _logger?.LogInfo("Ollama process completed - setting processing complete flag");
+                _logger?.LogInformation("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
                 _isProcessingActive = false;
                 Dispatcher.Invoke(() =>
@@ -262,7 +265,7 @@ namespace wolle
 
         private void ShowLoading()
         {
-            _logger?.LogInfo("ShowLoading called - showing loading panel");
+            _logger?.LogInformation("ShowLoading called - showing loading panel");
 
             // Clear response and error content
             ResponseScrollViewer.Document = null;
@@ -322,7 +325,7 @@ namespace wolle
 
         private void ShowResponseComplete()
         {
-            _logger?.LogInfo("ShowResponseComplete called");
+            _logger?.LogInformation("ShowResponseComplete called");
             // Progress section is already hidden, response is visible
         }
 
@@ -351,7 +354,7 @@ namespace wolle
         {
             if (!_isProcessingComplete)
             {
-                _logger?.LogInfo("Close button clicked but processing not complete - asking user");
+                _logger?.LogInformation("Close button clicked but processing not complete - asking user");
 
                 // Ask user if they want to force close
                 var result = System.Windows.MessageBox.Show(
@@ -362,7 +365,7 @@ namespace wolle
 
                 if (result == System.Windows.MessageBoxResult.Yes)
                 {
-                    _logger?.LogInfo("User chose to force close");
+                    _logger?.LogInformation("User chose to force close");
                     _isClosing = true; // Force close
                     _isProcessingComplete = true; // Allow close
                     Close();
@@ -505,7 +508,7 @@ namespace wolle
             {
                 try
                 {
-                    _logger?.LogInfo($"Applying pending settings change: ApiTimeoutSeconds = {_pendingApiTimeoutSeconds.Value}");
+                    _logger?.LogInformation($"Applying pending settings change: ApiTimeoutSeconds = {_pendingApiTimeoutSeconds.Value}");
 
                     var settings = _settingsService.Value;
                     settings.ApiTimeoutSeconds = _pendingApiTimeoutSeconds.Value;
@@ -529,7 +532,7 @@ namespace wolle
             {
                 try
                 {
-                    _logger?.LogInfo($"Applying pending settings change: ContextWindowSize = {_pendingContextWindowSize.Value}");
+                    _logger?.LogInformation($"Applying pending settings change: ContextWindowSize = {_pendingContextWindowSize.Value}");
 
                     var settings = _settingsService.LoadSettings();
                     settings.ContextWindowSize = _pendingContextWindowSize.Value;
@@ -553,7 +556,7 @@ namespace wolle
             {
                 // Restart OllamaService with new settings
                 _ollamaService?.Dispose();
-                _ollamaService = new OllamaService(_settingsService, _logger!);
+                _ollamaService = _serviceProvider!.GetRequiredService<OllamaService>();
 
                 // Re-subscribe to events with new service
                 _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
@@ -570,14 +573,14 @@ namespace wolle
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            _logger?.LogInfo($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
+            _logger?.LogInformation($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
 
             // Prevent closing if processing is not complete
             lock (_stateLock)
             {
                 if (!_isProcessingComplete && !_isClosing)
                 {
-                    _logger?.LogInfo("Preventing window close - processing still active");
+                    _logger?.LogInformation("Preventing window close - processing still active");
                     e.Cancel = true;
                     return;
                 }
@@ -586,13 +589,13 @@ namespace wolle
                 _isClosing = true;
             }
 
-            _logger?.LogInfo("Window closing allowed");
+            _logger?.LogInformation("Window closing allowed");
             base.OnClosing(e);
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            _logger?.LogInfo($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
+            _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
             lock (_stateLock)
             {
                 _isClosing = true;
@@ -602,11 +605,11 @@ namespace wolle
             // Let it continue in the background
             if (!_isProcessingComplete)
             {
-                _logger?.LogInfo("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
+                _logger?.LogInformation("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
             }
             else
             {
-                _logger?.LogInfo("Processing complete - disposing OllamaService");
+                _logger?.LogInformation("Processing complete - disposing OllamaService");
             }
 
             // Cancel any ongoing processing
@@ -617,7 +620,7 @@ namespace wolle
             try
             {
                 _ollamaService?.Dispose();
-                _logger?.LogInfo("OllamaService disposed successfully");
+                _logger?.LogInformation("OllamaService disposed successfully");
             }
             catch (Exception ex)
             {

@@ -17,20 +17,33 @@ Theme: Automatic light/dark mode using Fluent ThemeMode APIs
 - Run: `dotnet run`
 
 ## Logging
-The application uses **Microsoft.Extensions.Logging** for enterprise-grade logging:
-- **Console Output**: Logs to console with configurable levels
+The application uses **Microsoft.Extensions.Logging with Serilog** for enterprise-grade logging:
+- **Console Output**: Logs to console with configurable levels and formatting
 - **Debug Output**: Integrated with Visual Studio/debug output
-- **File Logging**: Custom file-based logging with rotation and cleanup
-- **Structured Logging**: Support for structured logging with scopes and properties
+- **File Logging**: Serilog file sink with rotation and cleanup
+- **Structured Logging**: Full support for structured logging with scopes and properties
 - **Dependency Injection**: Native integration with Microsoft.Extensions.DependencyInjection
-- **Configuration**: Configurable log levels through service configuration
+- **Configuration**: Configurable log levels through Serilog configuration
 
 ### Logging Features:
 - **File Rotation**: Automatic log file rotation when size limits are reached
 - **Cleanup**: Automatic cleanup of old log files (configurable retention)
-- **Fallback**: Multiple fallback mechanisms if primary logging fails
-- **Security**: Log message sanitization to prevent injection attacks
-- **Performance**: Optimized for performance with proper locking and async support
+- **Performance**: Optimized async logging with minimal allocations
+- **Extensibility**: Easy to add additional sinks (Application Insights, Seq, etc.)
+- **Templates**: Customizable output templates for different sinks
+- **Enrichment**: Automatic enrichment with log context and source information
+
+### Log Output Locations:
+- **Console**: Real-time console output during development
+- **Debug Window**: Visual Studio debug output window
+- **Files**: `%LOCALAPPDATA%\wolle\logs\wolle_.log` with rotation
+- **Format**: `[{Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}`
+
+### Configuration:
+- **Minimum Level**: Debug (can be changed in SerilogConfig.cs)
+- **File Size Limit**: Configurable via settings (default 10MB)
+- **File Retention**: Configurable via settings (default 5 files)
+- **Flush Interval**: 1 second for timely file writes
 
 ## Commit Standards
 - **Format**: Use Conventional Commit standards: `<type>[optional scope]: <description>`

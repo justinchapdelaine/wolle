@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System.Runtime.Versioning;
 using wolle.Services;
 
@@ -65,19 +66,22 @@ namespace wolle
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
-            // Add logging
+            // Register SettingsService first for Serilog configuration
+            services.AddSingleton<SettingsService>();
+
+            // Configure Serilog
+            var settingsService = new SettingsService();
+            Log.Logger = SerilogConfig.ConfigureSerilog(settingsService);
+
+            // Add logging with Serilog
             services.AddLogging(configure =>
             {
-                configure.AddConsole();
-                configure.AddDebug();
-                configure.SetMinimumLevel(LogLevel.Debug);
+                configure.AddSerilog();
             });
 
             // Register application services
-            services.AddSingleton<SettingsService>();
             services.AddSingleton<MarkdownService>();
             services.AddSingleton<OllamaService>();
-            services.AddSingleton<LoggerService>();
 
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())
@@ -96,6 +100,9 @@ namespace wolle
             {
                 disposable.Dispose();
             }
+
+            // Close and flush Serilog
+            Log.CloseAndFlush();
 
             base.OnExit(e);
         }
