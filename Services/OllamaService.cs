@@ -748,7 +748,7 @@ namespace wolle.Services
                                             _logger?.LogWarning("OllamaService is disposed, not sending output to UI");
                                             break;
                                         }
-                                        
+
                                         string responseText = responseElement.GetString() ?? "";
                                         OnOutputReceived?.Invoke(responseText);
                                     }
@@ -763,7 +763,7 @@ namespace wolle.Services
                                             _logger?.LogWarning("OllamaService is disposed, not sending completion event to UI");
                                             break;
                                         }
-                                        
+
                                         _logger?.LogInformation("Ollama API processing completed");
                                         OnProcessComplete?.Invoke();
                                         break;
