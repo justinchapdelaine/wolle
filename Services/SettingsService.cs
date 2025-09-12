@@ -75,7 +75,7 @@ namespace wolle.Services
                     if (settings.ApiTimeoutSeconds <= 0 || settings.ApiTimeoutSeconds > 1800) // Max 30 minutes
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid API timeout in settings, resetting to default");
-                        settings.ApiTimeoutSeconds = 300; // 5 minutes
+                        settings.ApiTimeoutSeconds = 600; // 10 minutes
                     }
 
                     // Validate model name
@@ -348,7 +348,7 @@ namespace wolle.Services
         /// <summary>
         /// Gets or sets the timeout in seconds for API operations.
         /// </summary>
-        public int ApiTimeoutSeconds { get; set; } = 300; // 5 minutes
+        public int ApiTimeoutSeconds { get; set; } = 600; // 10 minutes
 
         /// <summary>
         /// Gets or sets maximum log file size in bytes.

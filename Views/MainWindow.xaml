@@ -40,6 +40,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
                 <Grid.Clip>
@@ -59,6 +60,36 @@
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                 
                 <Button Grid.Column="1" 
+                        Content="⚙️" 
+                        Click="SettingsButton_Click" 
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Width="32" 
+                        Height="32"
+                        Margin="0,0,0,0"
+                        Padding="0"
+                        FontSize="14"
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                
+                <Button Grid.Column="2" 
                         Content="✕" 
                         Click="CloseButton_Click" 
                         Background="Transparent"
@@ -149,7 +180,54 @@
                            FontSize="14"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                            Visibility="Collapsed"/>
-                </Grid>
+                
+                <!-- Settings Area -->
+                <StackPanel x:Name="SettingsPanel" 
+                            Grid.Row="3"
+                            Margin="0,12,0,0"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Settings" 
+                               FontSize="16" 
+                               FontWeight="Medium"
+                               Margin="0,0,0,12"/>
+                    
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Text="API Timeout (seconds):" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        
+                        <TextBox x:Name="ApiTimeoutTextBox" 
+                                 Grid.Column="1"
+                                 Text="600"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Content="Save" 
+                                Click="SaveSettingsButton_Click" 
+                                Margin="0,0,8,0"
+                                Padding="16,4"
+                                Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                BorderThickness="0"
+                                Cursor="Hand"/>
+                        
+                        <Button Content="Cancel" 
+                                Click="CancelSettingsButton_Click" 
+                                Padding="16,4"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                Cursor="Hand"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
             </Border>
         </Grid>
     </Border>

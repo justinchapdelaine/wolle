@@ -3,7 +3,7 @@
   "OllamaEndpoint": "http://127.0.0.1:11434",
   "ModelName": "gemma3:4b",
   "MaxFileSize": 10485760,
-  "ApiTimeoutSeconds": 300,
+  "ApiTimeoutSeconds": 600,
   "MaxLogSizeBytes": 10485760,
   "MaxLogFiles": 5,
   "Prompts": {

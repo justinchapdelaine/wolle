@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Media;
 using wolle.Services;
 using wolle.Extensions;
 
@@ -13,14 +14,18 @@ namespace wolle
     public partial class MainWindow : Window
     {
         private readonly SettingsService _settingsService;
-        private readonly OllamaService _ollamaService;
+        private OllamaService _ollamaService;
         private readonly MarkdownService _markdownService;
         private readonly LoggerService? _logger;
         private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
+        private bool _isProcessingActive = false;
         private readonly object _stateLock = new object();
         private string _accumulatedResponseText = "";
+
+        // Settings queuing
+        private int? _pendingApiTimeoutSeconds = null;
 
         public MainWindow()
         {
@@ -90,6 +95,11 @@ namespace wolle
             ShowLoading();
 
             _logger?.LogInfo("Starting file processing task");
+
+            // Set processing flags
+            _isProcessingComplete = false;
+            _isProcessingActive = true;
+
             // Process file with Ollama
             var processingTask = Task.Run(async () =>
             {
@@ -199,7 +209,7 @@ namespace wolle
         {
             if (!_isClosing && _ollamaService != null)
             {
-                Dispatcher.Invoke(() => 
+                Dispatcher.Invoke(() =>
                 {
                     // Hide progress section when first output is received
                     if (ProgressSection.Visibility == Visibility.Visible)
@@ -225,11 +235,16 @@ namespace wolle
             {
                 _logger?.LogInfo("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
+                _isProcessingActive = false;
                 Dispatcher.Invoke(() =>
                 {
                     // Ensure progress section is hidden
                     ProgressSection.Visibility = Visibility.Collapsed;
                     ShowResponseComplete();
+
+                    // Apply any pending settings changes
+                    ApplyPendingSettings();
+
                     // Optionally close after a delay
                     // Task.Delay(5000).ContinueWith(_ => Close());
                 });
@@ -254,7 +269,7 @@ namespace wolle
         private void ShowLoading()
         {
             _logger?.LogInfo("ShowLoading called - showing loading panel");
-            
+
             // Clear response and error content
             ResponseScrollViewer.Document = null;
             _accumulatedResponseText = ""; // Reset accumulated text
@@ -296,11 +311,11 @@ namespace wolle
         private void ShowError(string message)
         {
             _logger?.LogError($"ShowError called: {message}");
-            
+
             // Hide progress section and response section
             ProgressSection.Visibility = Visibility.Collapsed;
             ResponseScrollViewer.Visibility = Visibility.Collapsed;
-            
+
             // Show error
             ErrorTextBlock.Text = message;
             ErrorTextBlock.Visibility = Visibility.Visible;
@@ -339,6 +354,144 @@ namespace wolle
             Close();
         }
 
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Load current timeout value into settings UI
+            var settings = _settingsService.LoadSettings();
+            ApiTimeoutTextBox.Text = settings.ApiTimeoutSeconds.ToString();
+
+            // Show settings panel, hide other content
+            SettingsPanel.Visibility = Visibility.Visible;
+            ResponseScrollViewer.Visibility = Visibility.Collapsed;
+            ErrorTextBlock.Visibility = Visibility.Collapsed;
+        }
+
+        private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Validate and queue timeout setting
+                if (int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
+                {
+                    if (timeoutSeconds > 0 && timeoutSeconds <= 1800) // Max 30 minutes
+                    {
+                        if (!_isProcessingActive)
+                        {
+                            // If not processing, apply immediately
+                            _pendingApiTimeoutSeconds = timeoutSeconds;
+                            ApplyPendingSettings();
+                            return; // Exit early
+                        }
+                        else
+                        {
+                            // If processing, queue for later
+                            _pendingApiTimeoutSeconds = timeoutSeconds;
+
+                            // Hide settings panel
+                            SettingsPanel.Visibility = Visibility.Collapsed;
+                            ResponseScrollViewer.Visibility = Visibility.Visible;
+
+                            // Show queued message
+                            ErrorTextBlock.Text = "Settings queued and will apply after current processing completes.";
+                            ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorSuccessBrush"] as Brush;
+                            ErrorTextBlock.Visibility = Visibility.Visible;
+
+                            // Hide message after 3 seconds
+                            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                            timer.Tick += (s, args) =>
+                            {
+                                timer.Stop();
+                                ErrorTextBlock.Visibility = Visibility.Collapsed;
+                            };
+                            timer.Start();
+
+                            return; // Exit early to prevent old code from running
+                        }
+                    }
+                    else
+                    {
+                        ErrorTextBlock.Text = "Timeout must be between 1 and 1800 seconds (30 minutes).";
+                        ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCautionBrush"] as Brush;
+                        ErrorTextBlock.Visibility = Visibility.Visible;
+                        return; // Exit early to prevent old code from running
+                    }
+                }
+                else
+                {
+                    ErrorTextBlock.Text = "Please enter a valid number for timeout.";
+                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCautionBrush"] as Brush;
+                    ErrorTextBlock.Visibility = Visibility.Visible;
+                    return; // Exit early to prevent old code from running
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error saving settings: {ex.Message}");
+                ErrorTextBlock.Text = $"Error saving settings: {ex.Message}";
+                ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Brush;
+                ErrorTextBlock.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void CancelSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Hide settings panel, restore normal UI
+            SettingsPanel.Visibility = Visibility.Collapsed;
+            ResponseScrollViewer.Visibility = Visibility.Visible;
+            ErrorTextBlock.Visibility = Visibility.Collapsed;
+        }
+
+        private void ApplyPendingSettings()
+        {
+            if (_pendingApiTimeoutSeconds.HasValue)
+            {
+                try
+                {
+                    _logger?.LogInfo($"Applying pending settings change: ApiTimeoutSeconds = {_pendingApiTimeoutSeconds.Value}");
+
+                    var settings = _settingsService.LoadSettings();
+                    settings.ApiTimeoutSeconds = _pendingApiTimeoutSeconds.Value;
+                    _settingsService.SaveSettings(settings);
+
+                    // Restart OllamaService with new timeout
+                    _ollamaService?.Dispose();
+                    _ollamaService = new OllamaService(_settingsService, _logger);
+
+                    // Re-subscribe to events with new service
+                    _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
+                    _ollamaService.OnStatusUpdate += OnOllamaStatusUpdate;
+                    _ollamaService.OnOutputReceived += OnOllamaOutputReceived;
+                    _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
+                    _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
+
+                    // Show success message
+                    ErrorTextBlock.Text = "Settings applied successfully!";
+                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorSuccessBrush"] as Brush;
+                    ErrorTextBlock.Visibility = Visibility.Visible;
+
+                    // Hide success message after 3 seconds
+                    var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                    timer.Tick += (s, args) =>
+                    {
+                        timer.Stop();
+                        ErrorTextBlock.Visibility = Visibility.Collapsed;
+                    };
+                    timer.Start();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error applying pending settings: {ex.Message}");
+                    ErrorTextBlock.Text = $"Error applying settings: {ex.Message}";
+                    ErrorTextBlock.Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Brush;
+                    ErrorTextBlock.Visibility = Visibility.Visible;
+                }
+                finally
+                {
+                    _pendingApiTimeoutSeconds = null;
+                }
+            }
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             _logger?.LogInfo($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
@@ -352,7 +505,7 @@ namespace wolle
                     e.Cancel = true;
                     return;
                 }
-                
+
                 // Mark that we're attempting to close
                 _isClosing = true;
             }
@@ -379,7 +532,7 @@ namespace wolle
             {
                 _logger?.LogInfo("Processing complete - disposing OllamaService");
             }
-            
+
             // Always dispose OllamaService to prevent memory leaks
             try
             {
