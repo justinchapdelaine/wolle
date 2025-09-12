@@ -742,6 +742,13 @@ namespace wolle.Services
                                     var json = JsonDocument.Parse(line);
                                     if (json.RootElement.TryGetProperty("response", out var responseElement))
                                     {
+                                        // Check if disposed before invoking output callback
+                                        if (_isDisposed)
+                                        {
+                                            _logger?.LogWarning("OllamaService is disposed, not sending output to UI");
+                                            break;
+                                        }
+                                        
                                         string responseText = responseElement.GetString() ?? "";
                                         OnOutputReceived?.Invoke(responseText);
                                     }
@@ -750,6 +757,13 @@ namespace wolle.Services
                                     if (json.RootElement.TryGetProperty("done", out var doneElement) &&
                                         doneElement.GetBoolean())
                                     {
+                                        // Check if disposed before invoking completion callback
+                                        if (_isDisposed)
+                                        {
+                                            _logger?.LogWarning("OllamaService is disposed, not sending completion event to UI");
+                                            break;
+                                        }
+                                        
                                         _logger?.LogInformation("Ollama API processing completed");
                                         OnProcessComplete?.Invoke();
                                         break;

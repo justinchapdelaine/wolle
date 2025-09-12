@@ -242,8 +242,11 @@ namespace wolle
                     ProgressSection.Visibility = Visibility.Collapsed;
                     ShowResponseComplete();
 
-                    // Apply any pending settings changes
-                    ApplyPendingSettings();
+                    // Apply any pending settings changes, but don't dispose service if still processing UI
+                    if (!_isClosing)
+                    {
+                        ApplyPendingSettings();
+                    }
                 });
             }
         }
@@ -552,7 +555,7 @@ namespace wolle
                 }
             }
 
-            if (settingsApplied)
+            if (settingsApplied && !_isClosing)
             {
                 // Restart OllamaService with new settings
                 _ollamaService?.Dispose();
