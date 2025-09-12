@@ -112,10 +112,23 @@ namespace wolle.Services
 
             try
             {
+                // Check if disposed before attempting to use the semaphore
+                if (_isDisposed)
+                {
+                    _logger?.LogWarning("OllamaService is disposed, cannot check model existence");
+                    return false;
+                }
+
                 // Use shared HttpClient with thread-safe API calls
                 await _apiLock.WaitAsync();
                 try
                 {
+                    // Check if disposed again after acquiring the lock
+                    if (_isDisposed)
+                    {
+                        _logger?.LogWarning("OllamaService is disposed after acquiring lock");
+                        return false;
+                    }
                     // Add retry logic for network issues
                     int maxRetries = 3;
                     int retryCount = 0;
@@ -185,7 +198,15 @@ namespace wolle.Services
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error checking model existence: {ex.Message}");
+                // Check if this is a disposed object exception
+                if (ex is ObjectDisposedException disposedEx)
+                {
+                    _logger?.LogError($"Error checking model existence: Service is disposed - {disposedEx.Message}");
+                }
+                else
+                {
+                    _logger?.LogError($"Error checking model existence: {ex.Message}");
+                }
                 return false;
             }
         }
@@ -510,10 +531,25 @@ namespace wolle.Services
 
             try
             {
+                // Check if disposed before attempting to use the semaphore
+                if (_isDisposed)
+                {
+                    _logger?.LogWarning("OllamaService is disposed, cannot make API call");
+                    OnErrorReceived?.Invoke("Service is shutting down");
+                    return;
+                }
+
                 // Use shared HttpClient instance with configured timeout
                 await _apiLock.WaitAsync();
                 try
                 {
+                    // Check if disposed again after acquiring the lock
+                    if (_isDisposed)
+                    {
+                        _logger?.LogWarning("OllamaService is disposed after acquiring lock");
+                        OnErrorReceived?.Invoke("Service is shutting down");
+                        return;
+                    }
                     // Create Ollama API request
                     var request = new OllamaApiRequest
                     {
@@ -605,8 +641,17 @@ namespace wolle.Services
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Ollama API error: {ex.Message}");
-                OnErrorReceived?.Invoke($"Ollama API error: {ex.Message}");
+                // Check if this is a disposed object exception
+                if (ex is ObjectDisposedException disposedEx)
+                {
+                    _logger?.LogError($"Ollama API error: Service is disposed - {disposedEx.Message}");
+                    OnErrorReceived?.Invoke("Service is shutting down");
+                }
+                else
+                {
+                    _logger?.LogError($"Ollama API error: {ex.Message}");
+                    OnErrorReceived?.Invoke($"Ollama API error: {ex.Message}");
+                }
                 OnProcessComplete?.Invoke();
             }
 
@@ -615,6 +660,13 @@ namespace wolle.Services
 
         private async Task<bool> IsModelReadyAsync(HttpClient httpClient, string modelName)
         {
+            // Check if disposed before starting
+            if (_isDisposed)
+            {
+                _logger?.LogWarning("OllamaService is disposed, cannot check model readiness");
+                return false;
+            }
+
             try
             {
                 _logger?.LogInfo($"Checking if model {modelName} is ready...");
@@ -645,7 +697,15 @@ namespace wolle.Services
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error checking model readiness: {ex.Message}");
+                // Check if this is a disposed object exception
+                if (ex is ObjectDisposedException disposedEx)
+                {
+                    _logger?.LogError($"Error checking model readiness: Service is disposed - {disposedEx.Message}");
+                }
+                else
+                {
+                    _logger?.LogError($"Error checking model readiness: {ex.Message}");
+                }
                 return false;
             }
         }
