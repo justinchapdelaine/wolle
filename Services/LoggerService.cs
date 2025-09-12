@@ -8,7 +8,7 @@ namespace wolle.Services
     /// <summary>
     /// Provides logging functionality for application.
     /// </summary>
-    public class LoggerService
+    public class LoggerService : IDisposable
     {
         private readonly string _logFilePath;
         private static readonly object _lock = new object();
@@ -141,12 +141,16 @@ namespace wolle.Services
                 return string.Empty;
             }
 
-            // Remove newlines and tabs to prevent log injection
+            // Remove control characters to prevent log injection
             return message
                 .Replace("\n", "\\n")
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t")
-                .Replace("\0", "\\0");
+                .Replace("\0", "\\0")
+                .Replace("\b", "\\b")
+                .Replace("\f", "\\f")
+                .Replace("\v", "\\v")
+                .Replace("\x1b", "\\e"); // Escape character
         }
 
         /// <summary>
@@ -170,9 +174,10 @@ namespace wolle.Services
                     File.Move(_logFilePath, newLogPath);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If rotation fails, continue using current log file
+                // If rotation fails, continue using current log file but log the error
+                System.Diagnostics.Debug.WriteLine($"Log rotation failed: {ex.Message}");
             }
         }
 
@@ -214,6 +219,15 @@ namespace wolle.Services
                 // If cleanup fails, continue but log the error
                 System.Diagnostics.Debug.WriteLine($"Logger cleanup error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Disposes the logger service.
+        /// </summary>
+        public void Dispose()
+        {
+            // No resources to dispose currently
+            GC.SuppressFinalize(this);
         }
     }
 }

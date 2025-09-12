@@ -4,30 +4,42 @@ using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Collections.Generic;
 
 namespace wolle.Services
 {
     /// <summary>
-    /// Manages application settings and configuration.
+    /// Manages application settings and configuration with advanced features.
     /// </summary>
-    public class SettingsService
+    public class SettingsService : IOptions<AppSettings>, IDisposable
     {
         private readonly string _appDataPath;
         private readonly string _settingsPath;
+        private readonly ILogger<SettingsService>? _logger;
+        private AppSettings _currentSettings;
 
         /// <summary>
         /// Initializes a new instance of SettingsService class.
         /// </summary>
-        public SettingsService()
+        /// <param name="logger">Optional logger for dependency injection.</param>
+        public SettingsService(ILogger<SettingsService>? logger = null)
         {
             _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "wolle");
             _settingsPath = Path.Combine(_appDataPath, "settings.json");
+            _logger = logger;
 
             // Ensure app data directory exists
             if (!Directory.Exists(_appDataPath))
             {
                 Directory.CreateDirectory(_appDataPath);
             }
+
+            // Load initial settings
+            _currentSettings = LoadSettings();
         }
 
         /// <summary>
@@ -121,6 +133,7 @@ namespace wolle.Services
             catch (Exception ex)
             {
                 // Log error but continue with defaults
+                _logger?.LogError($"Failed to load settings: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
             }
 
@@ -146,6 +159,7 @@ namespace wolle.Services
             }
             catch (Exception ex)
             {
+                _logger?.LogError($"Failed to save settings: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
                 throw;
             }
@@ -182,7 +196,32 @@ namespace wolle.Services
             {
                 var defaultSettings = GetDefaultSettings();
                 SaveSettings(defaultSettings);
+                _currentSettings = defaultSettings;
             }
+        }
+
+        /// <summary>
+        /// Gets the current settings value.
+        /// </summary>
+        public AppSettings Value => _currentSettings;
+
+        /// <summary>
+        /// Updates the current settings and saves them.
+        /// </summary>
+        /// <param name="newSettings">The new settings to apply.</param>
+        public void UpdateSettings(AppSettings newSettings)
+        {
+            _currentSettings = newSettings;
+            SaveSettings(newSettings);
+        }
+
+        /// <summary>
+        /// Disposes resources used by SettingsService.
+        /// </summary>
+        public void Dispose()
+        {
+            // No unmanaged resources to dispose currently
+            GC.SuppressFinalize(this);
         }
     }
 
@@ -258,3 +297,4 @@ namespace wolle.Services
         public string Code { get; set; } = "Analyze this code and explain what it does? {0}";
     }
 }
+

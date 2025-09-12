@@ -167,3 +167,35 @@ artifacts/
 test.txt
 temp_pull_method.txt
 References/Screenshot*.png
+
+# Enhanced features - Runtime generated files
+# AppData directories and files
+AppData/
+wolle/
+logs/
+performance/
+exports/
+backups/
+plugins/
+
+# Enhanced features - Generated data files
+*.stats.json
+*.metrics.json
+*.performance.csv
+*.export.csv
+*.backup.json
+settings.backup.*
+settings.export.*
+
+# Enhanced features - Plugin related
+*.plugin.dll
+*.plugin.config
+plugin-cache/
+temp-plugins/
+
+# Enhanced features - Development and debugging
+debug-*.json
+perf-*.log
+analysis-*.csv
+*.benchmark
+*.profile

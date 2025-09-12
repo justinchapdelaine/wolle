@@ -4,6 +4,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using Markdig;
 using Neo.Markdig.Xaml;
+using Microsoft.Extensions.Logging;
 
 namespace wolle.Services
 {
@@ -18,14 +19,22 @@ namespace wolle.Services
         /// <returns>A styled FlowDocument.</returns>
         private FlowDocument CreateStyledFlowDocument()
         {
-            return new FlowDocument
-            {
-                FontSize = 14,
-                FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
-                TextAlignment = System.Windows.TextAlignment.Left,
-                LineHeight = 20,
-                PagePadding = new System.Windows.Thickness(10, 5, 14, 5) // Right padding for scrollbar
-            };
+            var document = new FlowDocument();
+            ApplyStyling(document);
+            return document;
+        }
+
+        /// <summary>
+        /// Applies consistent styling to a FlowDocument.
+        /// </summary>
+        /// <param name="document">The FlowDocument to style.</param>
+        private void ApplyStyling(FlowDocument document)
+        {
+            document.FontSize = 14;
+            document.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
+            document.TextAlignment = System.Windows.TextAlignment.Left;
+            document.LineHeight = 20;
+            document.PagePadding = new System.Windows.Thickness(10, 5, 14, 5); // Right padding for scrollbar
         }
 
         private readonly MarkdownPipeline _pipeline;
@@ -54,18 +63,15 @@ namespace wolle.Services
                 // Convert Markdown to FlowDocument using Neo.Markdig.Xaml
                 var flowDocument = MarkdownXaml.ToFlowDocument(markdown, _pipeline);
 
-                // Apply consistent styling
-                flowDocument.FontSize = 14;
-                flowDocument.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
-                flowDocument.TextAlignment = System.Windows.TextAlignment.Left;
-                flowDocument.LineHeight = 20;
-                flowDocument.PagePadding = new System.Windows.Thickness(10, 5, 14, 5); // Right padding for scrollbar
+                // Apply consistent styling using the same method as CreateStyledFlowDocument
+                ApplyStyling(flowDocument);
 
                 return flowDocument;
             }
-            catch
+            catch (Exception ex)
             {
                 // Fallback to plain text if Markdown parsing fails
+                System.Diagnostics.Debug.WriteLine($"Markdown parsing failed: {ex.Message}");
                 return CreatePlainTextDocument(markdown);
             }
         }

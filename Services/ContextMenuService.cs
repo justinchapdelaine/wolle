@@ -60,7 +60,7 @@ namespace wolle.Services
             catch (Exception ex)
             {
                 // Use proper logging instead of MessageBox
-                var logger = new LoggerService();
+                using var logger = new LoggerService();
                 logger.LogError($"Failed to register context menu: {ex.Message}");
                 MessageBox.Show($"Failed to register context menu: {ex.Message}", "Registration Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -75,9 +75,10 @@ namespace wolle.Services
             {
                 Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\*\shell\wolle");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Key doesn't exist, ignore
+                // Key doesn't exist, ignore but log for debugging
+                System.Diagnostics.Debug.WriteLine($"Failed to unregister context menu: {ex.Message}");
             }
         }
 

@@ -1,13 +1,13 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
+using Microsoft.Extensions.Logging;
 using wolle.Services;
-
-
 
 namespace wolle
 {
@@ -23,20 +23,21 @@ namespace wolle
         private bool _isProcessingActive = false;
         private readonly object _stateLock = new object();
         private string _accumulatedResponseText = "";
+        private CancellationTokenSource? _cancellationTokenSource;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow()
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, LoggerService? logger = null)
         {
             try
             {
-                // Initialize services and logger first
-                _settingsService = new SettingsService();
-                _logger = new LoggerService(_settingsService);
-                _ollamaService = new OllamaService(_settingsService, _logger);
-                _markdownService = new MarkdownService();
+                // Initialize services via dependency injection
+                _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+                _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
+                _markdownService = markdownService ?? throw new ArgumentNullException(nameof(markdownService));
+                _logger = logger ?? new LoggerService(_settingsService);
 
                 InitializeComponent();
 
@@ -50,12 +51,12 @@ namespace wolle
                 // Handle unhandled exceptions
                 AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
                 {
-                    _logger?.LogError($"Unhandled exception: {e.ExceptionObject}");
+                    _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
                 };
 
                 Dispatcher.UnhandledException += (sender, e) =>
                 {
-                    _logger?.LogError($"Unhandled dispatcher exception: {e.Exception}");
+                    _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
                     e.Handled = true;
                 };
 
@@ -90,24 +91,32 @@ namespace wolle
             _isProcessingComplete = false;
             _isProcessingActive = true;
 
+            // Create cancellation token for this processing operation
+            _cancellationTokenSource = new CancellationTokenSource();
+
             // Process file with Ollama
             var processingTask = Task.Run(async () =>
             {
                 try
                 {
-                    bool isReady = await _ollamaService.EnsureOllamaReadyAsync();
+                    bool isReady = await _ollamaService.EnsureOllamaReadyAsync(_cancellationTokenSource.Token);
 
                     if (isReady)
                     {
-                        await _ollamaService.ProcessFileAsync(sanitizedPath);
+                        await _ollamaService.ProcessFileAsync(sanitizedPath, _cancellationTokenSource.Token);
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogInfo("Processing was cancelled");
+                    Dispatcher.Invoke(() => ShowError("Processing was cancelled"));
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
                     Dispatcher.Invoke(() => ShowError(ex.Message));
                 }
-            });
+            }, _cancellationTokenSource.Token);
 
             // Keep window visible and prevent immediate closing
             Activate();
@@ -272,6 +281,9 @@ namespace wolle
             ProgressDetails.Text = "This may take a few minutes on first run...";
         }
 
+        private readonly object _debounceLock = new object();
+        private DispatcherTimer? _markdownDebounceTimer;
+
         private void AppendResponseText(string text)
         {
             // Show response scroll viewer when first content is added
@@ -281,10 +293,31 @@ namespace wolle
                 _accumulatedResponseText = ""; // Reset for new response
             }
 
-            // Accumulate text and convert to FlowDocument
+            // Accumulate text
             _accumulatedResponseText += text;
-            var flowDocument = _markdownService.ConvertToFlowDocument(_accumulatedResponseText);
-            ResponseScrollViewer.Document = flowDocument;
+
+            // Debounce markdown conversion to improve performance
+            lock (_debounceLock)
+            {
+                _markdownDebounceTimer?.Stop();
+                
+                _markdownDebounceTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(300) // 300ms debounce
+                };
+                
+                _markdownDebounceTimer.Tick += (s, e) =>
+                {
+                    _markdownDebounceTimer?.Stop();
+                    var flowDocument = _markdownService.ConvertToFlowDocument(_accumulatedResponseText);
+                    ResponseScrollViewer.Document = flowDocument;
+                    
+                    // Auto-scroll to bottom (simplified for now)
+                    // TODO: Implement proper auto-scrolling
+                };
+                
+                _markdownDebounceTimer.Start();
+            }
         }
 
         private void ShowResponseComplete()
@@ -474,9 +507,9 @@ namespace wolle
                 {
                     _logger?.LogInfo($"Applying pending settings change: ApiTimeoutSeconds = {_pendingApiTimeoutSeconds.Value}");
 
-                    var settings = _settingsService.LoadSettings();
+                    var settings = _settingsService.Value;
                     settings.ApiTimeoutSeconds = _pendingApiTimeoutSeconds.Value;
-                    _settingsService.SaveSettings(settings);
+                    _settingsService.UpdateSettings(settings);
                     settingsApplied = true;
                 }
                 catch (Exception ex)
@@ -500,7 +533,7 @@ namespace wolle
 
                     var settings = _settingsService.LoadSettings();
                     settings.ContextWindowSize = _pendingContextWindowSize.Value;
-                    _settingsService.SaveSettings(settings);
+                    _settingsService.UpdateSettings(settings);
                     settingsApplied = true;
                 }
                 catch (Exception ex)
@@ -575,6 +608,10 @@ namespace wolle
             {
                 _logger?.LogInfo("Processing complete - disposing OllamaService");
             }
+
+            // Cancel any ongoing processing
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
 
             // Always dispose OllamaService to prevent memory leaks
             try

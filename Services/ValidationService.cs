@@ -27,7 +27,19 @@ namespace wolle.Services
                 }
 
                 // Check for path traversal attacks and suspicious characters
-                if (filePath.Contains("..") || filePath.Contains("|") || filePath.Contains("<") || filePath.Contains(">"))
+                if (filePath.Contains("..") || filePath.Contains("|") || filePath.Contains("<") || filePath.Contains(">") ||
+                    filePath.Contains("\"") || filePath.Contains("'") || filePath.Contains("*") || filePath.Contains("?"))
+                {
+                    return false;
+                }
+
+                // Normalize the path and check for traversal attempts
+                string normalizedPath = Path.GetFullPath(filePath);
+                string currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
+                
+                // Additional security check - ensure path doesn't escape current directory structure
+                if (!normalizedPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase) &&
+                    !normalizedPath.StartsWith(Path.GetPathRoot(currentDir)!, StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }
@@ -170,8 +182,14 @@ namespace wolle.Services
                     return false;
                 }
 
-                // Must be localhost or loopback for security
+                // Must be localhost or loopback for security (configurable restriction)
                 if (uri.Host != "localhost" && uri.Host != "127.0.0.1" && uri.Host != "::1")
+                {
+                    return false;
+                }
+
+                // Additional security check - ensure no port scanning or unusual ports
+                if (uri.Port > 65535 || uri.Port < 1)
                 {
                     return false;
                 }
