@@ -28,7 +28,7 @@ namespace wolle.Services
         /// <param name="logger">Optional logger for dependency injection.</param>
         public SettingsService(ILogger<SettingsService>? logger = null)
         {
-            _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "wolle");
+            _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Wolle");
             _settingsPath = Path.Combine(_appDataPath, "settings.json");
             _logger = logger;
 

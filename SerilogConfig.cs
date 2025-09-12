@@ -21,7 +21,7 @@ namespace wolle
             var settings = settingsService?.LoadSettings() ?? new AppSettings();
 
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string logDir = System.IO.Path.Combine(appDataPath, "wolle", "logs");
+            string logDir = System.IO.Path.Combine(appDataPath, "Wolle", "logs");
 
             // Create logs directory if it doesn't exist
             System.IO.Directory.CreateDirectory(logDir);
