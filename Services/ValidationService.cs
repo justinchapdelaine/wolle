@@ -36,7 +36,7 @@ namespace wolle.Services
                 // Normalize the path and check for traversal attempts
                 string normalizedPath = Path.GetFullPath(filePath);
                 string currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
-                
+
                 // Additional security check - ensure path doesn't escape current directory structure
                 if (!normalizedPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase) &&
                     !normalizedPath.StartsWith(Path.GetPathRoot(currentDir)!, StringComparison.OrdinalIgnoreCase))
@@ -66,31 +66,30 @@ namespace wolle.Services
         /// Validates an executable file path.
         /// </summary>
         /// <param name="path">The executable path to validate.</param>
-        /// <param name="logger">Optional logger for validation messages.</param>
         /// <returns>True if the executable path is valid, false otherwise.</returns>
-        public static bool ValidateExecutablePath(string path, LoggerService? logger = null)
+        public static bool ValidateExecutablePath(string path)
         {
             try
             {
-                logger?.LogInfo($"Validating executable path: {path}");
+                System.Diagnostics.Debug.WriteLine($"Validating executable path: {path}");
 
                 if (string.IsNullOrEmpty(path))
                 {
-                    logger?.LogError("Path validation failed: path is null or empty");
+                    System.Diagnostics.Debug.WriteLine("Path validation failed: path is null or empty");
                     return false;
                 }
 
                 // Check if file exists
                 if (!File.Exists(path))
                 {
-                    logger?.LogError($"Path validation failed: file does not exist at {path}");
+                    System.Diagnostics.Debug.WriteLine($"Path validation failed: file does not exist at {path}");
                     return false;
                 }
 
                 // Check if it's actually an executable
                 if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 {
-                    logger?.LogError($"Path validation failed: not an .exe file: {path}");
+                    System.Diagnostics.Debug.WriteLine($"Path validation failed: not an .exe file: {path}");
                     return false;
                 }
 
@@ -98,7 +97,7 @@ namespace wolle.Services
                 var fileInfo = new FileInfo(path);
                 if (fileInfo.Length == 0 || fileInfo.Length > 100 * 1024 * 1024) // 100MB max
                 {
-                    logger?.LogError($"Path validation failed: invalid file size: {fileInfo.Length} bytes");
+                    System.Diagnostics.Debug.WriteLine($"Path validation failed: invalid file size: {fileInfo.Length} bytes");
                     return false;
                 }
 
@@ -114,7 +113,7 @@ namespace wolle.Services
                         !string.IsNullOrEmpty(versionInfo.CompanyName) ||
                         !string.IsNullOrEmpty(versionInfo.OriginalFilename))
                     {
-                        logger?.LogInfo("Path validation passed: has version information");
+                        System.Diagnostics.Debug.WriteLine("Path validation passed: has version information");
                     }
                     else
                     {
@@ -122,36 +121,36 @@ namespace wolle.Services
                         // Ollama executable is typically around 30-50MB
                         if (fileInfo.Length > 10 * 1024 * 1024) // At least 10MB
                         {
-                            logger?.LogInfo("Path validation passed: reasonable executable size with no version info");
+                            System.Diagnostics.Debug.WriteLine("Path validation passed: reasonable executable size with no version info");
                         }
                         else
                         {
-                            logger?.LogError("Path validation failed: no version information and too small to be valid executable");
+                            System.Diagnostics.Debug.WriteLine("Path validation failed: no version information and too small to be valid executable");
                             return false;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogInfo($"Version info access failed (continuing anyway): {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Version info access failed (continuing anyway): {ex.Message}");
                     // If we can't get version info, check file size as fallback
                     if (fileInfo.Length > 10 * 1024 * 1024) // At least 10MB
                     {
-                        logger?.LogInfo("Path validation passed: reasonable executable size (version info access failed)");
+                        System.Diagnostics.Debug.WriteLine("Path validation passed: reasonable executable size (version info access failed)");
                     }
                     else
                     {
-                        logger?.LogError($"Path validation failed: cannot access version info and file too small: {fileInfo.Length} bytes");
+                        System.Diagnostics.Debug.WriteLine($"Path validation failed: cannot access version info and file too small: {fileInfo.Length} bytes");
                         return false;
                     }
                 }
 
-                logger?.LogInfo("Path validation passed");
+                System.Diagnostics.Debug.WriteLine("Path validation passed");
                 return true;
             }
             catch (Exception ex)
             {
-                logger?.LogError($"Path validation exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Path validation exception: {ex.Message}");
                 return false;
             }
         }

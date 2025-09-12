@@ -2,14 +2,16 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace wolle.Services
 {
     /// <summary>
-    /// Provides logging functionality for application.
+    /// Provides logging functionality using Microsoft.Extensions.Logging.
     /// </summary>
-    public class LoggerService : IDisposable
+    public class LoggerService
     {
+        private readonly ILogger<LoggerService> _logger;
         private readonly string _logFilePath;
         private static readonly object _lock = new object();
         private readonly long _maxLogSize;
@@ -18,9 +20,12 @@ namespace wolle.Services
         /// <summary>
         /// Initializes a new instance of LoggerService class.
         /// </summary>
+        /// <param name="logger">The Microsoft.Extensions.Logging logger.</param>
         /// <param name="settingsService">Optional settings service for configuration.</param>
-        public LoggerService(SettingsService? settingsService = null)
+        public LoggerService(ILogger<LoggerService> logger, SettingsService? settingsService = null)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
             // Get settings or use defaults
             var settings = settingsService?.LoadSettings() ?? new AppSettings();
             _maxLogSize = settings.MaxLogSizeBytes;
@@ -38,6 +43,8 @@ namespace wolle.Services
 
             // Clean up old log files
             CleanupOldLogFiles(logDir);
+
+            _logger.LogInformation("LoggerService initialized with log file: {LogFilePath}", _logFilePath);
         }
 
         /// <summary>
@@ -66,9 +73,15 @@ namespace wolle.Services
                     string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {sanitizedMessage}";
                     File.AppendAllText(_logFilePath, logEntry + Environment.NewLine);
                 }
+
+                // Also log through Microsoft.Extensions.Logging
+                _logger.LogDebug("File log entry: {Message}", sanitizedMessage);
             }
             catch (Exception ex)
             {
+                // Log the failure through Microsoft.Extensions.Logging
+                _logger.LogError(ex, "Failed to write to log file");
+
                 // If logging fails, try to write to a fallback location
                 try
                 {
@@ -103,31 +116,95 @@ namespace wolle.Services
         /// Logs an informational message.
         /// </summary>
         /// <param name="message">The message to log.</param>
-        public void LogInfo(string message) => Log($"INFO: {message}");
+        public void LogInfo(string message)
+        {
+            Log($"INFO: {message}");
+            _logger.LogInformation(message);
+        }
 
         /// <summary>
         /// Logs an error message.
         /// </summary>
         /// <param name="message">The error message to log.</param>
-        public void LogError(string message) => Log($"ERROR: {message}");
+        public void LogError(string message)
+        {
+            Log($"ERROR: {message}");
+            _logger.LogError(message);
+        }
 
         /// <summary>
         /// Logs a warning message.
         /// </summary>
         /// <param name="message">The warning message to log.</param>
-        public void LogWarning(string message) => Log($"WARNING: {message}");
+        public void LogWarning(string message)
+        {
+            Log($"WARNING: {message}");
+            _logger.LogWarning(message);
+        }
 
         /// <summary>
         /// Logs a debug message.
         /// </summary>
         /// <param name="message">The debug message to log.</param>
-        public void LogDebug(string message) => Log($"DEBUG: {message}");
+        public void LogDebug(string message)
+        {
+            Log($"DEBUG: {message}");
+            _logger.LogDebug(message);
+        }
 
         /// <summary>
         /// Gets log file path.
         /// </summary>
         /// <returns>The path to log file.</returns>
         public string GetLogFilePath() => _logFilePath;
+
+        /// <summary>
+        /// Logs an exception with additional context.
+        /// </summary>
+        /// <param name="exception">The exception to log.</param>
+        /// <param name="message">Additional context message.</param>
+        public void LogException(Exception exception, string message = "")
+        {
+            var errorMessage = string.IsNullOrEmpty(message) ? exception.Message : $"{message}: {exception.Message}";
+            LogError(errorMessage);
+            _logger.LogError(exception, message);
+        }
+
+        /// <summary>
+        /// Logs with custom log level.
+        /// </summary>
+        /// <param name="logLevel">The log level.</param>
+        /// <param name="message">The message to log.</param>
+        /// <param name="args">Optional format arguments.</param>
+        public void LogCustom(LogLevel logLevel, string message, params object[] args)
+        {
+            var formattedMessage = args.Length > 0 ? string.Format(message, args) : message;
+            Log($"{logLevel}: {formattedMessage}");
+
+            switch (logLevel)
+            {
+                case LogLevel.Trace:
+                    _logger.LogTrace(message, args);
+                    break;
+                case LogLevel.Debug:
+                    _logger.LogDebug(message, args);
+                    break;
+                case LogLevel.Information:
+                    _logger.LogInformation(message, args);
+                    break;
+                case LogLevel.Warning:
+                    _logger.LogWarning(message, args);
+                    break;
+                case LogLevel.Error:
+                    _logger.LogError(message, args);
+                    break;
+                case LogLevel.Critical:
+                    _logger.LogCritical(message, args);
+                    break;
+                case LogLevel.None:
+                    break;
+            }
+        }
 
         /// <summary>
         /// Sanitizes log message to prevent log injection.
@@ -172,11 +249,13 @@ namespace wolle.Services
                 if (File.Exists(_logFilePath))
                 {
                     File.Move(_logFilePath, newLogPath);
+                    _logger.LogInformation("Log file rotated to: {NewLogPath}", newLogPath);
                 }
             }
             catch (Exception ex)
             {
                 // If rotation fails, continue using current log file but log the error
+                _logger.LogError(ex, "Log rotation failed");
                 System.Diagnostics.Debug.WriteLine($"Log rotation failed: {ex.Message}");
             }
         }
@@ -204,8 +283,10 @@ namespace wolle.Services
                 {
                     try
                     {
-                        File.Delete(logFiles[0]);
+                        var fileToDelete = logFiles[0];
+                        File.Delete(fileToDelete);
                         logFiles.RemoveAt(0);
+                        _logger.LogDebug("Deleted old log file: {LogFile}", fileToDelete);
                     }
                     catch
                     {
@@ -217,17 +298,11 @@ namespace wolle.Services
             catch (Exception ex)
             {
                 // If cleanup fails, continue but log the error
+                _logger.LogError(ex, "Logger cleanup error");
                 System.Diagnostics.Debug.WriteLine($"Logger cleanup error: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Disposes the logger service.
-        /// </summary>
-        public void Dispose()
-        {
-            // No resources to dispose currently
-            GC.SuppressFinalize(this);
-        }
+
     }
 }

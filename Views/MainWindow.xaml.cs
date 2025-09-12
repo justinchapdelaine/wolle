@@ -29,7 +29,7 @@ namespace wolle
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, LoggerService? logger = null)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, LoggerService logger)
         {
             try
             {
@@ -37,7 +37,7 @@ namespace wolle
                 _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
                 _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
                 _markdownService = markdownService ?? throw new ArgumentNullException(nameof(markdownService));
-                _logger = logger ?? new LoggerService(_settingsService);
+                _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
                 InitializeComponent();
 
@@ -300,22 +300,22 @@ namespace wolle
             lock (_debounceLock)
             {
                 _markdownDebounceTimer?.Stop();
-                
+
                 _markdownDebounceTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromMilliseconds(300) // 300ms debounce
                 };
-                
+
                 _markdownDebounceTimer.Tick += (s, e) =>
                 {
                     _markdownDebounceTimer?.Stop();
                     var flowDocument = _markdownService.ConvertToFlowDocument(_accumulatedResponseText);
                     ResponseScrollViewer.Document = flowDocument;
-                    
+
                     // Auto-scroll to bottom (simplified for now)
                     // TODO: Implement proper auto-scrolling
                 };
-                
+
                 _markdownDebounceTimer.Start();
             }
         }
@@ -553,7 +553,7 @@ namespace wolle
             {
                 // Restart OllamaService with new settings
                 _ollamaService?.Dispose();
-                _ollamaService = new OllamaService(_settingsService, _logger);
+                _ollamaService = new OllamaService(_settingsService, _logger!);
 
                 // Re-subscribe to events with new service
                 _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;

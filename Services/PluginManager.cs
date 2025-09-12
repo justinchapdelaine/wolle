@@ -88,7 +88,7 @@ namespace wolle.Services
                 return Enumerable.Empty<IFileProcessorPlugin>();
 
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            
+
             lock (_pluginLock)
             {
                 return _loadedPlugins.Values
@@ -164,8 +164,8 @@ namespace wolle.Services
         {
             lock (_pluginLock)
             {
-                return _pluginConfigurations.TryGetValue(pluginName, out var config) 
-                    ? new Dictionary<string, object>(config) 
+                return _pluginConfigurations.TryGetValue(pluginName, out var config)
+                    ? new Dictionary<string, object>(config)
                     : null;
             }
         }
@@ -184,7 +184,7 @@ namespace wolle.Services
                     return false;
 
                 _pluginConfigurations[pluginName] = new Dictionary<string, object>(configuration);
-                
+
                 // Apply configuration to plugin
                 if (_loadedPlugins.TryGetValue(pluginName, out var plugin))
                 {
@@ -204,7 +204,7 @@ namespace wolle.Services
         public async Task<FileProcessingResult> ProcessFileWithBestPluginAsync(string filePath, CancellationToken cancellationToken = default)
         {
             var bestPlugin = GetBestPluginForFile(filePath);
-            
+
             if (bestPlugin == null)
             {
                 return new FileProcessingResult
@@ -224,12 +224,12 @@ namespace wolle.Services
                 }
 
                 var result = await bestPlugin.ProcessFileAsync(filePath, cancellationToken);
-                
+
                 // Add metadata
                 result.Metadata.Add("PluginName", bestPlugin.Name);
                 result.Metadata.Add("PluginVersion", bestPlugin.Version.ToString());
                 result.Metadata.Add("PluginAuthor", bestPlugin.Author);
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -254,7 +254,7 @@ namespace wolle.Services
         public Dictionary<string, PluginValidationResult> ValidateAllPlugins()
         {
             var results = new Dictionary<string, PluginValidationResult>();
-            
+
             lock (_pluginLock)
             {
                 foreach (var kvp in _loadedPlugins)
@@ -316,7 +316,7 @@ namespace wolle.Services
                             Console.WriteLine($"Failed to create instance of plugin type {pluginType.Name}");
                             continue;
                         }
-                        
+
                         // Validate plugin
                         var validationResult = plugin?.ValidateConfiguration() ?? new PluginValidationResult();
                         if (!validationResult.IsValid)
@@ -328,7 +328,7 @@ namespace wolle.Services
                         lock (_pluginLock)
                         {
                             _loadedPlugins[plugin!.Name] = plugin;
-                            
+
                             // Store metadata
                             var metadata = new PluginMetadata
                             {
@@ -341,9 +341,9 @@ namespace wolle.Services
                                 PluginType = pluginType,
                                 AssemblyPath = assemblyPath
                             };
-                            
+
                             _pluginMetadata[plugin.Name] = metadata;
-                            
+
                             // Initialize configuration
                             if (!_pluginConfigurations.ContainsKey(plugin.Name))
                             {
@@ -374,7 +374,7 @@ namespace wolle.Services
             {
                 var sortedPlugins = _loadedPlugins.OrderBy(kvp => kvp.Value.Priority).ToList();
                 _loadedPlugins.Clear();
-                
+
                 foreach (var kvp in sortedPlugins)
                 {
                     _loadedPlugins[kvp.Key] = kvp.Value;

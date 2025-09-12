@@ -60,8 +60,9 @@ namespace wolle.Services
             catch (Exception ex)
             {
                 // Use proper logging instead of MessageBox
-                using var logger = new LoggerService();
-                logger.LogError($"Failed to register context menu: {ex.Message}");
+                // Note: Context menu operations are typically one-time setup operations
+                // and don't require extensive logging. System event log would be more appropriate here.
+                System.Diagnostics.Debug.WriteLine($"Failed to register context menu: {ex.Message}");
                 MessageBox.Show($"Failed to register context menu: {ex.Message}", "Registration Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

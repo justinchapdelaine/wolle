@@ -99,20 +99,20 @@ namespace wolle.Services
         private readonly string _modelName;
         private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1); // For thread-safe API calls
-        
+
         // Basic operation statistics
         private int _totalFilesProcessed = 0;
         private int _successfulOperations = 0;
         private int _failedOperations = 0;
         private DateTime _lastOperationTime = DateTime.MinValue;
-        
+
         // Advanced performance monitoring
         private readonly Queue<PerformanceMetric> _performanceMetrics = new();
         private readonly object _metricsLock = new();
         private DateTime _serviceStartTime = DateTime.Now;
         private long _totalBytesProcessed = 0;
         private TimeSpan _totalProcessingTime = TimeSpan.Zero;
-        
+
         // Advanced error handling
         private readonly Dictionary<string, ErrorRecoveryStrategy> _errorRecoveryStrategies = new();
         private readonly Queue<ErrorEvent> _errorHistory = new();
@@ -132,17 +132,17 @@ namespace wolle.Services
         /// </summary>
         /// <param name="settingsService">The settings service for configuration.</param>
         /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaService(SettingsService settingsService, LoggerService? logger = null)
+        public OllamaService(SettingsService settingsService, LoggerService logger)
         {
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-            _logger = logger ?? new LoggerService(_settingsService);
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             var settings = _settingsService.Value;
             _modelName = settings.ModelName;
             _httpClient = new HttpClient();
             _httpClient.BaseAddress = new Uri(settings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(settings.ApiTimeoutSeconds);
-            _logger?.LogInfo("OllamaService created");
+            _logger.LogInfo("OllamaService created");
         }
 
         /// <summary>
@@ -331,7 +331,7 @@ namespace wolle.Services
             _logger?.LogInfo("StartOllamaServerAsync started");
 
             // Validate and sanitize Ollama path
-            if (!ValidationService.ValidateExecutablePath(ollamaPath, _logger))
+            if (!ValidationService.ValidateExecutablePath(ollamaPath))
             {
                 _logger?.LogError("Invalid Ollama path");
                 OnErrorReceived?.Invoke("Invalid Ollama executable path.");
@@ -854,7 +854,7 @@ namespace wolle.Services
                 _logger?.LogInfo($"Found configured Ollama path: {settings.OllamaPath}");
 
                 // Validate the path before returning
-                if (ValidationService.ValidateExecutablePath(settings.OllamaPath, _logger))
+                if (ValidationService.ValidateExecutablePath(settings.OllamaPath))
                 {
                     return settings.OllamaPath;
                 }
@@ -876,7 +876,7 @@ namespace wolle.Services
                     _logger?.LogInfo($"Found Ollama in PATH: {ollamaPath}");
 
                     // Validate the path before returning
-                    if (ValidationService.ValidateExecutablePath(ollamaPath, _logger))
+                    if (ValidationService.ValidateExecutablePath(ollamaPath))
                     {
                         return ollamaPath;
                     }
@@ -954,10 +954,10 @@ namespace wolle.Services
                 // Read image bytes in chunks to avoid memory issues for large files
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, FileOptions.SequentialScan | FileOptions.Asynchronous);
                 using var memoryStream = new MemoryStream();
-                
+
                 await fileStream.CopyToAsync(memoryStream, 81920, cancellationToken);
                 byte[] imageBytes = memoryStream.ToArray();
-                
+
                 string base64String = Convert.ToBase64String(imageBytes);
 
                 _logger?.LogInfo($"Successfully converted image to base64 ({imageBytes.Length} bytes)");
@@ -978,7 +978,7 @@ namespace wolle.Services
         {
             double successRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0;
             string lastOp = _lastOperationTime != DateTime.MinValue ? _lastOperationTime.ToString("g") : "Never";
-            
+
             return $"Operations: {_totalFilesProcessed} total, {_successfulOperations} successful, {_failedOperations} failed ({successRate:F1}% success rate)\nLast operation: {lastOp}";
         }
 
@@ -1003,11 +1003,11 @@ namespace wolle.Services
             try
             {
                 _logger?.LogInfo("Performing Ollama health check");
-                
+
                 // Try to reach the Ollama API tags endpoint
                 var response = await _httpClient.GetAsync("/api/tags", cancellationToken);
                 response.EnsureSuccessStatusCode();
-                
+
                 _logger?.LogInfo("Ollama health check passed");
                 return true;
             }
@@ -1314,7 +1314,7 @@ namespace wolle.Services
             }
         }
 
-        private void RecordPerformanceMetric(string operationType, string fileName, long fileSizeBytes, 
+        private void RecordPerformanceMetric(string operationType, string fileName, long fileSizeBytes,
             TimeSpan processingTime, bool success, string? errorMessage = null)
         {
             var metric = new PerformanceMetric
@@ -1331,7 +1331,7 @@ namespace wolle.Services
             lock (_metricsLock)
             {
                 _performanceMetrics.Enqueue(metric);
-                
+
                 // Keep only last 1000 metrics
                 while (_performanceMetrics.Count > 1000)
                 {
@@ -1348,13 +1348,13 @@ namespace wolle.Services
         {
             if (string.IsNullOrEmpty(value))
                 return "";
-            
+
             // Escape quotes and wrap in quotes if contains comma, quote, or newline
             if (value.Contains("\"") || value.Contains(",") || value.Contains("\n"))
             {
                 return "\"" + value.Replace("\"", "\"\"") + "\"";
             }
-            
+
             return value;
         }
 
@@ -1453,7 +1453,7 @@ namespace wolle.Services
             lock (_errorLock)
             {
                 _errorHistory.Enqueue(errorEvent);
-                
+
                 // Keep only last 500 errors
                 while (_errorHistory.Count > 500)
                 {
@@ -1469,7 +1469,7 @@ namespace wolle.Services
                 {
                     _consecutiveErrors = 1;
                 }
-                
+
                 _lastErrorTime = DateTime.Now;
             }
 
@@ -1508,17 +1508,17 @@ namespace wolle.Services
                     try
                     {
                         strategy.RecoveryAction?.Invoke(errorEvent.ErrorMessage);
-                        
+
                         errorEvent.WasRecovered = true;
                         errorEvent.RecoveryTime = DateTime.Now - recoveryStartTime;
-                        
+
                         _logger?.LogInfo($"Successfully recovered from {errorEvent.ErrorType} on attempt {attempt}");
                         return true;
                     }
                     catch (Exception recoveryEx)
                     {
                         _logger?.LogWarning($"Recovery attempt {attempt} failed: {recoveryEx.Message}");
-                        
+
                         if (attempt < strategy.MaxRetries)
                         {
                             Thread.Sleep(strategy.RetryDelay);

@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Runtime.Versioning;
 using wolle.Services;
 
@@ -64,10 +65,20 @@ namespace wolle
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
+            // Add logging
+            services.AddLogging(configure =>
+            {
+                configure.AddConsole();
+                configure.AddDebug();
+                configure.SetMinimumLevel(LogLevel.Debug);
+            });
+
             // Register application services
             services.AddSingleton<SettingsService>();
             services.AddSingleton<MarkdownService>();
             services.AddSingleton<OllamaService>();
+            services.AddSingleton<LoggerService>();
+
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())
             {
@@ -89,8 +100,5 @@ namespace wolle
             base.OnExit(e);
         }
     }
+}
 
-    /// <summary>
-    /// Custom logger provider that integrates with our LoggerService.
-    /// </summary>
-    }

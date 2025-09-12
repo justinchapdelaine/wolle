@@ -16,6 +16,22 @@ Theme: Automatic light/dark mode using Fluent ThemeMode APIs
 - Format: `dotnet format`
 - Run: `dotnet run`
 
+## Logging
+The application uses **Microsoft.Extensions.Logging** for enterprise-grade logging:
+- **Console Output**: Logs to console with configurable levels
+- **Debug Output**: Integrated with Visual Studio/debug output
+- **File Logging**: Custom file-based logging with rotation and cleanup
+- **Structured Logging**: Support for structured logging with scopes and properties
+- **Dependency Injection**: Native integration with Microsoft.Extensions.DependencyInjection
+- **Configuration**: Configurable log levels through service configuration
+
+### Logging Features:
+- **File Rotation**: Automatic log file rotation when size limits are reached
+- **Cleanup**: Automatic cleanup of old log files (configurable retention)
+- **Fallback**: Multiple fallback mechanisms if primary logging fails
+- **Security**: Log message sanitization to prevent injection attacks
+- **Performance**: Optimized for performance with proper locking and async support
+
 ## Commit Standards
 - **Format**: Use Conventional Commit standards: `<type>[optional scope]: <description>`
 - **Types**: 
