@@ -1,66 +1,53 @@
-Perfect — since **gemma3:4b** is multimodal in Ollama, you can send both text and images to it over the REST API from C#.  
-The trick is that Ollama expects the image(s) as **base64‑encoded strings** in an `images` array in your JSON payload.
+What you’re running into is a quirk of how the new **.NET 9 WPF Fluent theme** ships its styles — and it’s why your `<Button Style="{DynamicResource AccentButtonStyle}" />` doesn’t look exactly like the WPF Gallery preview.
 
-Here’s a complete example you can drop into your C# project:
-
----
-
-### **C# Example: Sending an image to gemma3:4b via Ollama REST API**
-```csharp
-using System;
-using System.IO;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-
-class Program
-{
-    static async Task Main()
-    {
-        string imagePath = "cat.png"; // your local image
-        string prompt = "Describe this image in detail.";
-
-        // 1️⃣ Read and base64‑encode the image
-        byte[] imageBytes = await File.ReadAllBytesAsync(imagePath);
-        string imageBase64 = Convert.ToBase64String(imageBytes);
-
-        // 2️⃣ Create the request payload
-        var payload = new
-        {
-            model = "gemma3:4b", // vision-capable model
-            prompt = prompt,
-            images = new[] { imageBase64 }
-        };
-
-        // 3️⃣ Send to Ollama REST API
-        using var client = new HttpClient();
-        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-
-        HttpResponseMessage response = await client.PostAsync("http://localhost:11434/api/generate", content);
-        string result = await response.Content.ReadAsStringAsync();
-
-        Console.WriteLine(result);
-    }
-}
-```
+Here’s what’s going on:
 
 ---
 
-### **How it works**
-- **`model`** → must be a vision‑enabled model (`gemma3:4b`, `llava`, `bakllava`, etc.).
-- **`prompt`** → your text instruction.
-- **`images`** → array of base64‑encoded image strings.
-- Ollama will feed both the text and image(s) into the model.
+## 1️⃣ The Gallery is running with the *full* Fluent theme dictionary
+The WPF Gallery app merges the **entire** `Fluent.xaml` resource dictionary (and its light/dark variants) into `Application.Resources`. That means all the visual state triggers, animations, and extra brushes for hover/press are loaded.
+
+When you just set `ThemeMode="System"` in your app, you *do* get the base Fluent resources — but if you’ve overridden certain properties (like `Background`, `BorderBrush`, `Foreground`) anywhere in your app or window, or if your control template is altered by other styles, you can unintentionally break the triggers in `AccentButtonStyle`.
 
 ---
 
-### **Tips**
-- You can send **multiple images** by adding more base64 strings to the `images` array.
-- Keep images reasonably sized (≤1024×1024) for performance.
-- If you want streaming responses instead of waiting for the whole output, use `/api/chat` or `/api/generate` with streaming enabled and read the chunks as they arrive.
-- This works exactly the same for **Gemma 3’s other multimodal sizes** (`12b`, `27b`) — just change the `model` value.
+## 2️⃣ `AccentButtonStyle` depends on multiple resources
+The style in the Fluent theme isn’t just a couple of setters — it references:
+
+- **Brushes**:  
+  `AccentFillColorDefaultBrush`, `AccentFillColorSecondaryBrush`, `AccentFillColorTertiaryBrush`,  
+  `TextOnAccentFillColorPrimaryBrush`, `TextOnAccentFillColorDisabledBrush`
+- **VisualStateManager triggers** for:
+  - `PointerOver` → uses `AccentFillColorSecondaryBrush`
+  - `Pressed` → uses `AccentFillColorTertiaryBrush`
+  - `Disabled` → uses `AccentFillColorDisabledBrush` + `TextOnAccentFillColorDisabledBrush`
+
+If any of those brushes are missing or overridden, the hover/press states will fall back to whatever is currently set on the button.
 
 ---
 
-If you want, I can also show you how to adapt this so the **image prompt and output** are integrated into a WPF UI, so you can select an image file, send it to gemma3:4b, and display the model’s description in your app’s themed Markdown viewer. That would tie together everything we’ve been working on. Would you like me to prepare that?
+## 3️⃣ Common reasons it looks “incomplete” in your app
+- **Missing merged dictionaries** — If you rely solely on `ThemeMode="System"` but haven’t actually referenced `PresentationFramework.Fluent` in your project, some keyed styles may not be loaded.
+- **Overriding properties** — If you set `Background`, `Foreground`, or `BorderBrush` directly on the button or in a parent style, you override the template’s dynamic resources, so the hover/press triggers can’t swap them.
+- **Custom window chrome / transparency** — If you’re using `AllowsTransparency="True"` or a custom `WindowChrome`, some theme effects (like subtle shadows or pressed states) won’t render the same way as in the Gallery.
+- **Running on Windows 10** — The Fluent theme is designed for Windows 11; on Windows 10, some brushes resolve differently.
+
+---
+
+## 4️⃣ How to get the *exact* Gallery look
+- Make sure you have:
+  ```xml
+  xmlns:themes="clr-namespace:Microsoft.Windows.Themes;assembly=PresentationFramework.Fluent"
+  ```
+  and that your app is actually referencing `PresentationFramework.Fluent.dll` (this is where `AccentButtonStyle` lives).
+- Don’t set `Background`/`Foreground` manually on the button — let the style’s `DynamicResource` bindings control them.
+- Ensure `ThemeMode="System"` is set at the **Application** level so the correct light/dark dictionary is loaded.
+- Test on Windows 11 for the intended visuals.
+
+---
+
+💡 **Tip:** If you want to confirm what’s missing, open the [Fluent.Light.xaml](https://github.com/dotnet/wpf/blob/main/src/Microsoft.DotNet.Wpf/src/Themes/PresentationFramework.Fluent/Themes/Fluent.Light.xaml) and search for `x:Key="AccentButtonStyle"`. You’ll see exactly which brushes and triggers it uses — then you can check if those resources exist in your app at runtime.
+
+---
+
+If you want, I can walk you through **copying the exact `AccentButtonStyle` from the Fluent theme into your project** so you can tweak it and guarantee the hover/press states match the Gallery 1:1 — even if you’ve got custom chrome or transparency. That way, you’re not relying on the default merge order. Would you like me to do that?

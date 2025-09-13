@@ -38,7 +38,7 @@ namespace wolle
                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
                 .WriteTo.File(
                     path: System.IO.Path.Combine(logDir, "wolle_.log"),
-                    rollingInterval: RollingInterval.Infinite,
+                    rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: settings.MaxLogFiles,
                     fileSizeLimitBytes: settings.MaxLogSizeBytes,
                     rollOnFileSizeLimit: true,

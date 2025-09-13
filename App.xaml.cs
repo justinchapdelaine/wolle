@@ -26,6 +26,17 @@ namespace wolle
                 // Check if a file path was passed as argument
                 if (e.Args.Length > 0)
                 {
+                    // Check for unregister command
+                    if (e.Args[0].Equals("--unregister", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var contextMenuService = _serviceProvider.GetRequiredService<ContextMenuService>();
+                        contextMenuService.UnregisterContextMenu();
+                        MessageBox.Show("Context menu unregistered successfully.", 
+                            "Unregister Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                        Shutdown();
+                        return;
+                    }
+
                     string filePath = e.Args[0];
 
                     // Validate file path before processing
@@ -46,9 +57,19 @@ namespace wolle
                 }
                 else
                 {
-                    // No file argument - show error and exit
-                    MessageBox.Show("Please run this application by right-clicking a file and selecting 'Untangle the Wolle'.",
-                        "No File Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // No arguments - register context menu
+                    try
+                    {
+                        var contextMenuService = _serviceProvider.GetRequiredService<ContextMenuService>();
+                        contextMenuService.RegisterContextMenu();
+                        MessageBox.Show("Context menu registered successfully! You can now right-click files and select 'Untangle the Wolle'.", 
+                            "Registration Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed to register context menu: {ex.Message}\n\nPlease try running as administrator.", 
+                            "Registration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                     Shutdown();
                 }
             }

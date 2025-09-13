@@ -26,6 +26,8 @@ namespace wolle
         private readonly object _stateLock = new object();
         private string _accumulatedResponseText = "";
         private CancellationTokenSource? _cancellationTokenSource;
+        private DispatcherTimer? _statusUpdateTimer;
+        private string _currentStatus = "";
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
@@ -43,6 +45,14 @@ namespace wolle
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
                 InitializeComponent();
+
+                // Initialize status update timer
+                _statusUpdateTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1)
+                };
+                _statusUpdateTimer.Tick += OnStatusUpdateTimerTick;
+                _logger?.LogInformation("DispatcherTimer created and handler attached");
 
                 // Subscribe to Ollama service events
                 _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
@@ -86,6 +96,12 @@ namespace wolle
             }
 
             _filePath = sanitizedPath;
+            
+            // Set initial status
+            _currentStatus = "Initializing...";
+            _logger?.LogInformation($"Set initial status to: {_currentStatus}");
+            UpdateStatusDisplay();
+            
             ShowLoading();
 
             _logger?.LogInformation("Starting file processing task");
@@ -93,6 +109,10 @@ namespace wolle
             // Set processing flags
             _isProcessingComplete = false;
             _isProcessingActive = true;
+
+            // Start status update timer
+            _statusUpdateTimer?.Start();
+            _logger?.LogInformation("Status update timer started");
 
             // Create cancellation token for this processing operation
             _cancellationTokenSource = new CancellationTokenSource();
@@ -198,10 +218,38 @@ namespace wolle
             {
                 _logger?.LogInformation($"Status update: {status}");
 
+                // Store the current status for the timer to use
+                _currentStatus = status;
+                UpdateStatusDisplay();
+            }
+        }
+
+        private void OnStatusUpdateTimerTick(object? sender, EventArgs e)
+        {
+            _logger?.LogInformation("TIMER TICK: Status update timer tick fired (1-second interval)!");
+            UpdateStatusDisplay();
+        }
+
+        private void UpdateStatusDisplay()
+        {
+            if (!_isClosing && _ollamaService != null)
+            {
                 Dispatcher.Invoke(() =>
                 {
-                    ProgressDetails.Text = status;
+                    string statusWithTime = _currentStatus;
+                    var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
+                    if (currentProcessingTime.TotalSeconds > 0)
+                    {
+                        var wholeSeconds = Math.Floor(currentProcessingTime.TotalSeconds);
+                        statusWithTime += $" ({wholeSeconds:F0}s)";
+                    }
+                    _logger?.LogInformation($"UI UPDATE: Setting ProgressDetails.Text to: '{statusWithTime}'");
+                    ProgressDetails.Text = statusWithTime;
                 });
+            }
+            else
+            {
+                _logger?.LogInformation("UpdateStatusDisplay skipped - closing or ollamaService null");
             }
         }
 
@@ -236,6 +284,11 @@ namespace wolle
                 _logger?.LogInformation("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
                 _isProcessingActive = false;
+                
+                // Stop status update timer
+                _statusUpdateTimer?.Stop();
+                _logger?.LogInformation("Status update timer stopped");
+                
                 Dispatcher.Invoke(() =>
                 {
                     // Ensure progress section is hidden
@@ -450,9 +503,8 @@ namespace wolle
                         SettingsPanel.Visibility = Visibility.Collapsed;
                         ResponseScrollViewer.Visibility = Visibility.Visible;
 
-                        // Show queued message
-                        var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
-                        ShowTemporaryMessage("Settings queued and will apply after current processing completes.", successBrush);
+                        // Show information message using InfoBar
+                        ShowInformationMessage("Settings queued and will apply after current processing completes.");
 
                         return; // Exit early to prevent old code from running
                     }
@@ -499,6 +551,25 @@ namespace wolle
             {
                 timer.Stop();
                 ErrorTextBlock.Visibility = Visibility.Collapsed;
+            };
+            timer.Start();
+        }
+
+        /// <summary>
+        /// Shows an information message using InfoMessageBorder with automatic dismissal.
+        /// </summary>
+        /// <param name="message">The information message to show.</param>
+        /// <param name="seconds">The number of seconds to show message.</param>
+        private void ShowInformationMessage(string message, int seconds = 3)
+        {
+            InfoMessageTextBlock.Text = message;
+            InfoMessageBorder.Visibility = Visibility.Visible;
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
+            timer.Tick += (s, args) =>
+            {
+                timer.Stop();
+                InfoMessageBorder.Visibility = Visibility.Collapsed;
             };
             timer.Start();
         }
@@ -569,8 +640,7 @@ namespace wolle
                 _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
 
                 // Show success message
-                var successBrush = GetResourceBrush("SystemFillColorSuccessBrush");
-                ShowTemporaryMessage("Settings applied successfully!", successBrush);
+                ShowInformationMessage("Settings applied successfully!");
             }
         }
 
@@ -618,6 +688,14 @@ namespace wolle
             // Cancel any ongoing processing
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
+
+            // Stop and dispose status update timer
+            if (_statusUpdateTimer != null)
+            {
+                _statusUpdateTimer.Stop();
+                _statusUpdateTimer.Tick -= OnStatusUpdateTimerTick;
+            }
+            _statusUpdateTimer = null;
 
             // Always dispose OllamaService to prevent memory leaks
             try

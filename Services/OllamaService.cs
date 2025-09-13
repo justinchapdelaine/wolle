@@ -120,6 +120,7 @@ namespace wolle.Services
         private int _consecutiveErrors = 0;
         private DateTime? _lastErrorTime = null;
         private readonly object _processLock = new object(); // For thread-safe process operations
+        private DateTime? _currentOperationStartTime = null; // For timing current operation
 
         public event Action<string>? OnStatusUpdate;
         public event Action<string>? OnOutputReceived;
@@ -597,49 +598,74 @@ namespace wolle.Services
             _totalFilesProcessed++;
             _lastOperationTime = DateTime.Now;
 
-            // Validate and sanitize file path
-            if (!ValidateFilePath(filePath))
+            // Start timing the operation
+            var operationStartTime = DateTime.Now;
+            _currentOperationStartTime = operationStartTime;
+            _logger?.LogInformation($"Started timing operation at {operationStartTime:HH:mm:ss.fff}");
+            bool operationSuccess = false;
+            string? errorMessage = null;
+
+            try
             {
-                _logger?.LogError($"Invalid file path: {filePath}");
-                OnErrorReceived?.Invoke("Cannot access file. Please check:\n1. The file exists\n2. You have permission to read it\n3. The path is not too long\n4. The file is not locked by another program");
-                _failedOperations++;
-                return;
-            }
+                // Validate and sanitize file path
+                if (!ValidateFilePath(filePath))
+                {
+                    _logger?.LogError($"Invalid file path: {filePath}");
+                    OnErrorReceived?.Invoke("Cannot access file. Please check:\n1. The file exists\n2. You have permission to read it\n3. The path is not too long\n4. The file is not locked by another program");
+                    _failedOperations++;
+                    errorMessage = "Invalid file path";
+                    return;
+                }
 
-            // Check file size
-            var fileInfo = new FileInfo(filePath);
-            var settings = _settingsService.Value;
-            if (fileInfo.Length > settings.MaxFileSize)
+                // Check file size
+                var fileInfo = new FileInfo(filePath);
+                var settings = _settingsService.Value;
+                if (fileInfo.Length > settings.MaxFileSize)
+                {
+                    _logger?.LogError($"File too large: {fileInfo.Length} bytes (max: {settings.MaxFileSize})");
+                    OnErrorReceived?.Invoke($"File is too large ({fileInfo.Length / (1024 * 1024)}MB). Maximum size is {settings.MaxFileSize / (1024 * 1024)}MB.\n\nTry:\n• Compressing the file\n• Splitting it into smaller parts\n• Using a smaller file for testing");
+                    errorMessage = "File too large";
+                    return;
+                }
+
+                string? ollamaPath = GetOllamaPath();
+
+                string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
+                string prompt = await GetPromptForFileTypeAsync(fileExtension, filePath);
+
+                _logger?.LogInformation($"Processing {fileExtension} file with prompt: {prompt}");
+                OnStatusUpdate?.Invoke($"Starting analysis of {Path.GetFileName(filePath)}...");
+
+                // Check if this is an image file
+                if (IsImageFile(filePath))
+                {
+                    _logger?.LogInformation("File is an image - will use multimodal processing");
+                    OnStatusUpdate?.Invoke($"Processing image with multimodal model...");
+                    await RunOllamaApiAsync(prompt, filePath, cancellationToken);
+                }
+                else
+                {
+                    _logger?.LogInformation("File is not an image - will use text-only processing");
+                    OnStatusUpdate?.Invoke($"Processing text file...");
+                    await RunOllamaApiAsync(prompt, null, cancellationToken);
+                }
+
+                _successfulOperations++;
+                operationSuccess = true;
+                _logger?.LogInformation("ProcessFileAsync completed successfully");
+            }
+            finally
             {
-                _logger?.LogError($"File too large: {fileInfo.Length} bytes (max: {settings.MaxFileSize})");
-                OnErrorReceived?.Invoke($"File is too large ({fileInfo.Length / (1024 * 1024)}MB). Maximum size is {settings.MaxFileSize / (1024 * 1024)}MB.\n\nTry:\n• Compressing the file\n• Splitting it into smaller parts\n• Using a smaller file for testing");
-                return;
+                // Record performance metric
+                var processingTime = DateTime.Now - operationStartTime;
+                RecordPerformanceMetric("FileProcessing", filePath, new FileInfo(filePath).Length, processingTime, operationSuccess, errorMessage);
+                
+                // Clear current operation start time
+                lock (_metricsLock)
+                {
+                    _currentOperationStartTime = null;
+                }
             }
-
-            string? ollamaPath = GetOllamaPath();
-
-            string fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
-            string prompt = await GetPromptForFileTypeAsync(fileExtension, filePath);
-
-            _logger?.LogInformation($"Processing {fileExtension} file with prompt: {prompt}");
-            OnStatusUpdate?.Invoke($"Starting analysis of {Path.GetFileName(filePath)}...");
-
-            // Check if this is an image file
-            if (IsImageFile(filePath))
-            {
-                _logger?.LogInformation("File is an image - will use multimodal processing");
-                OnStatusUpdate?.Invoke($"Processing image ({new FileInfo(filePath).Length / 1024}KB) with multimodal model...");
-                await RunOllamaApiAsync(prompt, filePath, cancellationToken);
-            }
-            else
-            {
-                _logger?.LogInformation("File is not an image - will use text-only processing");
-                OnStatusUpdate?.Invoke($"Processing text file ({new FileInfo(filePath).Length / 1024}KB)...");
-                await RunOllamaApiAsync(prompt, null, cancellationToken);
-            }
-
-            _successfulOperations++;
-            _logger?.LogInformation("ProcessFileAsync completed successfully");
         }
 
         /// <summary>
@@ -1325,6 +1351,20 @@ namespace wolle.Services
             {
                 _logger?.LogError($"Failed to export performance metrics: {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current processing time for the active operation.
+        /// </summary>
+        /// <returns>Current processing time, or TimeSpan.Zero if no operation is active.</returns>
+        public TimeSpan GetCurrentProcessingTime()
+        {
+            lock (_metricsLock)
+            {
+                var result = _currentOperationStartTime.HasValue ? DateTime.Now - _currentOperationStartTime.Value : TimeSpan.Zero;
+                _logger?.LogInformation($"GetCurrentProcessingTime: {result.TotalSeconds:F1}s");
+                return result;
             }
         }
 

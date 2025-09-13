@@ -167,6 +167,24 @@
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                            Visibility="Collapsed"/>
                 
+                <!-- Information Message Area -->
+                <Border x:Name="InfoMessageBorder" 
+                        Grid.Row="2"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        Margin="0,8,0,0"
+                        Padding="16,12"
+                        CornerRadius="8"
+                        Effect="{DynamicResource CardShadow}"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="InfoMessageTextBlock" 
+                               TextWrapping="Wrap" 
+                               FontSize="14"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               VerticalAlignment="Center"/>
+                </Border>
+                
                 <!-- Settings Area -->
                 <StackPanel x:Name="SettingsPanel" 
                             Grid.Row="2"
@@ -213,9 +231,10 @@
                         </ComboBox>
                     </Grid>
                     
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,16,0">
                         <Button Style="{DynamicResource AccentButtonStyle}" Content="Save" 
-                                Click="SaveSettingsButton_Click" />
+                                Click="SaveSettingsButton_Click" 
+                                Margin="0,0,8,0" />
                         
                         <Button Content="Cancel" 
                                 Click="CancelSettingsButton_Click" />
