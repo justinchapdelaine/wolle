@@ -27,15 +27,13 @@ namespace wolle
         private CancellationTokenSource? _cancellationTokenSource;
         private DispatcherTimer? _statusUpdateTimer;
         private string _currentStatus = "";
-        private readonly IMarkdownDebounceService _debounceService;
-        private readonly IResponseStateService _responseStateService;
-        private readonly IResponseUIService _responseUIService;
+        private readonly IResponseDisplayCoordinator _coordinator;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService, IResponseStateService responseStateService, IResponseUIService responseUIService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator)
         {
             try
             {
@@ -45,17 +43,12 @@ namespace wolle
                 _markdownService = markdownService ?? throw new ArgumentNullException(nameof(markdownService));
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-                _debounceService = debounceService ?? throw new ArgumentNullException(nameof(debounceService));
-                _responseStateService = responseStateService ?? throw new ArgumentNullException(nameof(responseStateService));
-                _responseUIService = responseUIService ?? throw new ArgumentNullException(nameof(responseUIService));
+                _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
 
                 InitializeComponent();
 
-                // Initialize response state service with UI control
-                (_responseStateService as ResponseStateService)?.Initialize(ResponseScrollViewer);
-
-                // Initialize response UI service with UI control
-                (_responseUIService as ResponseUIService)?.Initialize(ResponseScrollViewer);
+                // Initialize coordinator with UI control
+                (_coordinator as ResponseDisplayCoordinator)?.Initialize(ResponseScrollViewer);
 
                 // Initialize status update timer
                 _statusUpdateTimer = new DispatcherTimer
@@ -334,13 +327,11 @@ namespace wolle
         {
             _logger?.LogInformation("ShowLoading called - showing loading panel");
 
-            // Clear response and error content
-            _responseUIService.ClearResponseContent();
-            _responseStateService.ResetAccumulatedText(); // Reset accumulated text
-            ErrorTextBlock.Text = "";
+            // Use coordinator to handle response clearing and hiding
+            _coordinator.ShowLoading();
 
-            // Hide response and error sections
-            _responseUIService.HideResponseSection();
+            // Handle error text and progress section in MainWindow
+            ErrorTextBlock.Text = "";
             ErrorTextBlock.Visibility = Visibility.Collapsed;
 
             // Show progress section and reset indicators
@@ -353,26 +344,17 @@ namespace wolle
 
         private void AppendResponseText(string text)
         {
-            // Show response scroll viewer when first content is added
-            _responseStateService.ShowResponseSection();
-
-            // Accumulate text using state service
-            _responseStateService.AccumulateText(text);
-
-            // Use debounce service for markdown conversion
-            _debounceService.DebounceMarkdownConversion(_responseStateService.GetAccumulatedText(), accumulatedText =>
-            {
-                var flowDocument = _markdownService.ConvertToFlowDocument(accumulatedText);
-                _responseUIService.UpdateDocument(flowDocument);
-
-                // Auto-scroll to bottom (simplified for now)
-                // TODO: Implement proper auto-scrolling
-            });
+            // Use coordinator to handle all response display logic
+            _coordinator.AppendResponseText(text);
         }
 
         private void ShowResponseComplete()
         {
             _logger?.LogInformation("ShowResponseComplete called");
+
+            // Use coordinator to handle response complete state
+            _coordinator.ShowResponseComplete();
+
             // Progress section is already hidden, response is visible
         }
 
@@ -380,11 +362,13 @@ namespace wolle
         {
             _logger?.LogError($"ShowError called: {message}");
 
-            // Hide progress section and response section
-            ProgressSection.Visibility = Visibility.Collapsed;
-            ResponseScrollViewer.Visibility = Visibility.Collapsed;
+            // Use coordinator to handle error state
+            _coordinator.ShowError(message);
 
-            // Show error
+            // Hide progress section
+            ProgressSection.Visibility = Visibility.Collapsed;
+
+            // Show error text
             ErrorTextBlock.Text = message;
             ErrorTextBlock.Visibility = Visibility.Visible;
         }
