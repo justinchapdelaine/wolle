@@ -28,8 +28,9 @@ namespace wolle
         private readonly IProgressManagementService _progressManagementService;
         private readonly IStatusManagementService _statusManagementService;
         private readonly ISettingsManagementService _settingsManagementService;
+        private readonly IUIInteractionService _uiInteractionService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService)
         {
             try
             {
@@ -43,6 +44,7 @@ namespace wolle
                 _progressManagementService = progressManagementService ?? throw new ArgumentNullException(nameof(progressManagementService));
                 _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
                 _settingsManagementService = settingsManagementService ?? throw new ArgumentNullException(nameof(settingsManagementService));
+                _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
 
                 InitializeComponent();
 
@@ -57,6 +59,9 @@ namespace wolle
 
                 // Initialize settings management service with UI controls
                 (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!);
+
+                // Initialize UI interaction service
+                (_uiInteractionService as UIInteractionService)?.Initialize(this);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
@@ -118,6 +123,9 @@ namespace wolle
 
             // Notify settings service about processing state
             _settingsManagementService.SetProcessingState(true);
+
+            // Notify UI interaction service about processing state
+            _uiInteractionService.SetProcessingState(false); // Processing is not complete
 
             // Start status update timer
             _statusManagementService.StartStatusTimer();
@@ -259,6 +267,9 @@ namespace wolle
                 // Notify settings service about processing state
                 _settingsManagementService.SetProcessingState(false);
 
+                // Notify UI interaction service about processing state
+                _uiInteractionService.SetProcessingState(true); // Processing is complete
+
                 // Stop status update timer
                 _statusManagementService.StopStatusTimer();
                 _logger?.LogInformation("Status update timer stopped");
@@ -329,10 +340,8 @@ namespace wolle
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                DragMove();
-            }
+            // Use UI interaction service to handle window dragging
+            _uiInteractionService.EnableWindowDrag(sender, e);
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
