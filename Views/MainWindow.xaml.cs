@@ -25,16 +25,16 @@ namespace wolle
         private bool _isProcessingActive = false;
         private readonly object _stateLock = new object();
         private CancellationTokenSource? _cancellationTokenSource;
-        private DispatcherTimer? _statusUpdateTimer;
         private string _currentStatus = "";
         private readonly IResponseDisplayCoordinator _coordinator;
         private readonly IProgressManagementService _progressManagementService;
+        private readonly IStatusManagementService _statusManagementService;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService)
         {
             try
             {
@@ -46,6 +46,7 @@ namespace wolle
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
                 _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
                 _progressManagementService = progressManagementService ?? throw new ArgumentNullException(nameof(progressManagementService));
+                _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
 
                 InitializeComponent();
 
@@ -55,13 +56,11 @@ namespace wolle
                 // Initialize progress management service with UI controls
                 (_progressManagementService as ProgressManagementService)?.Initialize(ProgressBar, ProgressRing, ProgressDetails);
 
-                // Initialize status update timer
-                _statusUpdateTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(1)
-                };
-                _statusUpdateTimer.Tick += OnStatusUpdateTimerTick;
-                _logger?.LogInformation("DispatcherTimer created and handler attached");
+                // Initialize status management service
+                (_statusManagementService as StatusManagementService)?.Initialize();
+
+                // Subscribe to status timer events
+                _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
 
                 // Subscribe to Ollama service events
                 _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
@@ -120,7 +119,7 @@ namespace wolle
             _isProcessingActive = true;
 
             // Start status update timer
-            _statusUpdateTimer?.Start();
+            _statusManagementService.StartStatusTimer();
             _logger?.LogInformation("Status update timer started");
 
             // Create cancellation token for this processing operation
@@ -192,8 +191,8 @@ namespace wolle
             {
                 _logger?.LogInformation($"Status update: {status}");
 
-                // Store the current status for the timer to use
-                _currentStatus = status;
+                // Use status management service to handle status updates
+                _statusManagementService.UpdateStatus(status);
                 UpdateStatusDisplay();
             }
         }
@@ -210,13 +209,11 @@ namespace wolle
             {
                 Dispatcher.Invoke(() =>
                 {
-                    string statusWithTime = _currentStatus;
+                    // Use status management service to format and display status
+                    string currentStatus = _statusManagementService.GetCurrentStatus();
                     var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
-                    if (currentProcessingTime.TotalSeconds > 0)
-                    {
-                        var wholeSeconds = Math.Floor(currentProcessingTime.TotalSeconds);
-                        statusWithTime += $" ({wholeSeconds:F0}s)";
-                    }
+                    string statusWithTime = _statusManagementService.FormatStatusWithTime(currentStatus, currentProcessingTime);
+
                     _logger?.LogInformation($"UI UPDATE: Setting ProgressDetails.Text to: '{statusWithTime}'");
                     ProgressDetails.Text = statusWithTime;
                 });
@@ -260,7 +257,7 @@ namespace wolle
                 _isProcessingActive = false;
 
                 // Stop status update timer
-                _statusUpdateTimer?.Stop();
+                _statusManagementService.StopStatusTimer();
                 _logger?.LogInformation("Status update timer stopped");
 
                 Dispatcher.Invoke(() =>
@@ -618,13 +615,14 @@ namespace wolle
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
 
+            // Unsubscribe from status timer events
+            _statusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
+
             // Stop and dispose status update timer
-            if (_statusUpdateTimer != null)
+            if (_statusManagementService is StatusManagementService statusService)
             {
-                _statusUpdateTimer.Stop();
-                _statusUpdateTimer.Tick -= OnStatusUpdateTimerTick;
+                statusService.Dispose();
             }
-            _statusUpdateTimer = null;
 
             // Always dispose OllamaService to prevent memory leaks
             try

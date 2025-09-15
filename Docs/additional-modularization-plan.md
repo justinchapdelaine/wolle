@@ -392,14 +392,14 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **TEST:** Verify progress bar/ring transitions work
 - [x] **TEST:** Verify build is clean
 
-- [ ] Create `Services/IStatusManagementService.cs`
-- [ ] Create `Services/StatusManagementService.cs`
-- [ ] Extract status logic from MainWindow
-- [ ] Update MainWindow to use new service
-- [ ] Register service in `App.xaml.cs`
-- [ ] **TEST:** Verify status updates work correctly
-- [ ] **TEST:** Verify time formatting works
-- [ ] **TEST:** Verify build is clean
+- [x] Create `Services/IStatusManagementService.cs`
+- [x] Create `Services/StatusManagementService.cs`
+- [x] Extract status logic from MainWindow
+- [x] Update MainWindow to use new service
+- [x] Register service in `App.xaml.cs`
+- [x] **TEST:** Verify status updates work correctly
+- [x] **TEST:** Verify time formatting works
+- [x] **TEST:** Verify build is clean
 
 - [ ] Create `Services/ISettingsManagementService.cs`
 - [ ] Create `Services/SettingsManagementService.cs`
@@ -464,16 +464,16 @@ public class ResourceManagementService : IResourceManagementService
 ### Overall Progress
 | Phase | Status | Services Completed | Lines Extracted | Notes |
 |-------|--------|------------------|-----------------|-------|
-| **Phase 1** | 🚧 In Progress | 1/3 | 50/180 | Progress Management Service complete |
+| **Phase 1** | 🚧 In Progress | 2/3 | 80/180 | Progress & Status Management Services complete |
 | **Phase 2** | ⏳ Not Started | 0/3 | 0/200 | Medium priority services |
 | **Phase 3** | ⏳ Not Started | 0/2 | 0/35 | Low priority services |
-| **Total** | 🚧 In Progress | 1/8 | 50/415 | All services |
+| **Total** | 🚧 In Progress | 2/8 | 80/415 | All services |
 
 ### Phase 1 Progress
 | Service | Status | Date | Commit Hash | Notes |
 |---------|--------|------|-------------|-------|
 | Progress Management Service | ✅ Complete | 2025-09-14 | (pending) | ~50 lines extracted successfully |
-| Status Management Service | ⏳ Not Started | - | - | ~30 lines to extract |
+| Status Management Service | ✅ Complete | 2025-09-14 | (pending) | ~30 lines extracted successfully |
 | Settings Management Service | ⏳ Not Started | - | - | ~100 lines to extract |
 
 ### Phase 2 Progress
@@ -532,4 +532,4 @@ public class ResourceManagementService : IResourceManagementService
 ---
 
 *Last Updated: 2025-09-14*
-*Status: Phase 1 In Progress - Progress Management Service Complete*
+*Status: Phase 1 In Progress - Progress & Status Management Services Complete*
