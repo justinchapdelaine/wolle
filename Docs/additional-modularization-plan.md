@@ -421,6 +421,15 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **TEST:** Verify drag operations work
 - [x] **TEST:** Verify build is clean
 
+- [x] Create `Services/IErrorManagementService.cs`
+- [x] Create `Services/ErrorManagementService.cs`
+- [x] Extract error logic from MainWindow
+- [x] Update MainWindow to use new service
+- [x] Register service in `App.xaml.cs`
+- [x] **TEST:** Verify error handling works correctly
+- [x] **TEST:** Verify error display works
+- [x] **TEST:** Verify build is clean
+
 - [ ] Create `Services/IFileProcessingService.cs`
 - [ ] Create `Services/FileProcessingService.cs`
 - [ ] Extract file processing logic from MainWindow
@@ -475,9 +484,9 @@ public class ResourceManagementService : IResourceManagementService
 | Phase | Status | Services Completed | Lines Extracted | Notes |
 |-------|--------|------------------|-----------------|-------|
 | **Phase 1** | ✅ Complete | 3/3 | 180/180 | All services completed successfully |
-| **Phase 2** | 🚧 In Progress | 1/4 | 80/200 | UI Interaction Service complete |
+| **Phase 2** | 🚧 In Progress | 2/5 | 130/200 | UI Interaction & Error Management Services complete |
 | **Phase 3** | ⏳ Not Started | 0/2 | 0/35 | Low priority services |
-| **Total** | 🚧 In Progress | 4/9 | 260/415 | All services |
+| **Total** | 🚧 In Progress | 5/10 | 310/415 | All services |
 
 ### Phase 1 Progress
 | Service | Status | Date | Commit Hash | Notes |
@@ -491,6 +500,7 @@ public class ResourceManagementService : IResourceManagementService
 |---------|--------|------|-------------|-------|
 | Response Management Service | ✅ Complete | 2025-09-14 | (pending) | **Already implemented** as IResponseDisplayCoordinator |
 | UI Interaction Service | ✅ Complete | 2025-09-14 | (pending) | ~80 lines extracted successfully |
+| Error Management Service | ✅ Complete | 2025-09-14 | (pending) | ~50 lines extracted successfully |
 | File Processing Service | ⏳ Not Started | - | - | ~70 lines to extract |
 | Window Management Service | ⏳ Not Started | - | - | ~100 lines to extract |
 | Message Display Service | ⏳ Not Started | - | - | ~30 lines to extract |
@@ -544,4 +554,4 @@ public class ResourceManagementService : IResourceManagementService
 ---
 
 *Last Updated: 2025-09-14*
-*Status: Phase 2 In Progress - UI Interaction Service Complete*
+*Status: Phase 2 In Progress - UI Interaction & Error Management Services Complete*

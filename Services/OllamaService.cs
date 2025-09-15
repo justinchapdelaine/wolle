@@ -143,7 +143,7 @@ namespace wolle.Services
             _httpClient = new HttpClient();
             _httpClient.BaseAddress = new Uri(settings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(settings.ApiTimeoutSeconds);
-            _logger.LogInformation("OllamaService created");
+            _logger.LogInformation($"OllamaService created with timeout: {settings.ApiTimeoutSeconds} seconds");
         }
 
         /// <summary>
@@ -1655,7 +1655,15 @@ namespace wolle.Services
 
                 try
                 {
-                    _apiLock?.Dispose();
+                    // Only dispose SemaphoreSlim if no API calls are active
+                    if (_apiLock != null && _apiLock.CurrentCount == 1)
+                    {
+                        _apiLock.Dispose();
+                    }
+                    else if (_apiLock != null)
+                    {
+                        _logger?.LogWarning("SemaphoreSlim not disposed - API calls may still be active");
+                    }
                 }
                 catch (Exception ex)
                 {

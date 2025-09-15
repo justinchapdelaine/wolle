@@ -29,8 +29,9 @@ namespace wolle
         private readonly IStatusManagementService _statusManagementService;
         private readonly ISettingsManagementService _settingsManagementService;
         private readonly IUIInteractionService _uiInteractionService;
+        private readonly IErrorManagementService _errorManagementService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService)
         {
             try
             {
@@ -45,6 +46,7 @@ namespace wolle
                 _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
                 _settingsManagementService = settingsManagementService ?? throw new ArgumentNullException(nameof(settingsManagementService));
                 _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
+                _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
 
                 InitializeComponent();
 
@@ -62,6 +64,9 @@ namespace wolle
 
                 // Initialize UI interaction service
                 (_uiInteractionService as UIInteractionService)?.Initialize(this);
+
+                // Initialize error management service with UI controls
+                (_errorManagementService as ErrorManagementService)?.Initialize(ErrorTextBlock, InfoMessageBorder, InfoMessageTextBlock);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
@@ -333,9 +338,8 @@ namespace wolle
             // Hide progress section
             ProgressSection.Visibility = Visibility.Collapsed;
 
-            // Show error text
-            ErrorTextBlock.Text = message;
-            ErrorTextBlock.Visibility = Visibility.Visible;
+            // Use error management service to show error text
+            _errorManagementService.ShowError(message);
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -377,9 +381,8 @@ namespace wolle
         /// <returns>The brush or fallback brush.</returns>
         private Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush")
         {
-            return Application.Current.Resources[resourceKey] as Brush ??
-                   Application.Current.Resources[fallbackKey] as Brush ??
-                   new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Black);
+            // Use error management service to get resource brush
+            return _errorManagementService.GetResourceBrush(resourceKey, fallbackKey);
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -466,6 +469,11 @@ namespace wolle
 
             // Cancel any ongoing processing
             _cancellationTokenSource?.Cancel();
+
+            // Wait for cancellation to take effect
+            System.Threading.Thread.Sleep(100);
+
+            // Dispose cancellation token source
             _cancellationTokenSource?.Dispose();
 
             // Unsubscribe from status timer events
@@ -480,6 +488,13 @@ namespace wolle
             // Always dispose OllamaService to prevent memory leaks
             try
             {
+                // Cancel any ongoing processing first
+                _cancellationTokenSource?.Cancel();
+
+                // Wait a moment for cancellation to take effect
+                System.Threading.Thread.Sleep(100);
+
+                // Now dispose the service
                 _ollamaService?.Dispose();
                 _logger?.LogInformation("OllamaService disposed successfully");
             }

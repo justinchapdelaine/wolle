@@ -1,5 +1,0 @@
-private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Use UI interaction service to handle window close
-            _uiInteractionService.CloseWindow();
-        }
