@@ -28,12 +28,13 @@ namespace wolle
         private CancellationTokenSource? _cancellationTokenSource;
         private DispatcherTimer? _statusUpdateTimer;
         private string _currentStatus = "";
+        private readonly IMarkdownDebounceService _debounceService;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService)
         {
             try
             {
@@ -43,6 +44,7 @@ namespace wolle
                 _markdownService = markdownService ?? throw new ArgumentNullException(nameof(markdownService));
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+                _debounceService = debounceService ?? throw new ArgumentNullException(nameof(debounceService));
 
                 InitializeComponent();
 
@@ -340,9 +342,6 @@ namespace wolle
             ProgressDetails.Text = "This may take a few minutes on first run...";
         }
 
-        private readonly object _debounceLock = new object();
-        private DispatcherTimer? _markdownDebounceTimer;
-
         private void AppendResponseText(string text)
         {
             // Show response scroll viewer when first content is added
@@ -355,28 +354,15 @@ namespace wolle
             // Accumulate text
             _accumulatedResponseText += text;
 
-            // Debounce markdown conversion to improve performance
-            lock (_debounceLock)
+            // Use debounce service for markdown conversion
+            _debounceService.DebounceMarkdownConversion(_accumulatedResponseText, accumulatedText =>
             {
-                _markdownDebounceTimer?.Stop();
+                var flowDocument = _markdownService.ConvertToFlowDocument(accumulatedText);
+                ResponseScrollViewer.Document = flowDocument;
 
-                _markdownDebounceTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromMilliseconds(300) // 300ms debounce
-                };
-
-                _markdownDebounceTimer.Tick += (s, e) =>
-                {
-                    _markdownDebounceTimer?.Stop();
-                    var flowDocument = _markdownService.ConvertToFlowDocument(_accumulatedResponseText);
-                    ResponseScrollViewer.Document = flowDocument;
-
-                    // Auto-scroll to bottom (simplified for now)
-                    // TODO: Implement proper auto-scrolling
-                };
-
-                _markdownDebounceTimer.Start();
-            }
+                // Auto-scroll to bottom (simplified for now)
+                // TODO: Implement proper auto-scrolling
+            });
         }
 
         private void ShowResponseComplete()
