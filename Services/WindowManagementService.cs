@@ -13,6 +13,8 @@ namespace wolle.Services
     {
         private Window? _mainWindow;
         private readonly ILogger<WindowManagementService> _logger;
+        private readonly OllamaService _ollamaService;
+        private readonly IStatusManagementService _statusManagementService;
         private bool _isWindowClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
@@ -21,9 +23,13 @@ namespace wolle.Services
         /// Initializes window management service
         /// </summary>
         /// <param name="logger">The logger</param>
-        public WindowManagementService(ILogger<WindowManagementService> logger)
+        /// <param name="ollamaService">The Ollama service</param>
+        /// <param name="statusManagementService">The status management service</param>
+        public WindowManagementService(ILogger<WindowManagementService> logger, OllamaService ollamaService, IStatusManagementService statusManagementService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
+            _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
         }
 
         /// <summary>
@@ -185,8 +191,30 @@ namespace wolle.Services
         {
             _logger?.LogInformation("Performing cleanup operations");
 
-            // Cleanup operations would be performed here
-            // This is a placeholder for any cleanup that needs to be done
+            // Dispose OllamaService to prevent memory leaks
+            try
+            {
+                _ollamaService?.Dispose();
+                _logger?.LogInformation("OllamaService disposed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error disposing OllamaService: {ex.Message}");
+            }
+
+            // Stop status update timer
+            try
+            {
+                if (_statusManagementService is StatusManagementService statusService)
+                {
+                    statusService.Dispose();
+                    _logger?.LogInformation("Status update timer disposed successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error disposing status update timer: {ex.Message}");
+            }
 
             _logger?.LogInformation("Cleanup operations completed");
         }

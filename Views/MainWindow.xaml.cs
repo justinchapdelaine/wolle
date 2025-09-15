@@ -70,6 +70,9 @@ namespace wolle
 
                 (_fileProcessingService as FileProcessingService)?.Initialize(_statusManagementService);
 
+                // Initialize window management service
+                (_windowManagementService as WindowManagementService)?.Initialize(this);
+
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
 

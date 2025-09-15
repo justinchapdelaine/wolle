@@ -441,6 +441,8 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **FIX:** Add missing status timer start/stop logic
 - [x] **FIX:** Resolve settings save disposal race condition
 - [x] **FIX:** Restore proper settings queuing implementation
+- [x] **FIX:** Move OllamaService disposal to WindowManagementService
+- [x] **FIX:** Prevent OllamaService disposal during processing
 
 - [x] Create `Services/IWindowManagementService.cs`
 - [x] Create `Services/WindowManagementService.cs`
