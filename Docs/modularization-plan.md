@@ -80,14 +80,14 @@ public class MarkdownDebounceService : IMarkdownDebounceService
 Extract response visibility and accumulation logic into a dedicated service.
 
 ### 📋 Tasks
-- [ ] Create `Services/ResponseStateService.cs`
-- [ ] Extract `_accumulatedResponseText` and visibility logic
-- [ ] Implement `IResponseStateService` interface
-- [ ] Update MainWindow to use new service
-- [ ] Register service in `App.xaml.cs`
-- [ ] **TEST:** Verify response state transitions work
-- [ ] **TEST:** Verify markdown formatting still works
-- [ ] **TEST:** Verify build is clean
+- [x] Create `Services/ResponseStateService.cs`
+- [x] Extract `_accumulatedResponseText` and visibility logic
+- [x] Implement `IResponseStateService` interface
+- [x] Update MainWindow to use new service
+- [x] Register service in `App.xaml.cs`
+- [x] **TEST:** Verify response state transitions work
+- [x] **TEST:** Verify markdown formatting still works
+- [x] **TEST:** Verify build is clean
 
 ### 🔄 Expected Changes
 ```csharp
@@ -239,7 +239,7 @@ public class ResponseDisplayCoordinator : IResponseDisplayCoordinator
 |------|--------|------|-------------|-------|
 | **Baseline** | ✅ Complete | 2025-09-14 | `b3635c2` | Working implementation with clean build |
 | **Step 1** | ✅ Complete | 2025-09-14 | `692ef81` | Extract Timer Management - working perfectly |
-| **Step 2** | ⏳ Not Started | - | - | Extract Response State Management |
+| **Step 2** | ✅ Complete | 2025-09-14 | `33473a8` | Extract Response State Management - working perfectly |
 | **Step 3** | ⏳ Not Started | - | - | Extract Markdown Conversion |
 | **Step 4** | ⏳ Not Started | - | - | Extract UI Management |
 | **Step 5** | ⏳ Not Started | - | - | Integrate Services |
@@ -313,4 +313,4 @@ dotnet build
 ---
 
 *Last Updated: 2025-09-14*
-*Status: Step 1 Complete - Ready to begin Step 2*
+*Status: Step 2 Complete - Ready to begin Step 3*
