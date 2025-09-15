@@ -105,6 +105,7 @@ namespace wolle
             // Register application services
             services.AddSingleton<MarkdownService>();
             services.AddSingleton<OllamaService>();
+            services.AddSingleton<IMarkdownConversionService, MarkdownConversionService>();
             services.AddSingleton<IMarkdownDebounceService, MarkdownDebounceService>();
             services.AddSingleton<IResponseStateService, ResponseStateService>();
 

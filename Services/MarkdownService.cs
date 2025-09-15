@@ -4,7 +4,6 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using Markdig;
 using Neo.Markdig.Xaml;
-using Microsoft.Extensions.Logging;
 
 namespace wolle.Services
 {
@@ -38,9 +37,12 @@ namespace wolle.Services
         }
 
         private readonly MarkdownPipeline _pipeline;
+        private readonly IMarkdownConversionService _conversionService;
 
-        public MarkdownService()
+        public MarkdownService(IMarkdownConversionService conversionService)
         {
+            _conversionService = conversionService ?? throw new ArgumentNullException(nameof(conversionService));
+
             // Configure Markdown pipeline with basic extensions first
             _pipeline = new MarkdownPipelineBuilder()
                 .UseEmphasisExtras()  // Bold, italic, strike
@@ -60,10 +62,10 @@ namespace wolle.Services
 
             try
             {
-                // Convert Markdown to FlowDocument using Neo.Markdig.Xaml
-                var flowDocument = MarkdownXaml.ToFlowDocument(markdown, _pipeline);
+                // Convert Markdown to FlowDocument using conversion service
+                var flowDocument = _conversionService.ConvertToFlowDocument(markdown, _pipeline);
 
-                // Apply consistent styling using the same method as CreateStyledFlowDocument
+                // Apply consistent styling using same method as CreateStyledFlowDocument
                 ApplyStyling(flowDocument);
 
                 return flowDocument;
