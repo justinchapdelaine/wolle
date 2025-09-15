@@ -30,8 +30,9 @@ namespace wolle
         private readonly IUIInteractionService _uiInteractionService;
         private readonly IErrorManagementService _errorManagementService;
         private readonly IFileProcessingService _fileProcessingService;
+        private readonly IWindowManagementService _windowManagementService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService)
         {
             try
             {
@@ -48,6 +49,7 @@ namespace wolle
                 _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
                 _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
+                _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
 
                 InitializeComponent();
 
@@ -68,6 +70,9 @@ namespace wolle
 
                 // Initialize error management service with UI controls
                 (_errorManagementService as ErrorManagementService)?.Initialize(ErrorTextBlock, InfoMessageBorder, InfoMessageTextBlock);
+
+                // Initialize window management service
+                (_windowManagementService as WindowManagementService)?.Initialize(this);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
@@ -396,23 +401,8 @@ namespace wolle
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            _logger?.LogInformation($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
-
-            // Prevent closing if processing is not complete
-            lock (_stateLock)
-            {
-                if (!_isProcessingComplete && !_isClosing)
-                {
-                    _logger?.LogInformation("Preventing window close - processing still active");
-                    e.Cancel = true;
-                    return;
-                }
-
-                // Mark that we're attempting to close
-                _isClosing = true;
-            }
-
-            _logger?.LogInformation("Window closing allowed");
+            // Use window management service to handle window closing
+            _windowManagementService.OnWindowClosing(e);
             base.OnClosing(e);
         }
 
