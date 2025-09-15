@@ -54,8 +54,20 @@ namespace wolle.Services
 
             try
             {
-                // Use OllamaService to process file
-                await _ollamaService.ProcessFileAsync(sanitizedPath, cancellationToken);
+                // Ensure Ollama is ready before processing file
+                bool isReady = await _ollamaService.EnsureOllamaReadyAsync(cancellationToken);
+
+                if (isReady)
+                {
+                    // Use OllamaService to process file
+                    await _ollamaService.ProcessFileAsync(sanitizedPath, cancellationToken);
+                }
+                else
+                {
+                    _logger?.LogError("Ollama is not ready for processing");
+                    _processingStatus = "Ollama not ready";
+                    return false;
+                }
 
                 _isProcessingComplete = true;
                 _processingProgress = 1.0;
