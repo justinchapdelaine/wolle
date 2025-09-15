@@ -28,12 +28,13 @@ namespace wolle
         private DispatcherTimer? _statusUpdateTimer;
         private string _currentStatus = "";
         private readonly IResponseDisplayCoordinator _coordinator;
+        private readonly IProgressManagementService _progressManagementService;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService)
         {
             try
             {
@@ -44,11 +45,15 @@ namespace wolle
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
                 _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+                _progressManagementService = progressManagementService ?? throw new ArgumentNullException(nameof(progressManagementService));
 
                 InitializeComponent();
 
                 // Initialize coordinator with UI control
                 (_coordinator as ResponseDisplayCoordinator)?.Initialize(ResponseScrollViewer);
+
+                // Initialize progress management service with UI controls
+                (_progressManagementService as ProgressManagementService)?.Initialize(ProgressBar, ProgressRing, ProgressDetails);
 
                 // Initialize status update timer
                 _statusUpdateTimer = new DispatcherTimer
@@ -175,43 +180,8 @@ namespace wolle
 
                 Dispatcher.Invoke(() =>
                 {
-
-                    if (progress.status.Contains("pulling"))
-                    {
-                        // Show determinate progress bar, hide indeterminate ring
-                        ProgressRing.Visibility = Visibility.Collapsed;
-                        ProgressBar.Visibility = Visibility.Visible;
-
-                        // Update progress bar
-                        ProgressBar.Value = progress.percent;
-
-                        // Update progress text with percentage
-                        if (progress.total > 0 && progress.completed > 0)
-                        {
-                            string completed = FormatBytes(progress.completed);
-                            string total = FormatBytes(progress.total);
-                            // Calculate speed (rough estimate)
-                            ProgressDetails.Text = "Downloading model...";
-                        }
-                        else
-                        {
-                            // No status text needed for other cases
-                        }
-                    }
-                    else if (progress.status.Contains("manifest"))
-                    {
-                        // Show indeterminate progress ring, hide determinate bar
-                        ProgressRing.Visibility = Visibility.Visible;
-                        ProgressBar.Visibility = Visibility.Collapsed;
-
-                        ProgressDetails.Text = "";
-                    }
-                    else
-                    {
-                        // Show indeterminate progress ring for other statuses
-                        ProgressRing.Visibility = Visibility.Visible;
-                        ProgressBar.Visibility = Visibility.Collapsed;
-                    }
+                    // Use progress management service to handle all progress display logic
+                    _progressManagementService.UpdateProgress(progress);
                 });
             }
         }
@@ -308,21 +278,6 @@ namespace wolle
             }
         }
 
-        private string FormatBytes(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-
-            return $"{len:0.##} {sizes[order]}";
-        }
-
         private void ShowLoading()
         {
             _logger?.LogInformation("ShowLoading called - showing loading panel");
@@ -330,16 +285,15 @@ namespace wolle
             // Use coordinator to handle response clearing and hiding
             _coordinator.ShowLoading();
 
-            // Handle error text and progress section in MainWindow
+            // Handle error text in MainWindow
             ErrorTextBlock.Text = "";
             ErrorTextBlock.Visibility = Visibility.Collapsed;
 
-            // Show progress section and reset indicators
+            // Show progress section and reset indicators using progress service
             ProgressSection.Visibility = Visibility.Visible;
-            ProgressRing.Visibility = Visibility.Visible;
-            ProgressBar.Visibility = Visibility.Collapsed;
-            ProgressBar.Value = 0;
-            ProgressDetails.Text = "This may take a few minutes on first run...";
+            _progressManagementService.ShowProgressRing();
+            _progressManagementService.SetProgressValue(0);
+            _progressManagementService.UpdateProgressText("This may take a few minutes on first run...");
         }
 
         private void AppendResponseText(string text)

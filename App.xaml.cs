@@ -110,6 +110,7 @@ namespace wolle
             services.AddSingleton<IResponseStateService, ResponseStateService>();
             services.AddSingleton<IResponseUIService, ResponseUIService>();
             services.AddSingleton<IResponseDisplayCoordinator, ResponseDisplayCoordinator>();
+            services.AddSingleton<IProgressManagementService, ProgressManagementService>();
 
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())
