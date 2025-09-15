@@ -19,7 +19,6 @@ namespace wolle
         private readonly MarkdownService _markdownService;
         private readonly ILogger<MainWindow> _logger = null!;
         private IServiceProvider? _serviceProvider;
-        private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
@@ -30,8 +29,9 @@ namespace wolle
         private readonly ISettingsManagementService _settingsManagementService;
         private readonly IUIInteractionService _uiInteractionService;
         private readonly IErrorManagementService _errorManagementService;
+        private readonly IFileProcessingService _fileProcessingService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService)
         {
             try
             {
@@ -47,6 +47,7 @@ namespace wolle
                 _settingsManagementService = settingsManagementService ?? throw new ArgumentNullException(nameof(settingsManagementService));
                 _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
+                _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
 
                 InitializeComponent();
 
@@ -104,64 +105,31 @@ namespace wolle
         {
             _logger?.LogInformation($"ProcessFile called with: {filePath}");
 
-            // Validate and sanitize file path
-            if (!ValidateFilePath(filePath, out string sanitizedPath))
-            {
-                _logger?.LogError($"Invalid file path: {filePath}");
-                ShowError("Invalid file path or file not accessible.");
-                return;
-            }
-
-            _filePath = sanitizedPath;
-
-            // Set initial status
-            _statusManagementService.UpdateStatus("Initializing...");
-            _logger?.LogInformation($"Set initial status to: Initializing...");
-            UpdateStatusDisplay();
-
-            ShowLoading();
-
-            _logger?.LogInformation("Starting file processing task");
-
-            // Set processing flags
-            _isProcessingComplete = false;
-
-            // Notify settings service about processing state
-            _settingsManagementService.SetProcessingState(true);
-
-            // Notify UI interaction service about processing state
-            _uiInteractionService.SetProcessingState(false); // Processing is not complete
-
-            // Start status update timer
-            _statusManagementService.StartStatusTimer();
-            _logger?.LogInformation("Status update timer started");
-
-            // Create cancellation token for this processing operation
-            _cancellationTokenSource = new CancellationTokenSource();
-
-            // Process file with Ollama
+            // Use file processing service to handle file processing
             var processingTask = Task.Run(async () =>
             {
                 try
                 {
-                    bool isReady = await _ollamaService.EnsureOllamaReadyAsync(_cancellationTokenSource.Token);
+                    // Create cancellation token for this processing operation
+                    _cancellationTokenSource = new CancellationTokenSource();
 
-                    if (isReady)
+                    bool result = await _fileProcessingService.ProcessFileAsync(filePath, _cancellationTokenSource.Token);
+
+                    if (result)
                     {
-                        await _ollamaService.ProcessFileAsync(sanitizedPath, _cancellationTokenSource.Token);
+                        _logger?.LogInformation("File processing completed successfully");
                     }
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger?.LogInformation("Processing was cancelled");
-                    Dispatcher.Invoke(() => ShowError("Processing was cancelled"));
+                    else
+                    {
+                        _logger?.LogError("File processing failed");
+                    }
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
                     Dispatcher.Invoke(() => ShowError(ex.Message));
                 }
-            }, _cancellationTokenSource.Token);
+            });
 
             // Keep window visible and prevent immediate closing
             Activate();
@@ -512,9 +480,5 @@ namespace wolle
         /// <param name="filePath">The file path to validate.</param>
         /// <param name="sanitizedPath">The sanitized file path.</param>
         /// <returns>True if path is valid, false otherwise.</returns>
-        private bool ValidateFilePath(string filePath, out string sanitizedPath)
-        {
-            return ValidationService.ValidateFilePath(filePath, out sanitizedPath);
-        }
     }
 }
