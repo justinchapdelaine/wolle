@@ -9,6 +9,12 @@ namespace wolle.Services
     public interface IFileProcessingService
     {
         /// <summary>
+        /// Initializes file processing service
+        /// </summary>
+        /// <param name="statusManagementService">The status management service</param>
+        void Initialize(IStatusManagementService statusManagementService);
+
+        /// <summary>
         /// Processes a file asynchronously
         /// </summary>
         /// <param name="filePath">The file path to process</param>

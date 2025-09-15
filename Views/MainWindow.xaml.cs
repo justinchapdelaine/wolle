@@ -68,11 +68,7 @@ namespace wolle
                 // Initialize UI interaction service
                 (_uiInteractionService as UIInteractionService)?.Initialize(this);
 
-                // Initialize error management service with UI controls
-                (_errorManagementService as ErrorManagementService)?.Initialize(ErrorTextBlock, InfoMessageBorder, InfoMessageTextBlock);
-
-                // Initialize window management service
-                (_windowManagementService as WindowManagementService)?.Initialize(this);
+                (_fileProcessingService as FileProcessingService)?.Initialize(_statusManagementService);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;

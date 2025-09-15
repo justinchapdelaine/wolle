@@ -438,6 +438,8 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **TEST:** Verify file processing works correctly
 - [x] **TEST:** Verify file validation works
 - [x] **TEST:** Verify build is clean
+- [x] **FIX:** Add missing status timer start/stop logic
+- [x] **FIX:** Resolve settings save disposal race condition
 
 - [x] Create `Services/IWindowManagementService.cs`
 - [x] Create `Services/WindowManagementService.cs`
