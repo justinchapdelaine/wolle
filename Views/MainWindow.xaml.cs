@@ -24,17 +24,17 @@ namespace wolle
         private bool _isProcessingComplete = false;
         private bool _isProcessingActive = false;
         private readonly object _stateLock = new object();
-        private string _accumulatedResponseText = "";
         private CancellationTokenSource? _cancellationTokenSource;
         private DispatcherTimer? _statusUpdateTimer;
         private string _currentStatus = "";
         private readonly IMarkdownDebounceService _debounceService;
+        private readonly IResponseStateService _responseStateService;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService, IResponseStateService responseStateService)
         {
             try
             {
@@ -45,8 +45,12 @@ namespace wolle
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
                 _debounceService = debounceService ?? throw new ArgumentNullException(nameof(debounceService));
+                _responseStateService = responseStateService ?? throw new ArgumentNullException(nameof(responseStateService));
 
                 InitializeComponent();
+
+                // Initialize response state service with UI control
+                (_responseStateService as ResponseStateService)?.Initialize(ResponseScrollViewer);
 
                 // Initialize status update timer
                 _statusUpdateTimer = new DispatcherTimer
@@ -327,11 +331,11 @@ namespace wolle
 
             // Clear response and error content
             ResponseScrollViewer.Document = null;
-            _accumulatedResponseText = ""; // Reset accumulated text
+            _responseStateService.ResetAccumulatedText(); // Reset accumulated text
             ErrorTextBlock.Text = "";
 
             // Hide response and error sections
-            ResponseScrollViewer.Visibility = Visibility.Collapsed;
+            _responseStateService.HideResponseSection();
             ErrorTextBlock.Visibility = Visibility.Collapsed;
 
             // Show progress section and reset indicators
@@ -345,17 +349,13 @@ namespace wolle
         private void AppendResponseText(string text)
         {
             // Show response scroll viewer when first content is added
-            if (ResponseScrollViewer.Visibility == Visibility.Collapsed)
-            {
-                ResponseScrollViewer.Visibility = Visibility.Visible;
-                _accumulatedResponseText = ""; // Reset for new response
-            }
+            _responseStateService.ShowResponseSection();
 
-            // Accumulate text
-            _accumulatedResponseText += text;
+            // Accumulate text using state service
+            _responseStateService.AccumulateText(text);
 
             // Use debounce service for markdown conversion
-            _debounceService.DebounceMarkdownConversion(_accumulatedResponseText, accumulatedText =>
+            _debounceService.DebounceMarkdownConversion(_responseStateService.GetAccumulatedText(), accumulatedText =>
             {
                 var flowDocument = _markdownService.ConvertToFlowDocument(accumulatedText);
                 ResponseScrollViewer.Document = flowDocument;

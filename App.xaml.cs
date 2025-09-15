@@ -106,6 +106,7 @@ namespace wolle
             services.AddSingleton<MarkdownService>();
             services.AddSingleton<OllamaService>();
             services.AddSingleton<IMarkdownDebounceService, MarkdownDebounceService>();
+            services.AddSingleton<IResponseStateService, ResponseStateService>();
 
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())
