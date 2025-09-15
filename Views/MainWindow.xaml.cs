@@ -29,12 +29,13 @@ namespace wolle
         private string _currentStatus = "";
         private readonly IMarkdownDebounceService _debounceService;
         private readonly IResponseStateService _responseStateService;
+        private readonly IResponseUIService _responseUIService;
 
         // Settings queuing
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService, IResponseStateService responseStateService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IMarkdownDebounceService debounceService, IResponseStateService responseStateService, IResponseUIService responseUIService)
         {
             try
             {
@@ -46,11 +47,15 @@ namespace wolle
                 _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
                 _debounceService = debounceService ?? throw new ArgumentNullException(nameof(debounceService));
                 _responseStateService = responseStateService ?? throw new ArgumentNullException(nameof(responseStateService));
+                _responseUIService = responseUIService ?? throw new ArgumentNullException(nameof(responseUIService));
 
                 InitializeComponent();
 
                 // Initialize response state service with UI control
                 (_responseStateService as ResponseStateService)?.Initialize(ResponseScrollViewer);
+
+                // Initialize response UI service with UI control
+                (_responseUIService as ResponseUIService)?.Initialize(ResponseScrollViewer);
 
                 // Initialize status update timer
                 _statusUpdateTimer = new DispatcherTimer
@@ -330,12 +335,12 @@ namespace wolle
             _logger?.LogInformation("ShowLoading called - showing loading panel");
 
             // Clear response and error content
-            ResponseScrollViewer.Document = null;
+            _responseUIService.ClearResponseContent();
             _responseStateService.ResetAccumulatedText(); // Reset accumulated text
             ErrorTextBlock.Text = "";
 
             // Hide response and error sections
-            _responseStateService.HideResponseSection();
+            _responseUIService.HideResponseSection();
             ErrorTextBlock.Visibility = Visibility.Collapsed;
 
             // Show progress section and reset indicators
@@ -358,7 +363,7 @@ namespace wolle
             _debounceService.DebounceMarkdownConversion(_responseStateService.GetAccumulatedText(), accumulatedText =>
             {
                 var flowDocument = _markdownService.ConvertToFlowDocument(accumulatedText);
-                ResponseScrollViewer.Document = flowDocument;
+                _responseUIService.UpdateDocument(flowDocument);
 
                 // Auto-scroll to bottom (simplified for now)
                 // TODO: Implement proper auto-scrolling
