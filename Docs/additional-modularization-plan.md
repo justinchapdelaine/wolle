@@ -440,6 +440,7 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **TEST:** Verify build is clean
 - [x] **FIX:** Add missing status timer start/stop logic
 - [x] **FIX:** Resolve settings save disposal race condition
+- [x] **FIX:** Restore proper settings queuing implementation
 
 - [x] Create `Services/IWindowManagementService.cs`
 - [x] Create `Services/WindowManagementService.cs`

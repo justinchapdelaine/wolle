@@ -388,7 +388,6 @@ namespace wolle
         /// </summary>
         /// <param name="message">The message to display.</param>
         /// <param name="brush">The foreground brush for the message.</param>
-        /// <param name="seconds">The number of seconds to show the message.</param>
         private void ApplyPendingSettings()
         {
             // Use settings management service to apply pending settings
