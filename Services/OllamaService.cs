@@ -659,7 +659,7 @@ namespace wolle.Services
                 // Record performance metric
                 var processingTime = DateTime.Now - operationStartTime;
                 RecordPerformanceMetric("FileProcessing", filePath, new FileInfo(filePath).Length, processingTime, operationSuccess, errorMessage);
-                
+
                 // Clear current operation start time
                 lock (_metricsLock)
                 {

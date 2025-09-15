@@ -96,12 +96,12 @@ namespace wolle
             }
 
             _filePath = sanitizedPath;
-            
+
             // Set initial status
             _currentStatus = "Initializing...";
             _logger?.LogInformation($"Set initial status to: {_currentStatus}");
             UpdateStatusDisplay();
-            
+
             ShowLoading();
 
             _logger?.LogInformation("Starting file processing task");
@@ -284,11 +284,11 @@ namespace wolle
                 _logger?.LogInformation("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
                 _isProcessingActive = false;
-                
+
                 // Stop status update timer
                 _statusUpdateTimer?.Stop();
                 _logger?.LogInformation("Status update timer stopped");
-                
+
                 Dispatcher.Invoke(() =>
                 {
                     // Ensure progress section is hidden

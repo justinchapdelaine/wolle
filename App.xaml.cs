@@ -8,10 +8,12 @@ using wolle.Services;
 
 namespace wolle
 {
+    [SupportedOSPlatform("windows")]
     public partial class App : Application
     {
         private IServiceProvider? _serviceProvider;
 
+        [SupportedOSPlatform("windows")]
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -31,7 +33,7 @@ namespace wolle
                     {
                         var contextMenuService = _serviceProvider.GetRequiredService<ContextMenuService>();
                         contextMenuService.UnregisterContextMenu();
-                        MessageBox.Show("Context menu unregistered successfully.", 
+                        MessageBox.Show("Context menu unregistered successfully.",
                             "Unregister Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                         Shutdown();
                         return;
@@ -62,12 +64,12 @@ namespace wolle
                     {
                         var contextMenuService = _serviceProvider.GetRequiredService<ContextMenuService>();
                         contextMenuService.RegisterContextMenu();
-                        MessageBox.Show("Context menu registered successfully! You can now right-click files and select 'Untangle the Wolle'.", 
+                        MessageBox.Show("Context menu registered successfully! You can now right-click files and select 'Untangle the Wolle'.",
                             "Registration Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Failed to register context menu: {ex.Message}\n\nPlease try running as administrator.", 
+                        MessageBox.Show($"Failed to register context menu: {ex.Message}\n\nPlease try running as administrator.",
                             "Registration Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     Shutdown();
@@ -114,6 +116,7 @@ namespace wolle
             services.AddSingleton<MainWindow>();
         }
 
+        [SupportedOSPlatform("windows")]
         protected override void OnExit(ExitEventArgs e)
         {
             // Dispose services
