@@ -22,19 +22,14 @@ namespace wolle
         private string? _filePath;
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
-        private bool _isProcessingActive = false;
         private readonly object _stateLock = new object();
         private CancellationTokenSource? _cancellationTokenSource;
-        private string _currentStatus = "";
         private readonly IResponseDisplayCoordinator _coordinator;
         private readonly IProgressManagementService _progressManagementService;
         private readonly IStatusManagementService _statusManagementService;
+        private readonly ISettingsManagementService _settingsManagementService;
 
-        // Settings queuing
-        private int? _pendingApiTimeoutSeconds = null;
-        private int? _pendingContextWindowSize = null;
-
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService)
         {
             try
             {
@@ -47,6 +42,7 @@ namespace wolle
                 _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
                 _progressManagementService = progressManagementService ?? throw new ArgumentNullException(nameof(progressManagementService));
                 _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
+                _settingsManagementService = settingsManagementService ?? throw new ArgumentNullException(nameof(settingsManagementService));
 
                 InitializeComponent();
 
@@ -58,6 +54,9 @@ namespace wolle
 
                 // Initialize status management service
                 (_statusManagementService as StatusManagementService)?.Initialize();
+
+                // Initialize settings management service with UI controls
+                (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
@@ -106,8 +105,8 @@ namespace wolle
             _filePath = sanitizedPath;
 
             // Set initial status
-            _currentStatus = "Initializing...";
-            _logger?.LogInformation($"Set initial status to: {_currentStatus}");
+            _statusManagementService.UpdateStatus("Initializing...");
+            _logger?.LogInformation($"Set initial status to: Initializing...");
             UpdateStatusDisplay();
 
             ShowLoading();
@@ -116,7 +115,9 @@ namespace wolle
 
             // Set processing flags
             _isProcessingComplete = false;
-            _isProcessingActive = true;
+
+            // Notify settings service about processing state
+            _settingsManagementService.SetProcessingState(true);
 
             // Start status update timer
             _statusManagementService.StartStatusTimer();
@@ -254,7 +255,9 @@ namespace wolle
             {
                 _logger?.LogInformation("Ollama process completed - setting processing complete flag");
                 _isProcessingComplete = true;
-                _isProcessingActive = false;
+
+                // Notify settings service about processing state
+                _settingsManagementService.SetProcessingState(false);
 
                 // Stop status update timer
                 _statusManagementService.StopStatusTimer();
@@ -372,92 +375,31 @@ namespace wolle
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Load current settings values into settings UI
-            var settings = _settingsService.LoadSettings();
-            ApiTimeoutTextBox.Text = settings.ApiTimeoutSeconds.ToString();
-
-            // Set context window size combobox
-            int contextSize = settings.ContextWindowSize;
-            if (contextSize == 32000)
-                ContextWindowSizeComboBox.SelectedIndex = 0;
-            else if (contextSize == 64000)
-                ContextWindowSizeComboBox.SelectedIndex = 1;
-            else // 128000 or any other value
-                ContextWindowSizeComboBox.SelectedIndex = 2;
-
-            // Show settings panel, hide other content
-            SettingsPanel.Visibility = Visibility.Visible;
-            ResponseScrollViewer.Visibility = Visibility.Collapsed;
-            ErrorTextBlock.Visibility = Visibility.Collapsed;
+            // Use settings management service to show settings panel
+            _settingsManagementService.ShowSettingsPanel();
         }
 
         private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            try
+            // Get timeout value from text box
+            if (!int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
             {
-                // Validate and queue timeout setting
-                bool timeoutValid = false;
-                if (int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
-                {
-                    if (timeoutSeconds > 0 && timeoutSeconds <= 1800) // Max 30 minutes
-                    {
-                        timeoutValid = true;
-                    }
-                }
-
-                // Get context window size from combobox
-                var selectedItem = ContextWindowSizeComboBox.SelectedItem as ComboBoxItem;
-                int contextWindowSize = selectedItem != null ? Convert.ToInt32(selectedItem.Tag) : 128000;
-
-                if (timeoutValid)
-                {
-                    if (!_isProcessingActive)
-                    {
-                        // If not processing, apply immediately
-                        _pendingApiTimeoutSeconds = timeoutSeconds;
-                        _pendingContextWindowSize = contextWindowSize;
-                        ApplyPendingSettings();
-                        return; // Exit early
-                    }
-                    else
-                    {
-                        // If processing, queue for later
-                        _pendingApiTimeoutSeconds = timeoutSeconds;
-                        _pendingContextWindowSize = contextWindowSize;
-
-                        // Hide settings panel
-                        SettingsPanel.Visibility = Visibility.Collapsed;
-                        ResponseScrollViewer.Visibility = Visibility.Visible;
-
-                        // Show information message using InfoBar
-                        ShowInformationMessage("Settings queued and will apply after current processing completes.");
-
-                        return; // Exit early to prevent old code from running
-                    }
-                }
-                else
-                {
-                    ErrorTextBlock.Text = "Timeout must be between 1 and 1800 seconds (30 minutes).";
-                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCautionBrush");
-                    ErrorTextBlock.Visibility = Visibility.Visible;
-                    return; // Exit early to prevent old code from running
-                }
+                _settingsManagementService.ShowErrorMessage("Please enter a valid timeout value.");
+                return;
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError($"Error saving settings: {ex.Message}");
-                ErrorTextBlock.Text = $"Error saving settings: {ex.Message}";
-                ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
-                ErrorTextBlock.Visibility = Visibility.Visible;
-            }
+
+            // Get context window size from combobox
+            var selectedItem = ContextWindowSizeComboBox.SelectedItem as ComboBoxItem;
+            int contextWindowSize = selectedItem != null ? Convert.ToInt32(selectedItem.Tag) : 128000;
+
+            // Use settings management service to save settings
+            _settingsManagementService.SaveSettings(timeoutSeconds, contextWindowSize);
         }
 
         private void CancelSettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Hide settings panel, restore normal UI
-            SettingsPanel.Visibility = Visibility.Collapsed;
-            ResponseScrollViewer.Visibility = Visibility.Visible;
-            ErrorTextBlock.Visibility = Visibility.Collapsed;
+            // Use settings management service to cancel settings
+            _settingsManagementService.CancelSettings();
         }
 
         /// <summary>
@@ -466,108 +408,10 @@ namespace wolle
         /// <param name="message">The message to display.</param>
         /// <param name="brush">The foreground brush for the message.</param>
         /// <param name="seconds">The number of seconds to show the message.</param>
-        private void ShowTemporaryMessage(string message, Brush brush, int seconds = 3)
-        {
-            ErrorTextBlock.Text = message;
-            ErrorTextBlock.Foreground = brush ?? Application.Current.Resources["TextFillColorPrimaryBrush"] as Brush;
-            ErrorTextBlock.Visibility = Visibility.Visible;
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
-            timer.Tick += (s, args) =>
-            {
-                timer.Stop();
-                ErrorTextBlock.Visibility = Visibility.Collapsed;
-            };
-            timer.Start();
-        }
-
-        /// <summary>
-        /// Shows an information message using InfoMessageBorder with automatic dismissal.
-        /// </summary>
-        /// <param name="message">The information message to show.</param>
-        /// <param name="seconds">The number of seconds to show message.</param>
-        private void ShowInformationMessage(string message, int seconds = 3)
-        {
-            InfoMessageTextBlock.Text = message;
-            InfoMessageBorder.Visibility = Visibility.Visible;
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
-            timer.Tick += (s, args) =>
-            {
-                timer.Stop();
-                InfoMessageBorder.Visibility = Visibility.Collapsed;
-            };
-            timer.Start();
-        }
-
         private void ApplyPendingSettings()
         {
-            bool settingsApplied = false;
-
-            if (_pendingApiTimeoutSeconds.HasValue)
-            {
-                try
-                {
-                    _logger?.LogInformation($"Applying pending settings change: ApiTimeoutSeconds = {_pendingApiTimeoutSeconds.Value}");
-
-                    var settings = _settingsService.Value;
-                    settings.ApiTimeoutSeconds = _pendingApiTimeoutSeconds.Value;
-                    _settingsService.UpdateSettings(settings);
-                    settingsApplied = true;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Error applying ApiTimeoutSeconds setting: {ex.Message}");
-                    ErrorTextBlock.Text = $"Error applying timeout setting: {ex.Message}";
-                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
-                    ErrorTextBlock.Visibility = Visibility.Visible;
-                }
-                finally
-                {
-                    _pendingApiTimeoutSeconds = null;
-                }
-            }
-
-            if (_pendingContextWindowSize.HasValue)
-            {
-                try
-                {
-                    _logger?.LogInformation($"Applying pending settings change: ContextWindowSize = {_pendingContextWindowSize.Value}");
-
-                    var settings = _settingsService.LoadSettings();
-                    settings.ContextWindowSize = _pendingContextWindowSize.Value;
-                    _settingsService.UpdateSettings(settings);
-                    settingsApplied = true;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Error applying ContextWindowSize setting: {ex.Message}");
-                    ErrorTextBlock.Text = $"Error applying context window setting: {ex.Message}";
-                    ErrorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
-                    ErrorTextBlock.Visibility = Visibility.Visible;
-                }
-                finally
-                {
-                    _pendingContextWindowSize = null;
-                }
-            }
-
-            if (settingsApplied && !_isClosing)
-            {
-                // Restart OllamaService with new settings
-                _ollamaService?.Dispose();
-                _ollamaService = _serviceProvider!.GetRequiredService<OllamaService>();
-
-                // Re-subscribe to events with new service
-                _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
-                _ollamaService.OnStatusUpdate += OnOllamaStatusUpdate;
-                _ollamaService.OnOutputReceived += OnOllamaOutputReceived;
-                _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
-                _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
-
-                // Show success message
-                ShowInformationMessage("Settings applied successfully!");
-            }
+            // Use settings management service to apply pending settings
+            _settingsManagementService.ApplyPendingSettings();
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
