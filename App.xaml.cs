@@ -51,8 +51,21 @@ namespace wolle
                     }
 
                     // Create main window with dependency injection and process the file
+                    Log.Information("About to create MainWindow");
                     var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+                    Log.Information("MainWindow created successfully");
+                    
+                    // Initialize MessageDisplayService with MainWindow
+                    var messageDisplayService = _serviceProvider.GetRequiredService<IMessageDisplayService>();
+                    (messageDisplayService as MessageDisplayService)?.Initialize(mainWindow);
+                    Log.Information("MessageDisplayService initialized successfully");
+                    
+                    // Initialize MainWindow with MessageDisplayService
+                    mainWindow.InitializeMessageDisplayService(messageDisplayService);
+                    Log.Information("MainWindow MessageDisplayService initialized successfully");
+                    
                     mainWindow.Show();
+                    Log.Information("MainWindow shown successfully");
 
                     // Process the file after window is shown
                     mainWindow.ProcessFile(sanitizedPath);
@@ -116,8 +129,12 @@ namespace wolle
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
             services.AddSingleton<IErrorManagementService, ErrorManagementService>();
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
-            services.AddSingleton<IMessageDisplayService>(provider =>
-                new MessageDisplayService(provider.GetRequiredService<MainWindow>()));
+            // Register MessageDisplayService - will be initialized after MainWindow is created
+            services.AddSingleton<IMessageDisplayService>(sp =>
+            {
+                var mainWindow = sp.GetRequiredService<MainWindow>();
+                return new MessageDisplayService(mainWindow);
+            });
             services.AddSingleton<IWindowManagementService>(provider =>
                 new WindowManagementService(
                     provider.GetRequiredService<ILogger<WindowManagementService>>(),

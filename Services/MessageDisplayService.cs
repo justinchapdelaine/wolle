@@ -13,7 +13,7 @@ namespace wolle.Services
     /// </summary>
     public class MessageDisplayService : IMessageDisplayService
     {
-        private readonly Window _mainWindow;
+        private Window _mainWindow;
         private readonly DispatcherTimer? _autoHideTimer;
         private readonly object _messageLock = new object();
 
@@ -27,6 +27,15 @@ namespace wolle.Services
                 Interval = TimeSpan.FromMilliseconds(100)
             };
             _autoHideTimer.Tick += OnAutoHideTimerTick;
+        }
+
+        /// <summary>
+        /// Initializes MessageDisplayService with MainWindow
+        /// </summary>
+        /// <param name="mainWindow">The main window</param>
+        public void Initialize(Window mainWindow)
+        {
+            _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         }
 
         /// <summary>
@@ -192,17 +201,17 @@ namespace wolle.Services
                         switch (messageType)
                         {
                             case "Success":
-                                infoMessageBorder.Background = Application.Current.FindResource("SuccessFillColorDefaultBrush") as Brush;
-                                infoMessageTextBlock.Foreground = Application.Current.FindResource("TextOnAccentFillColorPrimaryBrush") as Brush;
+                                infoMessageBorder.Background = Brushes.Green; // Fallback to green
+                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
                                 break;
                             case "Error":
-                                infoMessageBorder.Background = Application.Current.FindResource("ErrorFillColorDefaultBrush") as Brush;
-                                infoMessageTextBlock.Foreground = Application.Current.FindResource("TextOnAccentFillColorPrimaryBrush") as Brush;
+                                infoMessageBorder.Background = Brushes.Red; // Fallback to red
+                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
                                 break;
                             case "Info":
                             default:
-                                infoMessageBorder.Background = Application.Current.FindResource("InfoFillColorDefaultBrush") as Brush;
-                                infoMessageTextBlock.Foreground = Application.Current.FindResource("TextOnAccentFillColorPrimaryBrush") as Brush;
+                                infoMessageBorder.Background = Brushes.Blue; // Fallback to blue
+                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
                                 break;
                         }
 

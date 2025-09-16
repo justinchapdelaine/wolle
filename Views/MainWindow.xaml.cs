@@ -31,12 +31,13 @@ namespace wolle
         private readonly IErrorManagementService _errorManagementService;
         private readonly IFileProcessingService _fileProcessingService;
         private readonly IWindowManagementService _windowManagementService;
-        private readonly IMessageDisplayService _messageDisplayService;
+        private IMessageDisplayService? _messageDisplayService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IMessageDisplayService messageDisplayService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService)
         {
             try
             {
+                logger.LogInformation("MainWindow constructor - Starting initialization");
                 // Initialize services via dependency injection
                 _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
                 _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
@@ -51,7 +52,6 @@ namespace wolle
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
                 _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
                 _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
-                _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
 
                 InitializeComponent();
 
@@ -65,8 +65,6 @@ namespace wolle
                 (_statusManagementService as StatusManagementService)?.Initialize();
 
                 // Initialize settings management service with UI controls
-                (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
-
                 // Initialize UI interaction service
                 (_uiInteractionService as UIInteractionService)?.Initialize(this);
 
@@ -85,27 +83,39 @@ namespace wolle
             // Subscribe to file processing service events
             _fileProcessingService.OnFileProcessingComplete += OnFileProcessingComplete;
 
-                // Handle unhandled exceptions
-                AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-                {
-                    _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
-                };
-
-                Dispatcher.UnhandledException += (sender, e) =>
-                {
-                    _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
-                    e.Handled = true;
-                };
-
-                _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
-            }
-            catch (Exception ex)
+            // Handle unhandled exceptions
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
-                _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
-                _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
-                throw; // Re-throw to see if it's caught elsewhere
-            }
+                _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
+            };
+
+            Dispatcher.UnhandledException += (sender, e) =>
+            {
+                _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
+                e.Handled = true;
+            };
+
+            _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
         }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
+            _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
+            throw; // Re-throw to see if it's caught elsewhere
+        }
+    }
+
+    /// <summary>
+    /// Initializes MessageDisplayService after MainWindow is created
+    /// </summary>
+    /// <param name="messageDisplayService">The message display service</param>
+    public void InitializeMessageDisplayService(IMessageDisplayService messageDisplayService)
+    {
+        _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
+        
+        // Update SettingsManagementService with MessageDisplayService
+        (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
+    }
 
         public void ProcessFile(string filePath)
         {
