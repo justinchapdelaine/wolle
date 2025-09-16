@@ -22,7 +22,7 @@ namespace wolle
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
-        private CancellationTokenSource? _cancellationTokenSource;
+        private CancellationTokenSource? _cancellationTokenSource = new();
         private readonly IResponseDisplayCoordinator _coordinator;
         private readonly IProgressManagementService _progressManagementService;
         private readonly IStatusManagementService _statusManagementService;
@@ -188,7 +188,7 @@ namespace wolle
                 var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
 
                 // Use message display service to update progress
-                _messageDisplayService.UpdateProgress(currentStatus, currentProcessingTime);
+                _messageDisplayService?.UpdateProgress(currentStatus, currentProcessingTime);
             }
             else
             {
@@ -256,7 +256,7 @@ namespace wolle
             _logger?.LogInformation("ShowLoading called - showing loading panel");
 
             // Use message display service to show loading
-            _messageDisplayService.ShowLoading();
+            _messageDisplayService?.ShowLoading();
 
             // Handle error text in MainWindow
             ErrorTextBlock.Text = "";
@@ -280,7 +280,7 @@ namespace wolle
             _logger?.LogInformation("ShowResponseComplete called");
 
             // Use message display service to show success
-            _messageDisplayService.ShowSuccess("Processing completed successfully", 3000);
+            _messageDisplayService?.ShowSuccess("Processing completed successfully", 3000);
 
             // Progress section is already hidden, response is visible
         }
@@ -290,7 +290,7 @@ namespace wolle
             _logger?.LogError($"ShowError called: {message}");
 
             // Use message display service to show error
-            _messageDisplayService.ShowError(message, 5000);
+            _messageDisplayService?.ShowError(message, 5000);
 
             // Hide progress section
             ProgressSection.Visibility = Visibility.Collapsed;

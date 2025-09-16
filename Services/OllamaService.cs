@@ -12,6 +12,7 @@ using System.Windows;
 using Microsoft.Win32;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace wolle.Services
 {
@@ -91,7 +92,7 @@ namespace wolle.Services
     /// </summary>
     public class OllamaService : IDisposable
     {
-        private readonly SettingsService _settingsService;
+        private readonly IOptions<AppSettings> _settings;
         private readonly ILogger<OllamaService> _logger;
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
@@ -131,19 +132,19 @@ namespace wolle.Services
         /// <summary>
         /// Initializes a new instance of OllamaService class.
         /// </summary>
-        /// <param name="settingsService">The settings service for configuration.</param>
+        /// <param name="settings">The application settings configuration.</param>
         /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaService(SettingsService settingsService, ILogger<OllamaService> logger)
+        public OllamaService(IOptions<AppSettings> settings, ILogger<OllamaService> logger)
         {
-            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            var settings = _settingsService.Value;
-            _modelName = settings.ModelName;
+            var appSettings = _settings.Value;
+            _modelName = appSettings.ModelName;
             _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri(settings.OllamaEndpoint);
-            _httpClient.Timeout = TimeSpan.FromSeconds(settings.ApiTimeoutSeconds);
-            _logger.LogInformation($"OllamaService created with timeout: {settings.ApiTimeoutSeconds} seconds");
+            _httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
+            _httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
+            _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
         }
 
         /// <summary>
@@ -619,7 +620,7 @@ namespace wolle.Services
 
                 // Check file size
                 var fileInfo = new FileInfo(filePath);
-                var settings = _settingsService.Value;
+                var settings = _settings.Value;
                 if (fileInfo.Length > settings.MaxFileSize)
                 {
                     _logger?.LogError($"File too large: {fileInfo.Length} bytes (max: {settings.MaxFileSize})");
@@ -690,7 +691,7 @@ namespace wolle.Services
                 }
 
                 // Load settings to get context window size
-                var settings = _settingsService.Value;
+                var settings = _settings.Value;
 
                 // Use shared HttpClient instance with configured timeout
                 await _apiLock.WaitAsync(cancellationToken);
@@ -886,7 +887,7 @@ namespace wolle.Services
         private string? GetOllamaPath()
         {
             _logger?.LogInformation("GetOllamaPath started");
-            var settings = _settingsService.LoadSettings();
+            var settings = _settings.Value;
 
             // Check configured path first
             if (!string.IsNullOrEmpty(settings.OllamaPath) && File.Exists(settings.OllamaPath))
@@ -984,7 +985,7 @@ namespace wolle.Services
 
                 // Check file size against configured limit
                 var fileInfo = new FileInfo(filePath);
-                var settings = _settingsService.Value;
+                var settings = _settings.Value;
                 if (fileInfo.Length > settings.MaxFileSize)
                 {
                     _logger?.LogError($"Image file too large: {fileInfo.Length} bytes (max: {settings.MaxFileSize} bytes)");
