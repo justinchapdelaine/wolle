@@ -116,6 +116,11 @@ namespace wolle
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
             services.AddSingleton<IErrorManagementService, ErrorManagementService>();
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
+            services.AddSingleton<IWindowManagementService>(provider =>
+                new WindowManagementService(
+                    provider.GetRequiredService<ILogger<WindowManagementService>>(),
+                    provider.GetRequiredService<OllamaService>(),
+                    provider.GetRequiredService<IStatusManagementService>()));
 
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())

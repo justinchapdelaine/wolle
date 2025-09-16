@@ -438,15 +438,20 @@ public class ResourceManagementService : IResourceManagementService
 - [x] **TEST:** Verify file processing works correctly
 - [x] **TEST:** Verify file validation works
 - [x] **TEST:** Verify build is clean
+- [x] **FIX:** Add missing status timer start/stop logic
+- [x] **FIX:** Resolve settings save disposal race condition
+- [x] **FIX:** Restore proper settings queuing implementation
+- [x] **FIX:** Move OllamaService disposal to WindowManagementService
+- [x] **FIX:** Prevent OllamaService disposal during processing
 
-- [ ] Create `Services/IWindowManagementService.cs`
-- [ ] Create `Services/WindowManagementService.cs`
-- [ ] Extract window management logic from MainWindow
-- [ ] Update MainWindow to use new service
-- [ ] Register service in `App.xaml.cs`
-- [ ] **TEST:** Verify window closing works correctly
-- [ ] **TEST:** Verify cleanup operations work
-- [ ] **TEST:** Verify build is clean
+- [x] Create `Services/IWindowManagementService.cs`
+- [x] Create `Services/WindowManagementService.cs`
+- [x] Extract window management logic from MainWindow
+- [x] Update MainWindow to use new service
+- [x] Register service in `App.xaml.cs`
+- [x] **TEST:** Verify window closing works correctly
+- [x] **TEST:** Verify cleanup operations work
+- [x] **TEST:** Verify build is clean
 
 - [ ] Create `Services/IMessageDisplayService.cs`
 - [ ] Create `Services/MessageDisplayService.cs`
@@ -484,9 +489,9 @@ public class ResourceManagementService : IResourceManagementService
 | Phase | Status | Services Completed | Lines Extracted | Notes |
 |-------|--------|------------------|-----------------|-------|
 | **Phase 1** | ✅ Complete | 3/3 | 180/180 | All services completed successfully |
-| **Phase 2** | 🚧 In Progress | 3/5 | 200/200 | UI Interaction, Error Management & File Processing Services complete |
+| **Phase 2** | 🚧 In Progress | 4/5 | 300/200 | UI Interaction, Error Management, File Processing & Window Management Services complete |
 | **Phase 3** | ⏳ Not Started | 0/2 | 0/35 | Low priority services |
-| **Total** | 🚧 In Progress | 6/10 | 380/415 | All services |
+| **Total** | 🚧 In Progress | 7/10 | 480/415 | All services |
 
 ### Phase 1 Progress
 | Service | Status | Date | Commit Hash | Notes |
@@ -502,7 +507,7 @@ public class ResourceManagementService : IResourceManagementService
 | UI Interaction Service | ✅ Complete | 2025-09-14 | (pending) | ~80 lines extracted successfully |
 | Error Management Service | ✅ Complete | 2025-09-14 | (pending) | ~50 lines extracted successfully |
 | File Processing Service | ✅ Complete | 2025-09-14 | (pending) | ~70 lines extracted successfully |
-| Window Management Service | ⏳ Not Started | - | - | ~100 lines to extract |
+| Window Management Service | ✅ Complete | 2025-09-14 | (pending) | ~100 lines extracted successfully |
 | Message Display Service | ⏳ Not Started | - | - | ~30 lines to extract |
 
 ### Phase 3 Progress
@@ -554,4 +559,4 @@ public class ResourceManagementService : IResourceManagementService
 ---
 
 *Last Updated: 2025-09-14*
-*Status: Phase 2 In Progress - UI Interaction, Error Management & File Processing Services Complete*
+*Status: Phase 2 In Progress - UI Interaction, Error Management, File Processing & Window Management Services Complete*

@@ -13,6 +13,7 @@ namespace wolle.Services
     {
         private readonly OllamaService _ollamaService;
         private readonly ILogger<FileProcessingService> _logger;
+        private IStatusManagementService _statusManagementService;
         private string _currentFilePath = string.Empty;
         private bool _isProcessingActive = false;
         private bool _isProcessingComplete = false;
@@ -23,11 +24,23 @@ namespace wolle.Services
         /// Initializes file processing service
         /// </summary>
         /// <param name="ollamaService">The Ollama service</param>
+        /// <param name="statusManagementService">The status management service</param>
         /// <param name="logger">The logger</param>
-        public FileProcessingService(OllamaService ollamaService, ILogger<FileProcessingService> logger)
+        public FileProcessingService(OllamaService ollamaService, IStatusManagementService statusManagementService, ILogger<FileProcessingService> logger)
         {
             _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
+            _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        /// <summary>
+        /// Initializes file processing service
+        /// </summary>
+        /// <param name="statusManagementService">The status management service</param>
+        public void Initialize(IStatusManagementService statusManagementService)
+        {
+            _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
+            _logger?.LogInformation("FileProcessingService initialized");
         }
 
         /// <summary>
@@ -51,6 +64,13 @@ namespace wolle.Services
             _processingStatus = "Initializing...";
 
             _logger?.LogInformation($"Processing file: {sanitizedPath}");
+
+            // Notify services about processing state
+            _logger?.LogInformation("Starting file processing task");
+
+            // Start status update timer
+            _statusManagementService.StartStatusTimer();
+            _logger?.LogInformation("Status update timer started");
 
             try
             {
@@ -91,6 +111,10 @@ namespace wolle.Services
             finally
             {
                 _isProcessingActive = false;
+
+                // Stop status update timer
+                _statusManagementService.StopStatusTimer();
+                _logger?.LogInformation("Status update timer stopped");
             }
         }
 

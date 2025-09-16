@@ -30,8 +30,9 @@ namespace wolle
         private readonly IUIInteractionService _uiInteractionService;
         private readonly IErrorManagementService _errorManagementService;
         private readonly IFileProcessingService _fileProcessingService;
+        private readonly IWindowManagementService _windowManagementService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService)
         {
             try
             {
@@ -48,6 +49,7 @@ namespace wolle
                 _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
                 _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
+                _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
 
                 InitializeComponent();
 
@@ -66,8 +68,7 @@ namespace wolle
                 // Initialize UI interaction service
                 (_uiInteractionService as UIInteractionService)?.Initialize(this);
 
-                // Initialize error management service with UI controls
-                (_errorManagementService as ErrorManagementService)?.Initialize(ErrorTextBlock, InfoMessageBorder, InfoMessageTextBlock);
+                (_fileProcessingService as FileProcessingService)?.Initialize(_statusManagementService);
 
                 // Subscribe to status timer events
                 _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
@@ -390,7 +391,6 @@ namespace wolle
         /// </summary>
         /// <param name="message">The message to display.</param>
         /// <param name="brush">The foreground brush for the message.</param>
-        /// <param name="seconds">The number of seconds to show the message.</param>
         private void ApplyPendingSettings()
         {
             // Use settings management service to apply pending settings
@@ -399,23 +399,8 @@ namespace wolle
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            _logger?.LogInformation($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
-
-            // Prevent closing if processing is not complete
-            lock (_stateLock)
-            {
-                if (!_isProcessingComplete && !_isClosing)
-                {
-                    _logger?.LogInformation("Preventing window close - processing still active");
-                    e.Cancel = true;
-                    return;
-                }
-
-                // Mark that we're attempting to close
-                _isClosing = true;
-            }
-
-            _logger?.LogInformation("Window closing allowed");
+            // Use window management service to handle window closing
+            _windowManagementService.OnWindowClosing(e);
             base.OnClosing(e);
         }
 
