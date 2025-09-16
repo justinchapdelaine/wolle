@@ -80,42 +80,42 @@ namespace wolle
                 _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
                 _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
 
-            // Subscribe to file processing service events
-            _fileProcessingService.OnFileProcessingComplete += OnFileProcessingComplete;
+                // Subscribe to file processing service events
+                _fileProcessingService.OnFileProcessingComplete += OnFileProcessingComplete;
 
-            // Handle unhandled exceptions
-            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+                // Handle unhandled exceptions
+                AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+                {
+                    _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
+                };
+
+                Dispatcher.UnhandledException += (sender, e) =>
+                {
+                    _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
+                    e.Handled = true;
+                };
+
+                _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
+            }
+            catch (Exception ex)
             {
-                _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
-            };
-
-            Dispatcher.UnhandledException += (sender, e) =>
-            {
-                _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
-                e.Handled = true;
-            };
-
-            _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
+                _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
+                _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
+                throw; // Re-throw to see if it's caught elsewhere
+            }
         }
-        catch (Exception ex)
+
+        /// <summary>
+        /// Initializes MessageDisplayService after MainWindow is created
+        /// </summary>
+        /// <param name="messageDisplayService">The message display service</param>
+        public void InitializeMessageDisplayService(IMessageDisplayService messageDisplayService)
         {
-            _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
-            _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
-            throw; // Re-throw to see if it's caught elsewhere
-        }
-    }
+            _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
 
-    /// <summary>
-    /// Initializes MessageDisplayService after MainWindow is created
-    /// </summary>
-    /// <param name="messageDisplayService">The message display service</param>
-    public void InitializeMessageDisplayService(IMessageDisplayService messageDisplayService)
-    {
-        _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
-        
-        // Update SettingsManagementService with MessageDisplayService
-        (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
-    }
+            // Update SettingsManagementService with MessageDisplayService
+            (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
+        }
 
         public void ProcessFile(string filePath)
         {
@@ -131,10 +131,10 @@ namespace wolle
         private void OnFileProcessingComplete(object? sender, EventArgs e)
         {
             _logger?.LogInformation("File processing completed - setting processing complete flag");
-            
+
             // Notify settings service that processing is complete
             _settingsManagementService.SetProcessingState(false);
-            
+
             // Notify UI interaction service that processing is complete
             _uiInteractionService.SetProcessingState(true); // Processing is complete
 
@@ -356,9 +356,12 @@ namespace wolle
 
         private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine("SaveSettingsButton_Click called!");
+            
             // Get timeout value from text box
             if (!int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
             {
+                System.Diagnostics.Debug.WriteLine("Invalid timeout value - showing error message");
                 _settingsManagementService.ShowErrorMessage("Please enter a valid timeout value.");
                 return;
             }
@@ -366,6 +369,8 @@ namespace wolle
             // Get context window size from combobox
             var selectedItem = ContextWindowSizeComboBox.SelectedItem as ComboBoxItem;
             int contextWindowSize = selectedItem != null ? Convert.ToInt32(selectedItem.Tag) : 128000;
+
+            System.Diagnostics.Debug.WriteLine($"SaveSettingsButton_Click: timeout={timeoutSeconds}, contextSize={contextWindowSize}");
 
             // Use settings management service to save settings
             _settingsManagementService.SaveSettings(timeoutSeconds, contextWindowSize);

@@ -54,16 +54,16 @@ namespace wolle
                     Log.Information("About to create MainWindow");
                     var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
                     Log.Information("MainWindow created successfully");
-                    
+
                     // Initialize MessageDisplayService with MainWindow
                     var messageDisplayService = _serviceProvider.GetRequiredService<IMessageDisplayService>();
                     (messageDisplayService as MessageDisplayService)?.Initialize(mainWindow);
                     Log.Information("MessageDisplayService initialized successfully");
-                    
+
                     // Initialize MainWindow with MessageDisplayService
                     mainWindow.InitializeMessageDisplayService(messageDisplayService);
                     Log.Information("MainWindow MessageDisplayService initialized successfully");
-                    
+
                     mainWindow.Show();
                     Log.Information("MainWindow shown successfully");
 

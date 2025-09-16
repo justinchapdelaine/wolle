@@ -122,10 +122,10 @@ namespace wolle.Services
                 _processingStatus = "Processing complete";
 
                 _logger?.LogInformation($"File processing completed: {sanitizedPath}");
-                
+
                 // Raise completion event
                 OnFileProcessingComplete?.Invoke(this, EventArgs.Empty);
-                
+
                 return true;
             }
             catch (OperationCanceledException)

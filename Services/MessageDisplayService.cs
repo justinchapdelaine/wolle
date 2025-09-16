@@ -14,7 +14,7 @@ namespace wolle.Services
     public class MessageDisplayService : IMessageDisplayService
     {
         private Window _mainWindow;
-        private readonly DispatcherTimer? _autoHideTimer;
+        private DispatcherTimer? _autoHideTimer;
         private readonly object _messageLock = new object();
 
         public MessageDisplayService(Window mainWindow)
@@ -24,7 +24,7 @@ namespace wolle.Services
             // Initialize auto-hide timer
             _autoHideTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(100)
+                Interval = TimeSpan.FromMilliseconds(100) // Check every 100ms
             };
             _autoHideTimer.Tick += OnAutoHideTimerTick;
         }
@@ -137,6 +137,7 @@ namespace wolle.Services
         /// <param name="durationMs">Duration in milliseconds to show message</param>
         public void ShowTemporary(string message, int durationMs = 3000)
         {
+            System.Diagnostics.Debug.WriteLine($"ShowTemporary called: message='{message}', duration={durationMs}ms");
             ShowMessageInternal(message, "Info", durationMs);
         }
 
@@ -173,6 +174,36 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Gets adaptive brush with fallback support
+        /// </summary>
+        /// <param name="primaryResourceKey">Primary resource key</param>
+        /// <param name="fallbackResourceKey">Fallback resource key</param>
+        /// <returns>The brush or null if not found</returns>
+        private Brush? GetAdaptiveBrush(string primaryResourceKey, string fallbackResourceKey)
+        {
+            try
+            {
+                // Try primary resource first
+                if (Application.Current.Resources[primaryResourceKey] is Brush primaryBrush)
+                {
+                    return primaryBrush;
+                }
+
+                // Try fallback resource
+                if (Application.Current.Resources[fallbackResourceKey] is Brush fallbackBrush)
+                {
+                    return fallbackBrush;
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Shows message internally with auto-hide support
         /// </summary>
         /// <param name="message">The message to display</param>
@@ -180,55 +211,111 @@ namespace wolle.Services
         /// <param name="autoHideMs">Time in milliseconds before auto-hiding</param>
         private void ShowMessageInternal(string message, string messageType, int autoHideMs)
         {
+            System.Diagnostics.Debug.WriteLine($"ShowMessageInternal called: message='{message}', type={messageType}, autoHide={autoHideMs}ms");
+            
             lock (_messageLock)
             {
-                // Cancel any auto-hide timer
+                System.Diagnostics.Debug.WriteLine("Message lock acquired");
+                
+                // Cancel any auto-hide timer and hide existing message
                 if (_autoHideTimer != null)
                 {
                     _autoHideTimer.Stop();
+                    System.Diagnostics.Debug.WriteLine("Existing timer stopped");
                 }
+
+                // Hide any existing message first
+                _mainWindow.Dispatcher.Invoke(() =>
+                {
+                    System.Diagnostics.Debug.WriteLine("Dispatcher invoked to hide existing message");
+                    if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder)
+                    {
+                        infoMessageBorder.Visibility = Visibility.Collapsed;
+                        System.Diagnostics.Debug.WriteLine("Existing message hidden");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("InfoMessageBorder NOT FOUND!");
+                    }
+                });
 
                 // Show message
                 _mainWindow.Dispatcher.Invoke(() =>
                 {
+                    System.Diagnostics.Debug.WriteLine("Dispatcher invoked to show new message");
                     if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder &&
                         _mainWindow.FindName("InfoMessageTextBlock") is System.Windows.Controls.TextBlock infoMessageTextBlock)
                     {
+                        System.Diagnostics.Debug.WriteLine("UI elements found, setting message");
+                        
                         // Set message text
                         infoMessageTextBlock.Text = message;
+                        System.Diagnostics.Debug.WriteLine($"Message text set: '{message}'");
 
-                        // Set message type styling
+                        // Set message type styling with adaptive brushes
                         switch (messageType)
                         {
                             case "Success":
-                                infoMessageBorder.Background = Brushes.Green; // Fallback to green
-                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
+                                infoMessageBorder.Background = GetAdaptiveBrush("CardBackgroundFillColorDefaultBrush", "SolidBackgroundFillColorBaseBrush") ?? Brushes.Green;
+                                infoMessageTextBlock.Foreground = GetAdaptiveBrush("TextFillColorPrimaryBrush", "TextFillColorPrimaryBrush") ?? Brushes.White;
                                 break;
                             case "Error":
-                                infoMessageBorder.Background = Brushes.Red; // Fallback to red
-                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
+                                infoMessageBorder.Background = GetAdaptiveBrush("SystemControlErrorTextBrush", "SystemControlErrorTextBrush") ?? Brushes.Red;
+                                infoMessageTextBlock.Foreground = GetAdaptiveBrush("TextFillColorPrimaryBrush", "TextFillColorPrimaryBrush") ?? Brushes.White;
                                 break;
                             case "Info":
                             default:
-                                infoMessageBorder.Background = Brushes.Blue; // Fallback to blue
-                                infoMessageTextBlock.Foreground = Brushes.White; // Fallback to white
+                                infoMessageBorder.Background = GetAdaptiveBrush("CardBackgroundFillColorDefaultBrush", "SolidBackgroundFillColorBaseBrush") ?? Brushes.Blue;
+                                infoMessageTextBlock.Foreground = GetAdaptiveBrush("TextFillColorPrimaryBrush", "TextFillColorPrimaryBrush") ?? Brushes.White;
                                 break;
                         }
+                        System.Diagnostics.Debug.WriteLine("Message styling applied");
 
                         // Show message
                         infoMessageBorder.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Message set to Visible");
 
                         // Start auto-hide timer if needed
                         if (autoHideMs > 0)
                         {
-                            if (_autoHideTimer != null)
-                        {
-                            _autoHideTimer.Tag = autoHideMs;
-                            _autoHideTimer.Start();
+                            // Use Task.Delay instead of DispatcherTimer for more reliable timing
+                            Task.Delay(autoHideMs).ContinueWith(_ => 
+                            {
+                                _mainWindow.Dispatcher.Invoke(() =>
+                                {
+                                    if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder)
+                                    {
+                                        infoMessageBorder.Visibility = Visibility.Collapsed;
+                                        System.Diagnostics.Debug.WriteLine($"Message hidden by Task.Delay at {DateTime.Now:HH:mm:ss.fff}");
+                                    }
+                                });
+                            }, TaskScheduler.Default);
+                            
+                            System.Diagnostics.Debug.WriteLine($"Task.Delay started for {autoHideMs}ms at {DateTime.Now:HH:mm:ss.fff}");
                         }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("UI elements NOT FOUND!");
+                        if (_mainWindow.FindName("InfoMessageBorder") is Border borderCheck)
+                        {
+                            System.Diagnostics.Debug.WriteLine("InfoMessageBorder found");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("InfoMessageBorder NOT found");
+                        }
+                        if (_mainWindow.FindName("InfoMessageTextBlock") is System.Windows.Controls.TextBlock textCheck)
+                        {
+                            System.Diagnostics.Debug.WriteLine("InfoMessageTextBlock found");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("InfoMessageTextBlock NOT found");
                         }
                     }
                 });
+                System.Diagnostics.Debug.WriteLine("ShowMessageInternal completed");
             }
         }
 
@@ -237,14 +324,24 @@ namespace wolle.Services
         /// </summary>
         private void OnAutoHideTimerTick(object? sender, EventArgs e)
         {
+            System.Diagnostics.Debug.WriteLine("OnAutoHideTimerTick called!");
+            
             lock (_messageLock)
             {
-                // Hide message
+                System.Diagnostics.Debug.WriteLine("Timer tick lock acquired");
+                
+                // Hide message immediately (timer interval is set to the duration)
                 _mainWindow.Dispatcher.Invoke(() =>
                 {
+                    System.Diagnostics.Debug.WriteLine("Dispatcher invoked to hide message");
                     if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder)
                     {
                         infoMessageBorder.Visibility = Visibility.Collapsed;
+                        System.Diagnostics.Debug.WriteLine("Message visibility set to Collapsed");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("InfoMessageBorder NOT FOUND in timer tick!");
                     }
                 });
 
@@ -252,7 +349,13 @@ namespace wolle.Services
                 if (_autoHideTimer != null)
                 {
                     _autoHideTimer.Stop();
+                    // Reset interval back to 100ms for next use
+                    _autoHideTimer.Interval = TimeSpan.FromMilliseconds(100);
+                    System.Diagnostics.Debug.WriteLine("Timer stopped and reset to 100ms");
                 }
+                
+                // Debug: Log message hidden
+                System.Diagnostics.Debug.WriteLine($"Message hidden by timer at {DateTime.Now:HH:mm:ss.fff}");
             }
         }
 
@@ -266,8 +369,8 @@ namespace wolle.Services
                 if (_autoHideTimer != null)
                 {
                     _autoHideTimer.Stop();
+                    _autoHideTimer.Tick -= OnAutoHideTimerTick;
                 }
-                _autoHideTimer.Tick -= OnAutoHideTimerTick;
             }
         }
     }

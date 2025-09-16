@@ -107,8 +107,11 @@ namespace wolle.Services
         /// <returns>True if settings were saved, false if validation failed</returns>
         public bool SaveSettings(int timeoutSeconds, int contextWindowSize)
         {
+            System.Diagnostics.Debug.WriteLine($"SettingsManagementService.SaveSettings called: timeout={timeoutSeconds}, contextSize={contextWindowSize}, isProcessingActive={_isProcessingActive}");
+            
             if (!ValidateSettings(timeoutSeconds, contextWindowSize))
             {
+                System.Diagnostics.Debug.WriteLine("Settings validation failed");
                 ShowErrorMessage(GetValidationError());
                 return false;
             }
@@ -117,6 +120,7 @@ namespace wolle.Services
             {
                 if (!_isProcessingActive)
                 {
+                    System.Diagnostics.Debug.WriteLine("Processing not active - applying settings immediately");
                     // If not processing, apply immediately
                     _pendingApiTimeoutSeconds = timeoutSeconds;
                     _pendingContextWindowSize = contextWindowSize;
@@ -125,6 +129,7 @@ namespace wolle.Services
                 }
                 else
                 {
+                    System.Diagnostics.Debug.WriteLine("Processing active - queueing settings for later");
                     // If processing, queue for later
                     _pendingApiTimeoutSeconds = timeoutSeconds;
                     _pendingContextWindowSize = contextWindowSize;
@@ -133,12 +138,15 @@ namespace wolle.Services
                     HideSettingsPanel();
 
                     // Show information message
+                    System.Diagnostics.Debug.WriteLine("About to call ShowTemporary for queued settings message");
                     _messageDisplayService?.ShowTemporary("Settings queued and will apply after current processing completes.", 3000);
+                    System.Diagnostics.Debug.WriteLine("ShowTemporary call completed");
                     return true;
                 }
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Exception in SaveSettings: {ex.Message}");
                 ShowErrorMessage($"Error saving settings: {ex.Message}");
                 return false;
             }
