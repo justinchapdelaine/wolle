@@ -1,0 +1,29 @@
+This documentation contains the following article types:
+
+Quickstarts are getting-started instructions to guide you through making requests to the service.
+How-to guides contain instructions for using the service in more specific or customized ways.
+Typical workflow
+To use this feature, you submit data for analysis and handle the API output in your application. Analysis is performed as-is, with no added customization to the model used on your data.
+
+Create an Azure AI Language resource, which grants you access to the features offered by Azure AI Language. It generates a password (called a key) and an endpoint URL that you use to authenticate API requests.
+
+Create a request using either the REST API or the client library for C#, Java, JavaScript, and Python. You can also send asynchronous calls with a batch request to combine API requests for multiple features into a single call.
+
+Send the request containing your text data. Your key and endpoint are used for authentication.
+
+Stream or store the response locally.
+
+Key features for text summarization
+Text summarization uses natural language processing techniques to generate a summary for plain texts, which can be from a document, conversation, or any texts. There are two approaches of summarization this API provides:
+
+Extractive summarization: Produces a summary by extracting salient sentences within the source text, together the positioning information of these sentences.
+
+Multiple extracted sentences: These sentences collectively convey the main idea of the input text. They're original sentences extracted from the input text content.
+Rank score: The rank score indicates how relevant a sentence is to the main topic. Text summarization ranks extracted sentences, and you can determine whether they're returned in the order they appear, or according to their rank. For example, if you request a three-sentence summary extractive summarization returns the three highest scored sentences.
+Positional information: The start position and length of extracted sentences.
+Abstractive summarization: Generates a summary with concise, coherent sentences or words that aren't verbatim extract sentences from the original source.
+
+Summary texts: Abstractive summarization returns a summary for each contextual input range. A long input can be segmented so multiple groups of summary texts can be returned with their contextual input range.
+Contextual input range: The range within the input that was used to generate the summary text.
+
+The text summarization API request is processed upon receipt of the request by creating a job for the API backend. If the job succeeded, the output of the API is returned. The output is available for retrieval for 24 hours. After this time, the output is purged. Due to multilingual and emoji support, the response can contain text offsets. For more information, see how to process offsets.
