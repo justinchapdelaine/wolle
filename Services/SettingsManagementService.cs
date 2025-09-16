@@ -235,20 +235,8 @@ namespace wolle.Services
         /// <param name="message">The error message</param>
         public void ShowErrorMessage(string message)
         {
-            if (_errorTextBlock == null)
-                return;
-
-            _errorTextBlock.Text = message;
-            _errorTextBlock.Foreground = GetResourceBrush("SystemFillColorCriticalBrush");
-            _errorTextBlock.Visibility = Visibility.Visible;
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-            timer.Tick += (s, args) =>
-            {
-                timer.Stop();
-                _errorTextBlock.Visibility = Visibility.Collapsed;
-            };
-            timer.Start();
+            // Use message display service to show error
+            _messageDisplayService?.ShowError(message, 5000);
         }
 
         /// <summary>
@@ -257,19 +245,8 @@ namespace wolle.Services
         /// <param name="message">The success message</param>
         public void ShowSuccessMessage(string message)
         {
-            if (_infoMessageBorder == null || _infoMessageTextBlock == null)
-                return;
-
-            _infoMessageTextBlock.Text = message;
-            _infoMessageBorder.Visibility = Visibility.Visible;
-
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-            timer.Tick += (s, args) =>
-            {
-                timer.Stop();
-                _infoMessageBorder.Visibility = Visibility.Collapsed;
-            };
-            timer.Start();
+            // Use message display service to show success
+            _messageDisplayService?.ShowSuccess(message, 3000);
         }
 
         /// <summary>
