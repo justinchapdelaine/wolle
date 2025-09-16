@@ -449,12 +449,5 @@ namespace wolle
 
             base.OnClosed(e);
         }
-
-        /// <summary>
-        /// Validates and sanitizes file path for security.
-        /// </summary>
-        /// <param name="filePath">The file path to validate.</param>
-        /// <param name="sanitizedPath">The sanitized file path.</param>
-        /// <returns>True if path is valid, false otherwise.</returns>
     }
 }
