@@ -11,15 +11,17 @@ namespace wolle.Services
     /// <summary>
     /// Service for displaying messages to the user
     /// </summary>
-    public class MessageDisplayService : IMessageDisplayService
+    public class MessageDisplayService : IMessageDisplayService, IDisposable
     {
         private Window _mainWindow;
         private DispatcherTimer? _autoHideTimer;
         private readonly object _messageLock = new object();
+        private CancellationTokenSource? _cancellationTokenSource;
 
         public MessageDisplayService(Window mainWindow)
         {
             _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+            _cancellationTokenSource = new CancellationTokenSource();
 
             // Initialize auto-hide timer
             _autoHideTimer = new DispatcherTimer
@@ -278,17 +280,21 @@ namespace wolle.Services
                         // Start auto-hide timer if needed
                         if (autoHideMs > 0)
                         {
-                            // Use Task.Delay instead of DispatcherTimer for more reliable timing
-                            Task.Delay(autoHideMs).ContinueWith(_ => 
+                            // Use Task.Delay with cancellation token to prevent memory leaks
+                            var currentToken = _cancellationTokenSource?.Token ?? CancellationToken.None;
+                            Task.Delay(autoHideMs, currentToken).ContinueWith(_ => 
                             {
-                                _mainWindow.Dispatcher.Invoke(() =>
+                                if (!currentToken.IsCancellationRequested)
                                 {
-                                    if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder)
+                                    _mainWindow.Dispatcher.Invoke(() =>
                                     {
-                                        infoMessageBorder.Visibility = Visibility.Collapsed;
-                                        System.Diagnostics.Debug.WriteLine($"Message hidden by Task.Delay at {DateTime.Now:HH:mm:ss.fff}");
-                                    }
-                                });
+                                        if (_mainWindow.FindName("InfoMessageBorder") is Border infoMessageBorder)
+                                        {
+                                            infoMessageBorder.Visibility = Visibility.Collapsed;
+                                            System.Diagnostics.Debug.WriteLine($"Message hidden by Task.Delay at {DateTime.Now:HH:mm:ss.fff}");
+                                        }
+                                    });
+                                }
                             }, TaskScheduler.Default);
                             
                             System.Diagnostics.Debug.WriteLine($"Task.Delay started for {autoHideMs}ms at {DateTime.Now:HH:mm:ss.fff}");
@@ -366,6 +372,14 @@ namespace wolle.Services
         {
             lock (_messageLock)
             {
+                // Cancel any pending tasks
+                if (_cancellationTokenSource != null)
+                {
+                    _cancellationTokenSource.Cancel();
+                    _cancellationTokenSource.Dispose();
+                    _cancellationTokenSource = null;
+                }
+
                 if (_autoHideTimer != null)
                 {
                     _autoHideTimer.Stop();
