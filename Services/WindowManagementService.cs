@@ -15,6 +15,7 @@ namespace wolle.Services
         private readonly ILogger<WindowManagementService> _logger;
         private readonly OllamaService _ollamaService;
         private readonly IStatusManagementService _statusManagementService;
+        private readonly IEventManagementService _eventManagementService;
         private bool _isWindowClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
@@ -25,11 +26,13 @@ namespace wolle.Services
         /// <param name="logger">The logger</param>
         /// <param name="ollamaService">The Ollama service</param>
         /// <param name="statusManagementService">The status management service</param>
-        public WindowManagementService(ILogger<WindowManagementService> logger, OllamaService ollamaService, IStatusManagementService statusManagementService)
+        /// <param name="eventManagementService">The event management service</param>
+        public WindowManagementService(ILogger<WindowManagementService> logger, OllamaService ollamaService, IStatusManagementService statusManagementService, IEventManagementService eventManagementService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
             _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
+            _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
         }
 
         /// <summary>
@@ -190,6 +193,17 @@ namespace wolle.Services
         public void PerformCleanup()
         {
             _logger?.LogInformation("Performing cleanup operations");
+
+            // Unsubscribe from all events
+            try
+            {
+                _eventManagementService?.UnsubscribeFromAllEvents();
+                _logger?.LogInformation("Event subscriptions cleaned up successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error cleaning up event subscriptions: {ex.Message}");
+            }
 
             // Dispose OllamaService to prevent memory leaks
             try

@@ -58,13 +58,5 @@ namespace wolle.Services
         /// </summary>
         /// <returns>True if error is visible</returns>
         bool IsErrorVisible();
-
-        /// <summary>
-        /// Gets a brush from application resources with fallback
-        /// </summary>
-        /// <param name="resourceKey">The resource key</param>
-        /// <param name="fallbackKey">The fallback resource key</param>
-        /// <returns>The brush or fallback brush</returns>
-        Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush");
     }
 }

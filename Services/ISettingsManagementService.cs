@@ -65,14 +65,6 @@ namespace wolle.Services
         void ShowSuccessMessage(string message);
 
         /// <summary>
-        /// Gets a brush from application resources with fallback
-        /// </summary>
-        /// <param name="resourceKey">The resource key</param>
-        /// <param name="fallbackKey">The fallback resource key</param>
-        /// <returns>The brush or fallback brush</returns>
-        Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush");
-
-        /// <summary>
         /// Sets processing state
         /// </summary>
         /// <param name="isActive">Whether processing is active</param>

@@ -127,8 +127,11 @@ namespace wolle
             services.AddSingleton<IStatusManagementService, StatusManagementService>();
             services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
-            services.AddSingleton<IErrorManagementService, ErrorManagementService>();
+            services.AddSingleton<IErrorManagementService>(provider => 
+                new ErrorManagementService(provider.GetRequiredService<IResourceManagementService>()));
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
+            services.AddSingleton<IEventManagementService, EventManagementService>();
+            services.AddSingleton<IResourceManagementService, ResourceManagementService>();
             // Register MessageDisplayService - will be initialized after MainWindow is created
             services.AddSingleton<IMessageDisplayService>(sp =>
             {
@@ -139,7 +142,8 @@ namespace wolle
                 new WindowManagementService(
                     provider.GetRequiredService<ILogger<WindowManagementService>>(),
                     provider.GetRequiredService<OllamaService>(),
-                    provider.GetRequiredService<IStatusManagementService>()));
+                    provider.GetRequiredService<IStatusManagementService>(),
+                    provider.GetRequiredService<IEventManagementService>()));
 
             // Only register ContextMenuService on Windows
             if (OperatingSystem.IsWindows())

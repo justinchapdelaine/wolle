@@ -258,19 +258,6 @@ namespace wolle.Services
         }
 
         /// <summary>
-        /// Gets a brush from application resources with fallback
-        /// </summary>
-        /// <param name="resourceKey">The resource key</param>
-        /// <param name="fallbackKey">The fallback resource key</param>
-        /// <returns>The brush or fallback brush</returns>
-        public Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush")
-        {
-            return Application.Current.Resources[resourceKey] as Brush ??
-                   Application.Current.Resources[fallbackKey] as Brush ??
-                   new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Black);
-        }
-
-        /// <summary>
         /// Sets processing state
         /// </summary>
         /// <param name="isActive">Whether processing is active</param>

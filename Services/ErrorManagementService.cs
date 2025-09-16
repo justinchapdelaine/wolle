@@ -14,6 +14,16 @@ namespace wolle.Services
         private TextBlock? _errorTextBlock;
         private Border? _infoMessageBorder;
         private TextBlock? _infoMessageTextBlock;
+        private readonly IResourceManagementService _resourceManagementService;
+
+        /// <summary>
+        /// Initializes error management service
+        /// </summary>
+        /// <param name="resourceManagementService">The resource management service</param>
+        public ErrorManagementService(IResourceManagementService resourceManagementService)
+        {
+            _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
+        }
 
         /// <summary>
         /// Initializes error management service
@@ -34,7 +44,7 @@ namespace wolle.Services
         /// <param name="message">The error message</param>
         public void ShowError(string message)
         {
-            ShowError(message, GetResourceBrush("SystemFillColorCriticalBrush"));
+            ShowError(message, _resourceManagementService.GetResourceBrush("SystemFillColorCriticalBrush"));
         }
 
         /// <summary>
@@ -164,19 +174,6 @@ namespace wolle.Services
             {
                 return _errorTextBlock.Visibility == Visibility.Visible;
             });
-        }
-
-        /// <summary>
-        /// Gets a brush from application resources with fallback
-        /// </summary>
-        /// <param name="resourceKey">The resource key</param>
-        /// <param name="fallbackKey">The fallback resource key</param>
-        /// <returns>The brush or fallback brush</returns>
-        public Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush")
-        {
-            return Application.Current.Resources[resourceKey] as Brush ??
-                   Application.Current.Resources[fallbackKey] as Brush ??
-                   new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Black);
         }
     }
 }

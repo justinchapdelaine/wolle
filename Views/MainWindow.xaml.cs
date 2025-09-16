@@ -31,9 +31,11 @@ namespace wolle
         private readonly IErrorManagementService _errorManagementService;
         private readonly IFileProcessingService _fileProcessingService;
         private readonly IWindowManagementService _windowManagementService;
+        private readonly IEventManagementService _eventManagementService;
+        private readonly IResourceManagementService _resourceManagementService;
         private IMessageDisplayService? _messageDisplayService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IEventManagementService eventManagementService, IResourceManagementService resourceManagementService)
         {
             try
             {
@@ -52,6 +54,8 @@ namespace wolle
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
                 _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
                 _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
+                _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
+                _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
 
                 InitializeComponent();
 
@@ -70,30 +74,20 @@ namespace wolle
 
                 (_fileProcessingService as FileProcessingService)?.Initialize(_statusManagementService);
 
-                // Subscribe to status timer events
-                _statusManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
+                // Subscribe to all events using event management service
+                _eventManagementService.SubscribeToOllamaEvents(_ollamaService);
+                _eventManagementService.SubscribeToFileProcessingEvents(_fileProcessingService);
+                _eventManagementService.SubscribeToStatusEvents(_statusManagementService);
+                _eventManagementService.SubscribeToExceptionEvents();
 
-                // Subscribe to Ollama service events
-                _ollamaService.OnProgressUpdate += OnOllamaProgressUpdate;
-                _ollamaService.OnStatusUpdate += OnOllamaStatusUpdate;
-                _ollamaService.OnOutputReceived += OnOllamaOutputReceived;
-                _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
-                _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
-
-                // Subscribe to file processing service events
-                _fileProcessingService.OnFileProcessingComplete += OnFileProcessingComplete;
-
-                // Handle unhandled exceptions
-                AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
-                {
-                    _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
-                };
-
-                Dispatcher.UnhandledException += (sender, e) =>
-                {
-                    _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
-                    e.Handled = true;
-                };
+                // Subscribe to forwarded events from event management service
+                _eventManagementService.OnStatusTimerTick += OnStatusUpdateTimerTick;
+                _eventManagementService.OnOllamaProgressUpdate += OnOllamaProgressUpdate;
+                _eventManagementService.OnOllamaStatusUpdate += OnOllamaStatusUpdate;
+                _eventManagementService.OnOllamaOutputReceived += OnOllamaOutputReceived;
+                _eventManagementService.OnOllamaErrorReceived += OnOllamaErrorReceived;
+                _eventManagementService.OnOllamaProcessComplete += OnOllamaProcessComplete;
+                _eventManagementService.OnFileProcessingComplete += OnFileProcessingComplete;
 
                 _logger?.LogInformation("MainWindow constructor - Constructor completed successfully");
             }
@@ -344,8 +338,8 @@ namespace wolle
         /// <returns>The brush or fallback brush.</returns>
         private Brush GetResourceBrush(string resourceKey, string fallbackKey = "TextFillColorPrimaryBrush")
         {
-            // Use error management service to get resource brush
-            return _errorManagementService.GetResourceBrush(resourceKey, fallbackKey);
+            // Use resource management service to get resource brush
+            return _resourceManagementService.GetResourceBrush(resourceKey, fallbackKey);
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
