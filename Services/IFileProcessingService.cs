@@ -1,4 +1,5 @@
 using System.Threading;
+using System;
 using System.Threading.Tasks;
 
 namespace wolle.Services
@@ -21,6 +22,12 @@ namespace wolle.Services
         /// <param name="cancellationToken">The cancellation token</param>
         /// <returns>True if processing was successful, false otherwise</returns>
         Task<bool> ProcessFileAsync(string filePath, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Processes a file synchronously
+        /// </summary>
+        /// <param name="filePath">The file path to process</param>
+        void ProcessFile(string filePath);
 
         /// <summary>
         /// Validates and sanitizes file path for security
@@ -71,5 +78,10 @@ namespace wolle.Services
         /// </summary>
         /// <returns>Current processing status</returns>
         string GetProcessingStatus();
+
+        /// <summary>
+        /// Event raised when file processing completes
+        /// </summary>
+        event EventHandler? OnFileProcessingComplete;
     }
 }

@@ -1363,7 +1363,7 @@ namespace wolle.Services
             lock (_metricsLock)
             {
                 var result = _currentOperationStartTime.HasValue ? DateTime.Now - _currentOperationStartTime.Value : TimeSpan.Zero;
-                _logger?.LogInformation($"GetCurrentProcessingTime: {result.TotalSeconds:F1}s");
+                _logger?.LogInformation($"GetCurrentProcessingTime: _currentOperationStartTime.HasValue={_currentOperationStartTime.HasValue}, result={result.TotalSeconds:F1}s");
                 return result;
             }
         }

@@ -44,6 +44,34 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Processes a file synchronously
+        /// </summary>
+        /// <param name="filePath">The file path to process</param>
+        public void ProcessFile(string filePath)
+        {
+            // Start processing in background task
+            Task.Run(async () =>
+            {
+                try
+                {
+                    bool result = await ProcessFileAsync(filePath, CancellationToken.None);
+                    if (result)
+                    {
+                        _logger?.LogInformation("File processing completed successfully");
+                    }
+                    else
+                    {
+                        _logger?.LogError("File processing failed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
         /// Processes a file asynchronously
         /// </summary>
         /// <param name="filePath">The file path to process</param>
@@ -94,6 +122,10 @@ namespace wolle.Services
                 _processingStatus = "Processing complete";
 
                 _logger?.LogInformation($"File processing completed: {sanitizedPath}");
+                
+                // Raise completion event
+                OnFileProcessingComplete?.Invoke(this, EventArgs.Empty);
+                
                 return true;
             }
             catch (OperationCanceledException)
@@ -240,6 +272,11 @@ namespace wolle.Services
         {
             return _processingProgress;
         }
+
+        /// <summary>
+        /// Event raised when file processing completes
+        /// </summary>
+        public event EventHandler? OnFileProcessingComplete;
 
         /// <summary>
         /// Gets processing status message

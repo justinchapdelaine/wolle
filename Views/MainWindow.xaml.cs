@@ -80,6 +80,9 @@ namespace wolle
                 _ollamaService.OnErrorReceived += OnOllamaErrorReceived;
                 _ollamaService.OnProcessComplete += OnOllamaProcessComplete;
 
+            // Subscribe to file processing service events
+            _fileProcessingService.OnFileProcessingComplete += OnFileProcessingComplete;
+
                 // Handle unhandled exceptions
                 AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
                 {
@@ -110,44 +113,25 @@ namespace wolle
             _settingsManagementService.SetProcessingState(true);
 
             // Use file processing service to handle file processing
-            var processingTask = Task.Run(async () =>
-            {
-                try
-                {
-                    // Create cancellation token for this processing operation
-                    _cancellationTokenSource = new CancellationTokenSource();
+            _fileProcessingService.ProcessFile(filePath);
+        }
 
-                    bool result = await _fileProcessingService.ProcessFileAsync(filePath, _cancellationTokenSource.Token);
+        private void OnFileProcessingComplete(object? sender, EventArgs e)
+        {
+            _logger?.LogInformation("File processing completed - setting processing complete flag");
+            
+            // Notify settings service that processing is complete
+            _settingsManagementService.SetProcessingState(false);
+            
+            // Notify UI interaction service that processing is complete
+            _uiInteractionService.SetProcessingState(true); // Processing is complete
 
-                    if (result)
-                    {
-                        _logger?.LogInformation("File processing completed successfully");
-                    }
-                    else
-                    {
-                        _logger?.LogError("File processing failed");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
-                    Dispatcher.Invoke(() => ShowError(ex.Message));
-                }
-            });
+            // Stop status update timer
+            _statusManagementService.StopStatusTimer();
+            _logger?.LogInformation("Status update timer stopped");
 
-            // Keep window visible and prevent immediate closing
-            Activate();
-            Focus();
-
-            // Keep main thread alive until processing completes
-            processingTask.ContinueWith(task =>
-            {
-                _logger?.LogInformation("Processing task completed - window can now close");
-                Dispatcher.Invoke(() =>
-                {
-                    _isProcessingComplete = true;
-                });
-            });
+            // Show completion
+            ShowResponseComplete();
         }
 
         private void OnOllamaProgressUpdate(OllamaProgress progress)
@@ -255,7 +239,6 @@ namespace wolle
                 {
                     // Ensure progress section is hidden
                     ProgressSection.Visibility = Visibility.Collapsed;
-                    ShowResponseComplete();
 
                     // Apply any pending settings changes, but don't dispose service if still processing UI
                     if (!_isClosing)
