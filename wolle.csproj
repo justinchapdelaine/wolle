@@ -8,7 +8,13 @@
     <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
     <AssemblyName>wolle</AssemblyName>
     <RootNamespace>wolle</RootNamespace>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Title>wolle</Title>
+    <Description>Untangle the Wolle on your files</Description>
+    <Company>wolle</Company>
+    <Product>wolle</Product>
+    <Copyright>Copyright © 2025</Copyright>
+    <Version>1.0.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
 

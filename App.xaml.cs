@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Runtime.Versioning;
+using System.Windows.Resources;
 using wolle.Services;
 
 namespace wolle
