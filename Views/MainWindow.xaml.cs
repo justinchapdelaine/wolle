@@ -377,10 +377,8 @@ namespace wolle
         }
 
         /// <summary>
-        /// Shows a temporary message that automatically hides after a specified time.
+        /// Applies pending settings using the settings management service.
         /// </summary>
-        /// <param name="message">The message to display.</param>
-        /// <param name="brush">The foreground brush for the message.</param>
         private void ApplyPendingSettings()
         {
             // Use settings management service to apply pending settings
