@@ -105,6 +105,9 @@ namespace wolle
         {
             _logger?.LogInformation($"ProcessFile called with: {filePath}");
 
+            // Notify settings service that processing is starting
+            _settingsManagementService.SetProcessingState(true);
+
             // Use file processing service to handle file processing
             var processingTask = Task.Run(async () =>
             {
