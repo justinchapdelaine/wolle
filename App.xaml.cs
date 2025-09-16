@@ -116,6 +116,8 @@ namespace wolle
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
             services.AddSingleton<IErrorManagementService, ErrorManagementService>();
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
+            services.AddSingleton<IMessageDisplayService>(provider =>
+                new MessageDisplayService(provider.GetRequiredService<MainWindow>()));
             services.AddSingleton<IWindowManagementService>(provider =>
                 new WindowManagementService(
                     provider.GetRequiredService<ILogger<WindowManagementService>>(),

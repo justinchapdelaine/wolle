@@ -22,6 +22,7 @@ namespace wolle.Services
         private SettingsService? _settingsService;
         private OllamaService? _ollamaService;
         private IServiceProvider? _serviceProvider;
+        private IMessageDisplayService? _messageDisplayService;
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
         private bool _isProcessingActive = false;
@@ -39,9 +40,10 @@ namespace wolle.Services
         /// <param name="settingsService">The settings service</param>
         /// <param name="ollamaService">The Ollama service</param>
         /// <param name="serviceProvider">The service provider</param>
+        /// <param name="messageDisplayService">The message display service</param>
         public void Initialize(Panel settingsPanel, FlowDocumentScrollViewer responseScrollViewer, TextBlock errorTextBlock,
             TextBox apiTimeoutTextBox, ComboBox contextWindowSizeComboBox, Border infoMessageBorder, TextBlock infoMessageTextBlock,
-            SettingsService settingsService, OllamaService ollamaService, IServiceProvider serviceProvider)
+            SettingsService settingsService, OllamaService ollamaService, IServiceProvider serviceProvider, IMessageDisplayService messageDisplayService)
         {
             _settingsPanel = settingsPanel ?? throw new ArgumentNullException(nameof(settingsPanel));
             _responseScrollViewer = responseScrollViewer ?? throw new ArgumentNullException(nameof(responseScrollViewer));
@@ -53,6 +55,7 @@ namespace wolle.Services
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
         }
 
         /// <summary>
@@ -130,7 +133,7 @@ namespace wolle.Services
                     HideSettingsPanel();
 
                     // Show information message
-                    ShowSuccessMessage("Settings queued and will apply after current processing completes.");
+                    _messageDisplayService?.ShowTemporary("Settings queued and will apply after current processing completes.", 3000);
                     return true;
                 }
             }
@@ -193,7 +196,7 @@ namespace wolle.Services
                 _ollamaService = _serviceProvider!.GetRequiredService<OllamaService>();
 
                 // Show success message
-                ShowSuccessMessage("Settings applied successfully!");
+                _messageDisplayService?.ShowSuccess("Settings applied successfully!", 3000);
             }
         }
 

@@ -31,8 +31,9 @@ namespace wolle
         private readonly IErrorManagementService _errorManagementService;
         private readonly IFileProcessingService _fileProcessingService;
         private readonly IWindowManagementService _windowManagementService;
+        private readonly IMessageDisplayService _messageDisplayService;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IMessageDisplayService messageDisplayService)
         {
             try
             {
@@ -50,6 +51,7 @@ namespace wolle
                 _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
                 _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
                 _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
+                _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
 
                 InitializeComponent();
 
@@ -63,7 +65,7 @@ namespace wolle
                 (_statusManagementService as StatusManagementService)?.Initialize();
 
                 // Initialize settings management service with UI controls
-                (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!);
+                (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
 
                 // Initialize UI interaction service
                 (_uiInteractionService as UIInteractionService)?.Initialize(this);
@@ -177,16 +179,12 @@ namespace wolle
         {
             if (!_isClosing && _ollamaService != null)
             {
-                Dispatcher.Invoke(() =>
-                {
-                    // Use status management service to format and display status
-                    string currentStatus = _statusManagementService.GetCurrentStatus();
-                    var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
-                    string statusWithTime = _statusManagementService.FormatStatusWithTime(currentStatus, currentProcessingTime);
+                // Use status management service to format and display status
+                string currentStatus = _statusManagementService.GetCurrentStatus();
+                var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
 
-                    _logger?.LogInformation($"UI UPDATE: Setting ProgressDetails.Text to: '{statusWithTime}'");
-                    ProgressDetails.Text = statusWithTime;
-                });
+                // Use message display service to update progress
+                _messageDisplayService.UpdateProgress(currentStatus, currentProcessingTime);
             }
             else
             {
@@ -253,8 +251,8 @@ namespace wolle
         {
             _logger?.LogInformation("ShowLoading called - showing loading panel");
 
-            // Use coordinator to handle response clearing and hiding
-            _coordinator.ShowLoading();
+            // Use message display service to show loading
+            _messageDisplayService.ShowLoading();
 
             // Handle error text in MainWindow
             ErrorTextBlock.Text = "";
@@ -277,8 +275,8 @@ namespace wolle
         {
             _logger?.LogInformation("ShowResponseComplete called");
 
-            // Use coordinator to handle response complete state
-            _coordinator.ShowResponseComplete();
+            // Use message display service to show success
+            _messageDisplayService.ShowSuccess("Processing completed successfully", 3000);
 
             // Progress section is already hidden, response is visible
         }
@@ -287,8 +285,8 @@ namespace wolle
         {
             _logger?.LogError($"ShowError called: {message}");
 
-            // Use coordinator to handle error state
-            _coordinator.ShowError(message);
+            // Use message display service to show error
+            _messageDisplayService.ShowError(message, 5000);
 
             // Hide progress section
             ProgressSection.Visibility = Visibility.Collapsed;
