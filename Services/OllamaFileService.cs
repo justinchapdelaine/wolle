@@ -68,6 +68,8 @@ namespace wolle.Services
     /// </summary>
     public class OllamaFileService : IOllamaFileService
     {
+        private const int DefaultBufferSize = 81920; // 80KB buffer size for efficient file I/O
+        
         private readonly IOptions<AppSettings> _settings;
         private readonly ILogger<OllamaFileService> _logger;
         private readonly IOllamaProcessService _ollamaProcessService;
@@ -139,10 +141,10 @@ namespace wolle.Services
                 }
 
                 // Read image bytes in chunks to avoid memory issues for large files
-                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, FileOptions.SequentialScan | FileOptions.Asynchronous);
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: DefaultBufferSize, FileOptions.SequentialScan | FileOptions.Asynchronous);
                 using var memoryStream = new MemoryStream();
 
-                await fileStream.CopyToAsync(memoryStream, 81920, cancellationToken);
+                await fileStream.CopyToAsync(memoryStream, DefaultBufferSize, cancellationToken);
                 byte[] imageBytes = memoryStream.ToArray();
 
                 string base64String = Convert.ToBase64String(imageBytes);
