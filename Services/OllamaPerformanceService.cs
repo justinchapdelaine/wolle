@@ -7,8 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Provides performance monitoring and statistics for Ollama operations.
     /// </summary>
@@ -461,4 +460,3 @@ namespace wolle.Services
             _logger?.LogInformation("OllamaPerformanceService Dispose completed");
         }
     }
-}

@@ -5,8 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Provides Ollama integration services including model management and file processing.
     /// This is the main orchestrator service that coordinates between specialized services.
@@ -21,7 +20,7 @@ namespace wolle.Services
         private readonly IOllamaFileService _ollamaFileService;
         private readonly IEventAggregator _eventAggregator;
         private bool _isDisposed = false;
-        private readonly string _modelName;
+        private readonly string _modelName = "gemma3:4b";
 
         public event Action<string>? OnStatusUpdate;
         public event Action<string>? OnOutputReceived;
@@ -172,7 +171,7 @@ namespace wolle.Services
                     string? base64Image = await _ollamaFileService.ConvertImageToBase64Async(filePath);
                     if (!string.IsNullOrEmpty(base64Image))
                     {
-                        request.Images = new List<string> { base64Image };
+                        request = request with { Images = new List<string> { base64Image } };
                         _logger?.LogInformation("Image successfully converted to base64 and added to request");
                     }
                     else
@@ -294,4 +293,3 @@ namespace wolle.Services
             _logger?.LogInformation("OllamaService Dispose completed");
         }
     }
-}

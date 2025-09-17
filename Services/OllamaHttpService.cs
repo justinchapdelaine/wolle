@@ -10,8 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Provides HTTP communication with Ollama API.
     /// </summary>
@@ -653,4 +652,3 @@ namespace wolle.Services
             _logger?.LogInformation("OllamaHttpService Dispose completed");
         }
     }
-}

@@ -3,8 +3,7 @@ using Serilog;
 using Serilog.Events;
 using wolle.Services;
 
-namespace wolle
-{
+namespace wolle;
     /// <summary>
     /// Configures Serilog logging for the application.
     /// </summary>
@@ -49,4 +48,3 @@ namespace wolle
             return loggerConfig.CreateLogger();
         }
     }
-}

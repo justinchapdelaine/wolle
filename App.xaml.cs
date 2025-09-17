@@ -14,8 +14,7 @@ using System.Windows.Threading;
 using System.Threading.Tasks;
 using wolle.Services;
 
-namespace wolle
-{
+namespace wolle;
     [SupportedOSPlatform("windows")]
     public partial class App : Application
     {
@@ -487,5 +486,4 @@ namespace wolle
             Shutdown();
         }
     }
-}
 

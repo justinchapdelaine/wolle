@@ -5,8 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Provides file operations and validation for Ollama processing.
     /// </summary>
@@ -342,4 +341,3 @@ namespace wolle.Services
             }
         }
     }
-}

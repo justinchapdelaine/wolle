@@ -5,8 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Provides Ollama process management services.
     /// </summary>
@@ -412,4 +411,3 @@ namespace wolle.Services
             _logger?.LogInformation("OllamaProcessService Dispose completed");
         }
     }
-}

@@ -2,21 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace wolle.Services
-{
+namespace wolle.Services;
     /// <summary>
     /// Represents a performance metric for monitoring.
     /// </summary>
-    public class PerformanceMetric
+    public record PerformanceMetric
     {
-        public DateTime Timestamp { get; set; }
-        public string OperationType { get; set; } = string.Empty;
-        public string FileName { get; set; } = string.Empty;
-        public long FileSizeBytes { get; set; }
-        public TimeSpan ProcessingTime { get; set; }
-        public bool Success { get; set; }
-        public string? ErrorMessage { get; set; }
-        public Dictionary<string, string> Metadata { get; } = new();
+        public DateTime Timestamp { get; init; }
+        public required string OperationType { get; init; }
+        public required string FileName { get; init; }
+        public long FileSizeBytes { get; init; }
+        public TimeSpan ProcessingTime { get; init; }
+        public bool Success { get; init; }
+        public string? ErrorMessage { get; init; }
+        public Dictionary<string, string> Metadata { get; init; } = new();
     }
 
     /// <summary>
@@ -39,31 +38,31 @@ namespace wolle.Services
     /// <summary>
     /// Represents Ollama API request.
     /// </summary>
-    public class OllamaApiRequest
+    public record OllamaApiRequest
     {
-        public string Model { get; set; } = string.Empty;
-        public string Prompt { get; set; } = string.Empty;
-        public bool Stream { get; set; }
-        public OllamaOptions? Options { get; set; }
-        public List<string>? Images { get; set; }
+        public required string Model { get; init; }
+        public required string Prompt { get; init; }
+        public bool Stream { get; init; }
+        public OllamaOptions? Options { get; init; }
+        public List<string>? Images { get; init; }
     }
 
     /// <summary>
     /// Represents Ollama API options.
     /// </summary>
-    public class OllamaOptions
+    public record OllamaOptions
     {
         [JsonPropertyName("num_ctx")]
-        public int? NumCtx { get; set; }
+        public int? NumCtx { get; init; }
         
         [JsonPropertyName("temperature")]
-        public double? Temperature { get; set; }
+        public double? Temperature { get; init; }
         
         [JsonPropertyName("top_p")]
-        public double? TopP { get; set; }
+        public double? TopP { get; init; }
         
         [JsonPropertyName("top_k")]
-        public int? TopK { get; set; }
+        public int? TopK { get; init; }
     }
 
     /// <summary>
@@ -77,4 +76,3 @@ namespace wolle.Services
         public long completed { get; set; }
         public int percent { get; set; }
     }
-}

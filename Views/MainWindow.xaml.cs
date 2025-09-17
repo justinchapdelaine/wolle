@@ -11,8 +11,7 @@ using Microsoft.Extensions.Logging;
 using wolle.Services;
 using wolle.Services.Events;
 
-namespace wolle
-{
+namespace wolle;
     public partial class MainWindow : Window
     {
         private readonly SettingsService _settingsService;
@@ -723,4 +722,3 @@ namespace wolle
             base.OnClosed(e);
         }
     }
-}
