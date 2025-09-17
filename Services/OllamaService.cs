@@ -153,7 +153,7 @@ namespace wolle.Services
 
             // Initialize periodic cleanup
             _periodicCleanupCts = new CancellationTokenSource();
-            _periodicCleanupTask = Task.Run(() => PeriodicCleanupAsync(_periodicCleanupCts.Token));
+            _periodicCleanupTask = PeriodicCleanupAsync(_periodicCleanupCts.Token);
         }
 
         /// <summary>
@@ -466,7 +466,7 @@ namespace wolle.Services
             }
 
             // Comprehensive shell injection pattern detection
-            var dangerousPatterns = new[] 
+            var dangerousPatterns = new[]
             {
                 // Command chaining
                 "&&", "||", ";", "&", "|",
@@ -953,7 +953,7 @@ namespace wolle.Services
             // Check configured path first with enhanced validation
             if (!string.IsNullOrEmpty(settings.OllamaPath))
             {
-                if (ValidationService.ValidateExecutablePath(settings.OllamaPath) && 
+                if (ValidationService.ValidateExecutablePath(settings.OllamaPath) &&
                     IsSafeExecutablePath(settings.OllamaPath))
                 {
                     _logger?.LogInformation($"Found configured Ollama path: {settings.OllamaPath}");
@@ -981,7 +981,7 @@ namespace wolle.Services
                     }
 
                     var ollamaPath = Path.Combine(dir, "ollama.exe");
-                    if (File.Exists(ollamaPath) && 
+                    if (File.Exists(ollamaPath) &&
                         ValidationService.ValidateExecutablePath(ollamaPath) &&
                         IsSafeExecutablePath(ollamaPath))
                     {
@@ -1008,7 +1008,7 @@ namespace wolle.Services
             {
                 try
                 {
-                    if (File.Exists(commonPath) && 
+                    if (File.Exists(commonPath) &&
                         ValidationService.ValidateExecutablePath(commonPath) &&
                         IsSafeExecutablePath(commonPath))
                     {
@@ -1041,7 +1041,7 @@ namespace wolle.Services
             {
                 // Get full path to resolve any relative paths or ..
                 var fullPath = Path.GetFullPath(executablePath);
-                
+
                 // Check if file is actually an executable
                 var extension = Path.GetExtension(fullPath).ToLowerInvariant();
                 if (extension != ".exe" && extension != ".com" && extension != ".bat" && extension != ".cmd")
@@ -1052,7 +1052,7 @@ namespace wolle.Services
 
                 // Check for suspicious file names
                 var fileName = Path.GetFileName(fullPath).ToLowerInvariant();
-                var suspiciousNames = new[] 
+                var suspiciousNames = new[]
                 {
                     "cmd.exe", "powershell.exe", "bash.exe", "sh.exe",
                     "wscript.exe", "cscript.exe", "rundll32.exe",
@@ -1070,7 +1070,7 @@ namespace wolle.Services
 
                 // Check for suspicious directory patterns
                 var directoryName = Path.GetDirectoryName(fullPath) ?? "";
-                var suspiciousDirs = new[] 
+                var suspiciousDirs = new[]
                 {
                     "temp", "tmp", "windows\\system32", "windows\\syswow64",
                     "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
@@ -1123,9 +1123,9 @@ namespace wolle.Services
             {
                 // Get full path to resolve any relative paths or ..
                 var fullPath = Path.GetFullPath(directoryPath);
-                
+
                 // Check for path traversal attempts
-                if (fullPath.Contains("..\\") || fullPath.Contains("../") || 
+                if (fullPath.Contains("..\\") || fullPath.Contains("../") ||
                     fullPath.Contains("\\..\\") || fullPath.Contains("/../"))
                 {
                     _logger?.LogError($"Path traversal detected in directory: {directoryPath}");
@@ -1134,7 +1134,7 @@ namespace wolle.Services
 
                 // Check for suspicious directory patterns
                 var lowerDir = fullPath.ToLowerInvariant();
-                var suspiciousDirs = new[] 
+                var suspiciousDirs = new[]
                 {
                     "temp", "tmp", "windows\\system32", "windows\\syswow64",
                     "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
@@ -1710,7 +1710,7 @@ namespace wolle.Services
         /// <param name="exception">Optional exception.</param>
         /// <param name="context">Additional context information.</param>
         /// <returns>True if error was recovered, false otherwise.</returns>
-        private bool HandleErrorWithRecovery(string errorType, string errorMessage, Exception? exception = null, Dictionary<string, string>? context = null)
+        private async Task<bool> HandleErrorWithRecovery(string errorType, string errorMessage, Exception? exception = null, Dictionary<string, string>? context = null)
         {
             var errorEvent = new ErrorEvent
             {
@@ -1750,10 +1750,10 @@ namespace wolle.Services
             // Try to recover using registered strategies
             if (_errorRecoveryStrategies.TryGetValue(errorType, out var strategy))
             {
-                return TryRecoverFromError(errorEvent, strategy);
+                return await TryRecoverFromError(errorEvent, strategy);
             }
 
-            return false;
+            return await Task.FromResult(false);
         }
 
         /// <summary>
@@ -1761,8 +1761,9 @@ namespace wolle.Services
         /// </summary>
         /// <param name="errorEvent">The error event.</param>
         /// <param name="strategy">The recovery strategy to use.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if recovery was successful, false otherwise.</returns>
-        private bool TryRecoverFromError(ErrorEvent errorEvent, ErrorRecoveryStrategy strategy)
+        private async Task<bool> TryRecoverFromError(ErrorEvent errorEvent, ErrorRecoveryStrategy strategy, CancellationToken cancellationToken = default)
         {
             if (!strategy.ShouldRetry)
                 return false;
@@ -1793,7 +1794,7 @@ namespace wolle.Services
 
                         if (attempt < strategy.MaxRetries)
                         {
-                            Thread.Sleep(strategy.RetryDelay);
+                            await Task.Delay(strategy.RetryDelay, cancellationToken);
                         }
                     }
                 }
@@ -1847,41 +1848,8 @@ namespace wolle.Services
                         // Wait for 5 minutes between cleanup cycles
                         await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
 
-                        // Clean up old performance metrics (older than 24 hours)
-                        lock (_metricsLock)
-                        {
-                            var cutoffTime = DateTime.Now.AddHours(-24);
-                            var initialCount = _performanceMetrics.Count;
-                            
-                            while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
-                            {
-                                var removedMetric = _performanceMetrics.Dequeue();
-                                _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
-                            }
-                            
-                            if (_performanceMetrics.Count < initialCount)
-                            {
-                                _logger?.LogInformation($"Periodic cleanup: removed {initialCount - _performanceMetrics.Count} old performance metrics");
-                            }
-                        }
-
-                        // Clean up old error events (older than 7 days)
-                        lock (_errorLock)
-                        {
-                            var cutoffTime = DateTime.Now.AddDays(-7);
-                            var initialCount = _errorHistory.Count;
-                            
-                            while (_errorHistory.Count > 0 && _errorHistory.Peek().Timestamp < cutoffTime)
-                            {
-                                var removedError = _errorHistory.Dequeue();
-                                _logger?.LogDebug($"Periodic cleanup: removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
-                            }
-                            
-                            if (_errorHistory.Count < initialCount)
-                            {
-                                _logger?.LogInformation($"Periodic cleanup: removed {initialCount - _errorHistory.Count} old error events");
-                            }
-                        }
+                        // Perform cleanup outside of lock blocks to prevent blocking
+                        await PerformCleanupAsync(cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -1899,6 +1867,98 @@ namespace wolle.Services
             {
                 _logger?.LogInformation("Periodic cleanup task stopped");
             }
+        }
+
+        /// <summary>
+        /// Performs actual cleanup operations with proper exception handling.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing cleanup operation.</returns>
+        private async Task PerformCleanupAsync(CancellationToken cancellationToken)
+        {
+            // Clean up old performance metrics (older than 24 hours)
+            var metricsRemoved = await CleanupPerformanceMetricsAsync(cancellationToken);
+            if (metricsRemoved > 0)
+            {
+                _logger?.LogInformation($"Periodic cleanup: removed {metricsRemoved} old performance metrics");
+            }
+
+            // Clean up old error events (older than 7 days)
+            var errorsRemoved = await CleanupErrorHistoryAsync(cancellationToken);
+            if (errorsRemoved > 0)
+            {
+                _logger?.LogInformation($"Periodic cleanup: removed {errorsRemoved} old error events");
+            }
+        }
+
+        /// <summary>
+        /// Cleans up old performance metrics asynchronously.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Number of metrics removed.</returns>
+        private async Task<int> CleanupPerformanceMetricsAsync(CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    lock (_metricsLock)
+                    {
+                        var cutoffTime = DateTime.Now.AddHours(-24);
+                        var initialCount = _performanceMetrics.Count;
+                        var removedCount = 0;
+
+                        while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
+                        {
+                            var removedMetric = _performanceMetrics.Dequeue();
+                            _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
+                            removedCount++;
+                        }
+
+                        return removedCount;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error cleaning up performance metrics: {ex.Message}");
+                    return 0;
+                }
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Cleans up old error events asynchronously.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Number of errors removed.</returns>
+        private async Task<int> CleanupErrorHistoryAsync(CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    lock (_errorLock)
+                    {
+                        var cutoffTime = DateTime.Now.AddDays(-7);
+                        var initialCount = _errorHistory.Count;
+                        var removedCount = 0;
+
+                        while (_errorHistory.Count > 0 && _errorHistory.Peek().Timestamp < cutoffTime)
+                        {
+                            var removedError = _errorHistory.Dequeue();
+                            _logger?.LogDebug($"Periodic cleanup: removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
+                            removedCount++;
+                        }
+
+                        return removedCount;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error cleaning up error history: {ex.Message}");
+                    return 0;
+                }
+            }, cancellationToken);
         }
 
         /// <summary>

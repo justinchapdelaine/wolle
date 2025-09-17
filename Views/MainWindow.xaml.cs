@@ -22,7 +22,7 @@ namespace wolle
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
-        private CancellationTokenSource? _cancellationTokenSource = new();
+        private CancellationTokenSource _cancellationTokenSource = new();
         private readonly IResponseDisplayCoordinator _coordinator;
         private readonly IProgressManagementService _progressManagementService;
         private readonly IStatusManagementService _statusManagementService;
@@ -412,7 +412,7 @@ namespace wolle
             }
 
             // Cancel any ongoing processing
-            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource.Cancel();
 
             // Wait for cancellation to take effect
             try
@@ -425,7 +425,7 @@ namespace wolle
             }
 
             // Dispose cancellation token source
-            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource.Dispose();
 
             // Unsubscribe from status timer events
             _statusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
@@ -440,7 +440,7 @@ namespace wolle
             try
             {
                 // Cancel any ongoing processing first
-                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource.Cancel();
 
                 // Wait a moment for cancellation to take effect
                 try

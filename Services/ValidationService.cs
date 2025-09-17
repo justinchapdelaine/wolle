@@ -131,7 +131,7 @@ namespace wolle.Services
                 return true;
 
             // Check for encoded path traversal attempts
-            if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) || 
+            if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
                 path.Contains("%2f", StringComparison.OrdinalIgnoreCase))
                 return true;
 

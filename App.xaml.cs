@@ -135,13 +135,13 @@ namespace wolle
             services.AddSingleton<IStatusManagementService, StatusManagementService>();
             services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
-            
+
             // Add HttpClient factory for OllamaService with proper configuration
             services.AddHttpClient("OllamaClient", (sp, httpClient) =>
             {
                 var settings = sp.GetRequiredService<IOptions<AppSettings>>();
                 var appSettings = settings.Value;
-                
+
                 httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
                 httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
                 httpClient.DefaultRequestHeaders.Add("User-Agent", "wolle/1.0.0");
@@ -149,7 +149,7 @@ namespace wolle
             });
 
             // Register OllamaService as singleton with all dependencies
-            services.AddSingleton<OllamaService>(sp => 
+            services.AddSingleton<OllamaService>(sp =>
             {
                 var settings = sp.GetRequiredService<IOptions<AppSettings>>();
                 var logger = sp.GetRequiredService<ILogger<OllamaService>>();
