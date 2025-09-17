@@ -392,7 +392,7 @@ namespace wolle
             base.OnClosing(e);
         }
 
-        protected override void OnClosed(EventArgs e)
+        protected override async void OnClosed(EventArgs e)
         {
             _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
             lock (_stateLock)
@@ -415,7 +415,14 @@ namespace wolle
             _cancellationTokenSource?.Cancel();
 
             // Wait for cancellation to take effect
-            System.Threading.Thread.Sleep(100);
+            try
+            {
+                await Task.Delay(100, _cancellationTokenSource.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                // Expected when cancellation token is triggered
+            }
 
             // Dispose cancellation token source
             _cancellationTokenSource?.Dispose();
@@ -436,7 +443,14 @@ namespace wolle
                 _cancellationTokenSource?.Cancel();
 
                 // Wait a moment for cancellation to take effect
-                System.Threading.Thread.Sleep(100);
+                try
+                {
+                    await Task.Delay(100, _cancellationTokenSource.Token);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Expected when cancellation token is triggered
+                }
 
                 // Now dispose the service
                 _ollamaService?.Dispose();

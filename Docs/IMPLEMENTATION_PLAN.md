@@ -24,12 +24,12 @@ This document outlines the implementation plan to fix all critical issues identi
 ### 1.2 UI Thread Blocking Issues
 **Files Affected:** `Views/MainWindow.xaml.cs`
 
-- [ ] **Replace Thread.Sleep with Task.Delay**
+- [x] **Replace Thread.Sleep with Task.Delay**
   - Line 418: Replace `System.Threading.Thread.Sleep(100);` with `await Task.Delay(100, cancellationToken);`
   - Line 439: Replace `System.Threading.Thread.Sleep(100);` with `await Task.Delay(100, cancellationToken);`
   - Make surrounding methods async
 
-- [ ] **Add proper async disposal pattern**
+- [x] **Add proper async disposal pattern**
   - Implement IAsyncDisposable for MainWindow
   - Use async/await pattern throughout disposal logic
   - Add proper cancellation support
@@ -230,8 +230,9 @@ This document outlines the implementation plan to fix all critical issues identi
 ## 📋 Implementation Checklist by Phase
 
 ### Phase 1: Critical Security Fixes (Week 1)
-- [ ] HttpClient management fixes
-- [ ] Input validation enhancements
+- [x] HttpClient management fixes
+- [x] Input validation enhancements
+- [x] UI thread blocking fixes
 - [ ] Command injection protection
 - [ ] Path validation improvements
 
@@ -309,4 +310,4 @@ This document outlines the implementation plan to fix all critical issues identi
 ---
 
 *Last Updated: September 16, 2025*
-*Status: Planning Phase - Ready to Start Implementation*
+*Status: Phase 1.2 (UI Thread Blocking Issues) - COMPLETED. Ready for Phase 1.4 (Command Injection Protection)*
