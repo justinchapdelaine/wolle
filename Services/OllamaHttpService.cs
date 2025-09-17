@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -378,7 +379,7 @@ namespace wolle.Services
                     var content = new StringContent(
                         JsonSerializer.Serialize(request, options: new JsonSerializerOptions { 
                             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                         }),
                         System.Text.Encoding.UTF8,
                         "application/json");

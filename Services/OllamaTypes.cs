@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace wolle.Services
 {
@@ -52,16 +53,16 @@ namespace wolle.Services
     /// </summary>
     public class OllamaOptions
     {
-        [System.Text.Json.Serialization.JsonPropertyName("num_ctx")]
+        [JsonPropertyName("num_ctx")]
         public int? NumCtx { get; set; }
         
-        [System.Text.Json.Serialization.JsonPropertyName("temperature")]
+        [JsonPropertyName("temperature")]
         public double? Temperature { get; set; }
         
-        [System.Text.Json.Serialization.JsonPropertyName("top_p")]
+        [JsonPropertyName("top_p")]
         public double? TopP { get; set; }
         
-        [System.Text.Json.Serialization.JsonPropertyName("top_k")]
+        [JsonPropertyName("top_k")]
         public int? TopK { get; set; }
     }
 
