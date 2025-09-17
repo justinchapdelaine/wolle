@@ -123,7 +123,7 @@ namespace wolle
         }
 
         /// <summary>
-        /// Configures dependency injection services.
+        /// Configures dependency injection services with automatic discovery and proper lifetime management.
         /// </summary>
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
@@ -145,17 +145,8 @@ namespace wolle
             // Register EventAggregator for event-based communication
             services.AddSingleton<IEventAggregator, EventAggregator>();
 
-            // Register application services
-            services.AddSingleton<MarkdownService>();
-            services.AddSingleton<IMarkdownConversionService, MarkdownConversionService>();
-            services.AddSingleton<IMarkdownDebounceService, MarkdownDebounceService>();
-            services.AddSingleton<IResponseStateService, ResponseStateService>();
-            services.AddSingleton<IResponseUIService, ResponseUIService>();
-            services.AddSingleton<IResponseDisplayCoordinator, ResponseDisplayCoordinator>();
-            services.AddSingleton<IProgressManagementService, ProgressManagementService>();
-            services.AddSingleton<IStatusManagementService, StatusManagementService>();
-            services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
-            services.AddSingleton<IUIInteractionService, UIInteractionService>();
+            // Auto-register all services using reflection
+            RegisterServicesAutomatically(services);
 
             // Add HttpClient factory for OllamaService with proper configuration
             services.AddHttpClient("OllamaClient", (sp, httpClient) =>
@@ -169,7 +160,7 @@ namespace wolle
                 httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
             });
 
-            // Register OllamaService as singleton with all dependencies
+            // Register OllamaService as singleton with factory pattern
             services.AddSingleton<OllamaService>(sp =>
             {
                 var settings = sp.GetRequiredService<IOptions<AppSettings>>();
@@ -178,12 +169,10 @@ namespace wolle
                 return new OllamaService(settings, logger, httpClientFactory);
             });
 
+            // Register services with complex dependencies using factory pattern
             services.AddSingleton<IErrorManagementService>(provider =>
                 new ErrorManagementService(provider.GetRequiredService<IResourceManagementService>()));
-            services.AddSingleton<IFileProcessingService, FileProcessingService>();
-            services.AddSingleton<IEventManagementService, EventManagementService>();
-            services.AddSingleton<IResourceManagementService, ResourceManagementService>();
-            services.AddSingleton<IMessageDisplayService, MessageDisplayService>();
+
             services.AddSingleton<IWindowManagementService>(provider =>
                 new WindowManagementService(
                     provider.GetRequiredService<ILogger<WindowManagementService>>(),
@@ -191,13 +180,7 @@ namespace wolle
                     provider.GetRequiredService<IStatusManagementService>(),
                     provider.GetRequiredService<IEventManagementService>()));
 
-            // Only register ContextMenuService on Windows
-            if (OperatingSystem.IsWindows())
-            {
-                services.AddSingleton<ContextMenuService>();
-            }
-
-            // Register main window
+            // Register main window with factory pattern for proper dependency resolution
             services.AddSingleton<MainWindow>(sp =>
             {
                 var eventAggregator = sp.GetRequiredService<IEventAggregator>();
@@ -219,6 +202,117 @@ namespace wolle
                     sp.GetRequiredService<IResourceManagementService>(),
                     eventAggregator);
             });
+        }
+
+        /// <summary>
+        /// Automatically registers services using reflection with proper lifetime management.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        private void RegisterServicesAutomatically(IServiceCollection services)
+        {
+            // Get all service types from the Services assembly
+            var serviceTypes = typeof(App).Assembly.GetTypes()
+                .Where(t => t.Namespace?.StartsWith("wolle.Services") == true)
+                .ToList();
+
+            // Register interface implementations with appropriate lifetimes
+            foreach (var serviceType in serviceTypes)
+            {
+                // Skip interfaces and abstract classes
+                if (serviceType.IsInterface || serviceType.IsAbstract)
+                    continue;
+
+                // Skip special cases that need manual registration
+                if (serviceType.Name == "SettingsService" ||
+                    serviceType.Name == "OllamaService" ||
+                    serviceType.Name == "MainWindow" ||
+                    serviceType.Name == "ContextMenuService")
+                    continue;
+
+                // Find the corresponding interface
+                var interfaceName = $"I{serviceType.Name}";
+                var interfaceType = serviceType.GetInterface(interfaceName);
+
+                if (interfaceType != null)
+                {
+                    // Determine service lifetime based on naming conventions and type characteristics
+                    var lifetime = DetermineServiceLifetime(serviceType);
+
+                    switch (lifetime)
+                    {
+                        case ServiceLifetime.Singleton:
+                            services.AddSingleton(interfaceType, serviceType);
+                            break;
+                        case ServiceLifetime.Scoped:
+                            services.AddScoped(interfaceType, serviceType);
+                            break;
+                        case ServiceLifetime.Transient:
+                            services.AddTransient(interfaceType, serviceType);
+                            break;
+                    }
+                }
+                else
+                {
+                    // Register concrete type without interface (for services like MarkdownService)
+                    var lifetime = DetermineServiceLifetime(serviceType);
+                    switch (lifetime)
+                    {
+                        case ServiceLifetime.Singleton:
+                            services.AddSingleton(serviceType);
+                            break;
+                        case ServiceLifetime.Scoped:
+                            services.AddScoped(serviceType);
+                            break;
+                        case ServiceLifetime.Transient:
+                            services.AddTransient(serviceType);
+                            break;
+                    }
+                }
+            }
+
+            // Only register ContextMenuService on Windows
+            if (OperatingSystem.IsWindows())
+            {
+                services.AddSingleton<ContextMenuService>();
+            }
+        }
+
+        /// <summary>
+        /// Determines the appropriate service lifetime based on type characteristics and naming conventions.
+        /// </summary>
+        /// <param name="serviceType">The service type to analyze.</param>
+        /// <returns>The appropriate service lifetime.</returns>
+        private ServiceLifetime DetermineServiceLifetime(Type serviceType)
+        {
+            var typeName = serviceType.Name.ToLower();
+
+            // Stateful services that maintain state should be singleton
+            if (typeName.Contains("state") ||
+                typeName.Contains("management") ||
+                typeName.Contains("coordinator") ||
+                typeName.Contains("aggregator"))
+            {
+                return ServiceLifetime.Singleton;
+            }
+
+            // Services that handle UI interactions should be scoped
+            if (typeName.Contains("ui") ||
+                typeName.Contains("interaction") ||
+                typeName.Contains("display"))
+            {
+                return ServiceLifetime.Scoped;
+            }
+
+            // Lightweight services without state can be transient
+            if (typeName.Contains("conversion") ||
+                typeName.Contains("debounce") ||
+                typeName.Contains("validation"))
+            {
+                return ServiceLifetime.Transient;
+            }
+
+            // Default to singleton for most services in this application
+            return ServiceLifetime.Singleton;
         }
 
         [SupportedOSPlatform("windows")]
