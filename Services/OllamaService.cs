@@ -1792,7 +1792,8 @@ namespace wolle.Services
 
                         if (attempt < strategy.MaxRetries)
                         {
-                            await Task.Delay(strategy.RetryDelay, cancellationToken);
+                            using var retryTimeout = new CancellationTokenSource(strategy.RetryDelay);
+                            await Task.Delay(strategy.RetryDelay, retryTimeout.Token);
                         }
                     }
                 }
