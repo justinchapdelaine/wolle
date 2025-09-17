@@ -108,12 +108,12 @@ namespace wolle.Services
             try
             {
                 // Ensure Ollama is ready before processing file
-                bool isReady = await _ollamaService.EnsureOllamaReadyAsync(cancellationToken);
+                bool isReady = await _ollamaService.EnsureOllamaReadyAsync();
 
                 if (isReady)
                 {
                     // Use OllamaService to process file
-                    await _ollamaService.ProcessFileAsync(sanitizedPath, cancellationToken);
+                    await _ollamaService.ProcessFileAsync(sanitizedPath);
                 }
                 else
                 {

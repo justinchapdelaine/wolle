@@ -165,8 +165,12 @@ namespace wolle
             {
                 var settings = sp.GetRequiredService<IOptions<AppSettings>>();
                 var logger = sp.GetRequiredService<ILogger<OllamaService>>();
-                var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-                return new OllamaService(settings, logger, httpClientFactory);
+                var ollamaHttpService = sp.GetRequiredService<IOllamaHttpService>();
+                var ollamaProcessService = sp.GetRequiredService<IOllamaProcessService>();
+                var ollamaPerformanceService = sp.GetRequiredService<IOllamaPerformanceService>();
+                var ollamaFileService = sp.GetRequiredService<IOllamaFileService>();
+                var eventAggregator = sp.GetRequiredService<IEventAggregator>();
+                return new OllamaService(settings, logger, ollamaHttpService, ollamaProcessService, ollamaPerformanceService, ollamaFileService, eventAggregator);
             });
 
             // Register services with complex dependencies using factory pattern

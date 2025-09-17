@@ -54,7 +54,7 @@ namespace wolle.Services
                 }
 
                 // Publish loading message event
-                _eventAggregator.Publish(new ShowMessageEvent(message, false, 0));
+                _eventAggregator?.Publish(new ShowMessageEvent(message, false, 0));
             }
         }
 
@@ -72,7 +72,7 @@ namespace wolle.Services
                 }
 
                 // Publish hide loading event (using ShowMessageEvent with empty message)
-                _eventAggregator.Publish(new ShowMessageEvent("", false, 0));
+                _eventAggregator?.Publish(new ShowMessageEvent("", false, 0));
             }
         }
 
@@ -92,7 +92,7 @@ namespace wolle.Services
         /// <param name="autoHideMs">Time in milliseconds before auto-hiding</param>
         public void ShowSuccess(string message, int autoHideMs)
         {
-            _eventAggregator.Publish(new ShowMessageEvent(message, false, autoHideMs));
+            _eventAggregator?.Publish(new ShowMessageEvent(message, false, autoHideMs));
         }
 
         /// <summary>
@@ -111,7 +111,7 @@ namespace wolle.Services
         /// <param name="autoHideMs">Time in milliseconds before auto-hiding</param>
         public void ShowError(string message, int autoHideMs)
         {
-            _eventAggregator.Publish(new ShowMessageEvent(message, true, autoHideMs));
+            _eventAggregator?.Publish(new ShowMessageEvent(message, true, autoHideMs));
         }
 
         /// <summary>
@@ -122,7 +122,7 @@ namespace wolle.Services
         public void ShowTemporary(string message, int durationMs = 3000)
         {
             System.Diagnostics.Debug.WriteLine($"ShowTemporary called: message='{message}', duration={durationMs}ms");
-            _eventAggregator.Publish(new ShowMessageEvent(message, false, durationMs));
+            _eventAggregator?.Publish(new ShowMessageEvent(message, false, durationMs));
         }
 
         /// <summary>
