@@ -213,7 +213,7 @@ namespace wolle.Services
                 }
 
                 // Check if file is not hidden or system (unless explicitly allowed)
-                if (fileInfo.Attributes.HasFlag(FileAttributes.Hidden | FileAttributes.System))
+                if (fileInfo.Attributes.HasFlag(FileAttributes.Hidden) || fileInfo.Attributes.HasFlag(FileAttributes.System))
                 {
                     Debug.WriteLine("File is hidden or system file");
                     return false;
