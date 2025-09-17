@@ -23,13 +23,13 @@ namespace wolle.Services
         /// <param name="processingTime">Time taken to process the file.</param>
         /// <param name="success">Whether the operation was successful.</param>
         /// <param name="errorMessage">Optional error message if operation failed.</param>
-        void RecordPerformanceMetric(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null);
+        Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null);
 
         /// <summary>
         /// Gets detailed performance statistics.
         /// </summary>
         /// <returns>Performance statistics object.</returns>
-        PerformanceStats GetPerformanceStats();
+        Task<PerformanceStats> GetPerformanceStatsAsync();
 
         /// <summary>
         /// Gets performance metrics for a specific time range.
@@ -37,19 +37,19 @@ namespace wolle.Services
         /// <param name="startTime">Start time for metrics.</param>
         /// <param name="endTime">End time for metrics.</param>
         /// <returns>List of performance metrics in time range.</returns>
-        List<PerformanceMetric> GetMetricsInRange(DateTime startTime, DateTime endTime);
+        Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime);
 
         /// <summary>
         /// Clears performance metrics.
         /// </summary>
-        void ClearPerformanceMetrics();
+        Task ClearPerformanceMetricsAsync();
 
         /// <summary>
         /// Exports performance metrics to CSV file.
         /// </summary>
         /// <param name="exportPath">Path to export CSV file.</param>
         /// <returns>True if export was successful, false otherwise.</returns>
-        bool ExportPerformanceMetrics(string exportPath);
+        Task<bool> ExportPerformanceMetricsAsync(string exportPath);
 
         /// <summary>
         /// Gets basic operation statistics.
@@ -60,7 +60,7 @@ namespace wolle.Services
         /// <summary>
         /// Resets operation statistics.
         /// </summary>
-        void ResetStatistics();
+        Task ResetStatisticsAsync();
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ namespace wolle.Services
     {
         private readonly ILogger<OllamaPerformanceService> _logger;
         private readonly Queue<PerformanceMetric> _performanceMetrics = new();
-        private readonly object _metricsLock = new();
+        private readonly SemaphoreSlim _metricsLock = new(1, 1);
         private DateTime _serviceStartTime = DateTime.Now;
         private long _totalBytesProcessed = 0;
         private TimeSpan _totalProcessingTime = TimeSpan.Zero;
@@ -106,7 +106,7 @@ namespace wolle.Services
         /// <param name="processingTime">Time taken to process the file.</param>
         /// <param name="success">Whether the operation was successful.</param>
         /// <param name="errorMessage">Optional error message if operation failed.</param>
-        public void RecordPerformanceMetric(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null)
+        public async Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null)
         {
             var metric = new PerformanceMetric
             {
@@ -119,7 +119,8 @@ namespace wolle.Services
                 ErrorMessage = errorMessage
             };
 
-            lock (_metricsLock)
+            await _metricsLock.WaitAsync();
+            try
             {
                 _performanceMetrics.Enqueue(metric);
 
@@ -134,17 +135,21 @@ namespace wolle.Services
                 _totalBytesProcessed += fileSizeBytes;
                 _totalProcessingTime += processingTime;
             }
+            finally
+            {
+                _metricsLock.Release();
+            }
 
             // Update operation statistics
-            _totalFilesProcessed++;
+            Interlocked.Increment(ref _totalFilesProcessed);
             _lastOperationTime = DateTime.Now;
             if (success)
             {
-                _successfulOperations++;
+                Interlocked.Increment(ref _successfulOperations);
             }
             else
             {
-                _failedOperations++;
+                Interlocked.Increment(ref _failedOperations);
             }
         }
 
@@ -152,9 +157,10 @@ namespace wolle.Services
         /// Gets detailed performance statistics.
         /// </summary>
         /// <returns>Performance statistics object.</returns>
-        public PerformanceStats GetPerformanceStats()
+        public async Task<PerformanceStats> GetPerformanceStatsAsync()
         {
-            lock (_metricsLock)
+            await _metricsLock.WaitAsync();
+            try
             {
                 var uptime = DateTime.Now - _serviceStartTime;
                 var avgProcessingTime = _totalFilesProcessed > 0 ? _totalProcessingTime.TotalMilliseconds / _totalFilesProcessed : 0;
@@ -175,6 +181,10 @@ namespace wolle.Services
                     RecentMetrics = _performanceMetrics.ToList()
                 };
             }
+            finally
+            {
+                _metricsLock.Release();
+            }
         }
 
         /// <summary>
@@ -183,28 +193,38 @@ namespace wolle.Services
         /// <param name="startTime">Start time for metrics.</param>
         /// <param name="endTime">End time for metrics.</param>
         /// <returns>List of performance metrics in time range.</returns>
-        public List<PerformanceMetric> GetMetricsInRange(DateTime startTime, DateTime endTime)
+        public async Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime)
         {
-            lock (_metricsLock)
+            await _metricsLock.WaitAsync();
+            try
             {
                 return _performanceMetrics
                     .Where(m => m.Timestamp >= startTime && m.Timestamp <= endTime)
                     .ToList();
+            }
+            finally
+            {
+                _metricsLock.Release();
             }
         }
 
         /// <summary>
         /// Clears performance metrics.
         /// </summary>
-        public void ClearPerformanceMetrics()
+        public async Task ClearPerformanceMetricsAsync()
         {
-            lock (_metricsLock)
+            await _metricsLock.WaitAsync();
+            try
             {
                 _performanceMetrics.Clear();
                 _serviceStartTime = DateTime.Now;
                 _totalBytesProcessed = 0;
                 _totalProcessingTime = TimeSpan.Zero;
                 _logger?.LogInformation("Performance metrics cleared");
+            }
+            finally
+            {
+                _metricsLock.Release();
             }
         }
 
@@ -213,11 +233,12 @@ namespace wolle.Services
         /// </summary>
         /// <param name="exportPath">Path to export CSV file.</param>
         /// <returns>True if export was successful, false otherwise.</returns>
-        public bool ExportPerformanceMetrics(string exportPath)
+        public async Task<bool> ExportPerformanceMetricsAsync(string exportPath)
         {
             try
             {
-                lock (_metricsLock)
+                await _metricsLock.WaitAsync();
+                try
                 {
                     var lines = new List<string>
                     {
@@ -236,9 +257,13 @@ namespace wolle.Services
                         lines.Add(line);
                     }
 
-                    File.WriteAllLines(exportPath, lines);
+                    await File.WriteAllLinesAsync(exportPath, lines);
                     _logger?.LogInformation($"Performance metrics exported to {exportPath}");
                     return true;
+                }
+                finally
+                {
+                    _metricsLock.Release();
                 }
             }
             catch (Exception ex)
@@ -263,15 +288,20 @@ namespace wolle.Services
         /// <summary>
         /// Resets operation statistics.
         /// </summary>
-        public void ResetStatistics()
+        public async Task ResetStatisticsAsync()
         {
-            lock (_metricsLock)
+            await _metricsLock.WaitAsync();
+            try
             {
                 _totalFilesProcessed = 0;
                 _successfulOperations = 0;
                 _failedOperations = 0;
                 _lastOperationTime = DateTime.MinValue;
                 _logger?.LogInformation("Operation statistics reset");
+            }
+            finally
+            {
+                _metricsLock.Release();
             }
         }
 
@@ -336,11 +366,12 @@ namespace wolle.Services
         /// <returns>Number of metrics removed.</returns>
         private async Task<int> CleanupPerformanceMetricsAsync(CancellationToken cancellationToken)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 try
                 {
-                    lock (_metricsLock)
+                    await _metricsLock.WaitAsync(cancellationToken);
+                    try
                     {
                         var cutoffTime = DateTime.Now.AddHours(-24);
                         var initialCount = _performanceMetrics.Count;
@@ -354,6 +385,10 @@ namespace wolle.Services
                         }
 
                         return removedCount;
+                    }
+                    finally
+                    {
+                        _metricsLock.Release();
                     }
                 }
                 catch (Exception ex)
@@ -414,6 +449,9 @@ namespace wolle.Services
                         _logger?.LogWarning("Periodic cleanup task did not complete gracefully within timeout");
                     }
                 }
+
+                // Dispose the semaphore
+                _metricsLock.Dispose();
             }
             catch (Exception ex)
             {

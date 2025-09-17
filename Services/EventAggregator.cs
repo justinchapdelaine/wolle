@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace wolle.Services;
 
@@ -37,7 +38,7 @@ public interface IEventAggregator
 /// </summary>
 public class EventAggregator : IEventAggregator
 {
-    private readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
+    private readonly ConcurrentDictionary<Type, ConcurrentBag<Delegate>> _handlers = new();
     private readonly ConcurrentDictionary<IDisposable, (Type EventType, Delegate Handler)> _subscriptions = new();
 
     /// <summary>
@@ -50,14 +51,11 @@ public class EventAggregator : IEventAggregator
 
         var eventType = typeof(TEvent);
         _handlers.AddOrUpdate(eventType,
-            addValueFactory: _ => new List<Delegate> { handler },
+            addValueFactory: _ => new ConcurrentBag<Delegate> { handler },
             updateValueFactory: (_, existingHandlers) =>
             {
-                lock (existingHandlers)
-                {
-                    existingHandlers.Add(handler);
-                    return existingHandlers;
-                }
+                existingHandlers.Add(handler);
+                return existingHandlers;
             });
 
         var subscription = new Subscription(() => UnsubscribeHandler<TEvent>(handler));
@@ -74,11 +72,7 @@ public class EventAggregator : IEventAggregator
         if (_handlers.TryGetValue(typeof(TEvent), out var handlers))
         {
             // Create a copy of handlers to avoid modification during enumeration
-            Delegate[] handlersCopy;
-            lock (handlers)
-            {
-                handlersCopy = handlers.ToArray();
-            }
+            Delegate[] handlersCopy = handlers.ToArray();
 
             foreach (var handler in handlersCopy)
             {
@@ -115,10 +109,14 @@ public class EventAggregator : IEventAggregator
     {
         if (_handlers.TryGetValue(eventType, out var handlers))
         {
-            lock (handlers)
+            // For ConcurrentBag, we need to recreate the bag without the handler
+            // since ConcurrentBag doesn't support direct removal
+            var newHandlers = new ConcurrentBag<Delegate>();
+            foreach (var existingHandler in handlers.Where(h => h != handler))
             {
-                handlers.Remove(handler);
+                newHandlers.Add(existingHandler);
             }
+            _handlers.TryUpdate(eventType, newHandlers, handlers);
         }
     }
 

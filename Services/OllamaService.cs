@@ -200,7 +200,7 @@ namespace wolle.Services
             {
                 // Record performance metric
                 var processingTime = DateTime.Now - operationStartTime;
-                _ollamaPerformanceService.RecordPerformanceMetric(
+                await _ollamaPerformanceService.RecordPerformanceMetricAsync(
                     "FileProcessing",
                     filePath,
                     new FileInfo(filePath).Length,
@@ -223,9 +223,9 @@ namespace wolle.Services
         /// Gets detailed performance statistics.
         /// </summary>
         /// <returns>Performance statistics object.</returns>
-        public PerformanceStats GetPerformanceStats()
+        public async Task<PerformanceStats> GetPerformanceStatsAsync()
         {
-            return _ollamaPerformanceService.GetPerformanceStats();
+            return await _ollamaPerformanceService.GetPerformanceStatsAsync();
         }
 
         /// <summary>
@@ -240,17 +240,17 @@ namespace wolle.Services
         /// <summary>
         /// Resets operation statistics.
         /// </summary>
-        public void ResetStatistics()
+        public async Task ResetStatisticsAsync()
         {
-            _ollamaPerformanceService.ResetStatistics();
+            await _ollamaPerformanceService.ResetStatisticsAsync();
         }
 
         /// <summary>
         /// Clears performance metrics.
         /// </summary>
-        public void ClearPerformanceMetrics()
+        public async Task ClearPerformanceMetricsAsync()
         {
-            _ollamaPerformanceService.ClearPerformanceMetrics();
+            await _ollamaPerformanceService.ClearPerformanceMetricsAsync();
         }
 
         /// <summary>
@@ -258,9 +258,9 @@ namespace wolle.Services
         /// </summary>
         /// <param name="exportPath">Path to export CSV file.</param>
         /// <returns>True if export was successful, false otherwise.</returns>
-        public bool ExportPerformanceMetrics(string exportPath)
+        public async Task<bool> ExportPerformanceMetricsAsync(string exportPath)
         {
-            return _ollamaPerformanceService.ExportPerformanceMetrics(exportPath);
+            return await _ollamaPerformanceService.ExportPerformanceMetricsAsync(exportPath);
         }
 
         /// <summary>
