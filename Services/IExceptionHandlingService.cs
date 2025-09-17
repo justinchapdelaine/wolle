@@ -90,17 +90,17 @@ namespace wolle.Services
         /// <summary>
         /// Gets the type of the exception.
         /// </summary>
-        public string ExceptionType { get; init; }
+        public required string ExceptionType { get; init; }
 
         /// <summary>
         /// Gets the message of the exception.
         /// </summary>
-        public string Message { get; init; }
+        public required string Message { get; init; }
 
         /// <summary>
         /// Gets the context where the exception occurred.
         /// </summary>
-        public string Context { get; init; }
+        public required string Context { get; init; }
 
         /// <summary>
         /// Gets the severity level of the exception.

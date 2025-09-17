@@ -194,7 +194,7 @@ namespace wolle.Services;
                                 "Invalid response format from Ollama API", ExceptionSeverity.Error);
                             return false;
                         }
-                        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                         {
                             _logger?.LogInformation("Model existence check was cancelled");
                             throw; // Re-throw cancellation exceptions
@@ -322,7 +322,7 @@ namespace wolle.Services;
                     "Request timed out while pulling model. Please try again.", ExceptionSeverity.Error);
                 throw;
             }
-            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger?.LogInformation("Ollama API pull was cancelled");
                 throw; // Re-throw cancellation exceptions

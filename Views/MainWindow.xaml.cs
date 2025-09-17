@@ -98,7 +98,7 @@ namespace wolle;
             {
                 _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
                 _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
-                _exceptionHandlingService.HandleException(ex, "MainWindow.Constructor", 
+                _exceptionHandlingService?.HandleException(ex, "MainWindow.Constructor", 
                     "Failed to initialize the application window. Please restart the application.", ExceptionSeverity.Critical);
                 throw; // Re-throw to see if it's caught elsewhere
             }

@@ -432,7 +432,7 @@ namespace wolle;
         /// </summary>
         /// <param name="sender">The event sender.</param>
         /// <param name="e">The event arguments.</param>
-        private void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             Log.Error(e.Exception, "Unobserved task exception occurred");
             
