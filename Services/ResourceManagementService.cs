@@ -124,16 +124,12 @@ namespace wolle.Services
                 if (Application.Current.Resources.Contains(resourceKey))
                 {
                     var resource = Application.Current.Resources[resourceKey];
-                    if (resource is Color color)
+                    return resource switch
                     {
-                        _logger?.LogDebug($"Retrieved color for resource '{resourceKey}'");
-                        return color;
-                    }
-                    else if (resource is Brush brush && brush is SolidColorBrush solidBrush)
-                    {
-                        _logger?.LogDebug($"Retrieved color from brush for resource '{resourceKey}'");
-                        return solidBrush.Color;
-                    }
+                        Color color => color,
+                        SolidColorBrush solidBrush => solidBrush.Color,
+                        _ => fallbackColor
+                    };
                 }
 
                 _logger?.LogWarning($"Color resource '{resourceKey}' not found, using fallback");

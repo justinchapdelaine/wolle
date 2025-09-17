@@ -73,12 +73,12 @@ namespace wolle.Services
 
             // Set context window size combobox
             int contextSize = settings.ContextWindowSize;
-            if (contextSize == 32000)
-                _contextWindowSizeComboBox.SelectedIndex = 0;
-            else if (contextSize == 64000)
-                _contextWindowSizeComboBox.SelectedIndex = 1;
-            else // 128000 or any other value
-                _contextWindowSizeComboBox.SelectedIndex = 2;
+            _contextWindowSizeComboBox.SelectedIndex = contextSize switch
+            {
+                32000 => 0,
+                64000 => 1,
+                _ => 2 // 128000 or any other value
+            };
 
             // Show settings panel
             _settingsPanel.Visibility = Visibility.Visible;

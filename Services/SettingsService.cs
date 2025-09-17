@@ -91,14 +91,9 @@ namespace wolle.Services
                     }
 
                     // Validate model name
-                    if (string.IsNullOrWhiteSpace(settings.ModelName))
+                    if (string.IsNullOrWhiteSpace(settings.ModelName) || !ValidationService.ValidateModelName(settings.ModelName))
                     {
-                        System.Diagnostics.Debug.WriteLine("Empty model name in settings, resetting to default");
-                        settings.ModelName = "gemma3:4b";
-                    }
-                    else if (!ValidationService.ValidateModelName(settings.ModelName))
-                    {
-                        System.Diagnostics.Debug.WriteLine("Invalid model name in settings, resetting to default");
+                        System.Diagnostics.Debug.WriteLine("Invalid or empty model name in settings, resetting to default");
                         settings.ModelName = "gemma3:4b";
                     }
 
