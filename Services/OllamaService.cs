@@ -94,11 +94,12 @@ namespace wolle.Services
     {
         private readonly IOptions<AppSettings> _settings;
         private readonly ILogger<OllamaService> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
         private readonly string _modelName;
-        private readonly HttpClient _httpClient;
+        private HttpClient _httpClient;
         private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1); // For thread-safe API calls
 
         // Basic operation statistics
@@ -134,14 +135,16 @@ namespace wolle.Services
         /// </summary>
         /// <param name="settings">The application settings configuration.</param>
         /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaService(IOptions<AppSettings> settings, ILogger<OllamaService> logger)
+        /// <param name="httpClientFactory">HTTP client factory for creating HTTP clients.</param>
+        public OllamaService(IOptions<AppSettings> settings, ILogger<OllamaService> logger, IHttpClientFactory httpClientFactory)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
             var appSettings = _settings.Value;
             _modelName = appSettings.ModelName;
-            _httpClient = new HttpClient();
+            _httpClient = _httpClientFactory.CreateClient();
             _httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
             _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
@@ -1644,16 +1647,7 @@ namespace wolle.Services
                     _ollamaProcess = null;
                 }
 
-                // Clean up HttpClient and SemaphoreSlim
-                try
-                {
-                    _httpClient?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Error disposing HttpClient: {ex.Message}");
-                }
-
+                // Clean up SemaphoreSlim (HttpClient is managed by factory)
                 try
                 {
                     // Only dispose SemaphoreSlim if no API calls are active

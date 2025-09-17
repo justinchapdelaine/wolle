@@ -1,0 +1,312 @@
+# Wolle Codebase Implementation Plan
+
+## Overview
+This document outlines the implementation plan to fix all critical issues identified in the comprehensive code review. Issues are organized by priority to ensure the most critical security and stability problems are addressed first.
+
+---
+
+## 🔥 High Priority - Security & Stability Issues
+
+### 1.1 HttpClient Management Issues
+**Files Affected:** `Services/OllamaService.cs`
+
+- [x] **Replace HttpClient creation with IHttpClientFactory**
+  - Add `services.AddHttpClient<OllamaService>();` in App.xaml.cs
+  - Inject IHttpClientFactory into OllamaService constructor
+  - Replace `new HttpClient()` with `_httpClientFactory.CreateClient()`
+  - Remove manual Dispose() calls for HttpClient
+
+- [ ] **Configure HttpClient with proper settings**
+  - Set timeout and base address in factory configuration
+  - Add retry policy with exponential backoff
+  - Configure proper headers and user agent
+
+### 1.2 UI Thread Blocking Issues
+**Files Affected:** `Views/MainWindow.xaml.cs`
+
+- [ ] **Replace Thread.Sleep with Task.Delay**
+  - Line 418: Replace `System.Threading.Thread.Sleep(100);` with `await Task.Delay(100, cancellationToken);`
+  - Line 439: Replace `System.Threading.Thread.Sleep(100);` with `await Task.Delay(100, cancellationToken);`
+  - Make surrounding methods async
+
+- [ ] **Add proper async disposal pattern**
+  - Implement IAsyncDisposable for MainWindow
+  - Use async/await pattern throughout disposal logic
+  - Add proper cancellation support
+
+### 1.3 Input Validation Vulnerabilities
+**Files Affected:** `Services/ValidationService.cs`
+
+- [x] **Implement comprehensive path validation**
+  - Replace current simple string checking with `Path.GetFullPath()`
+  - Add validation against allowed base directories
+  - Handle path canonicalization and normalization
+  - Add support for UNC paths and edge cases
+
+- [x] **Add file size validation**
+  - Implement configurable file size limits
+  - Add validation before file operations
+  - Provide clear error messages for size violations
+
+### 1.4 Command Injection Protection
+**Files Affected:** `Services/OllamaService.cs`
+
+- [ ] **Enhance argument validation**
+  - Use `ProcessStartInfo.ArgumentList` instead of string concatenation
+  - Add comprehensive shell injection pattern detection
+  - Implement proper argument escaping
+  - Add sandbox validation for process execution
+
+- [ ] **Add process execution security**
+  - Validate executable path before execution
+  - Use restricted process execution environment
+  - Add process privilege validation
+
+### 1.5 Memory Leak Prevention
+**Files Affected:** `Services/OllamaService.cs`
+
+- [ ] **Implement bounded collections**
+  - Add size limits to `_performanceMetrics` queue (max 1000 items)
+  - Add size limits to `_errorHistory` queue (max 500 items)
+  - Implement automatic cleanup when limits are reached
+  - Add periodic cleanup mechanism
+
+- [ ] **Fix Task continuation leaks**
+  - Properly cancel and clean up Task.Delay continuations
+  - Add CancellationToken support to all async operations
+  - Implement proper Task disposal patterns
+
+### 1.6 Resource Management Issues
+**Files Affected:** Multiple service files
+
+- [ ] **Implement proper async pattern**
+  - Replace fire-and-forget Task.Run with proper async/await
+  - Add proper exception handling for async operations
+  - Implement proper cancellation support
+
+- [ ] **Fix Timer operations**
+  - Remove timer operations from lock blocks
+  - Use lock-free patterns for timer management
+  - Add proper timer disposal
+
+---
+
+## ⚡ Medium Priority - Performance & Maintainability Issues
+
+### 2.1 Circular Dependencies
+**Files Affected:** `App.xaml.cs`, Multiple service files
+
+- [ ] **Remove MainWindow dependency from services**
+  - Implement event-based communication pattern
+  - Create mediator or event aggregator service
+  - Refactor IMessageDisplayService to not depend on MainWindow
+
+- [ ] **Implement proper DI patterns**
+  - Replace manual service registration with automatic discovery
+  - Use proper service lifetime management
+  - Implement proper factory patterns where needed
+
+### 2.2 God Class Refactoring
+**Files Affected:** `Services/OllamaService.cs`
+
+- [ ] **Split OllamaService into focused services**
+  - Create `OllamaHttpService` for HTTP operations
+  - Create `OllamaProcessService` for process management
+  - Create `OllamaPerformanceService` for metrics
+  - Create `OllamaFileService` for file operations
+
+- [ ] **Implement proper separation of concerns**
+  - Each service should have single responsibility
+  - Use dependency injection between new services
+  - Implement proper interface segregation
+
+### 2.3 Exception Handling Improvements
+**Files Affected:** Multiple service files
+
+- [ ] **Replace generic catch blocks**
+  - Catch specific exception types
+  - Add proper logging for all exceptions
+  - Implement graceful degradation
+
+- [ ] **Implement global exception handling**
+  - Add global try-catch in App.xaml.cs
+  - Create centralized error reporting
+  - Add user-friendly error messages
+
+### 2.4 Thread Safety Enhancements
+**Files Affected:** Multiple service files
+
+- [ ] **Establish lock hierarchy**
+  - Define clear lock ordering rules
+  - Replace multiple lock objects with single strategy
+  - Add deadlock detection and prevention
+
+- [ ] **Implement thread-safe patterns**
+  - Use concurrent collections where appropriate
+  - Implement proper async synchronization
+  - Add thread-safe state management
+
+---
+
+## 🔧 Low Priority - Code Quality & Modernization Issues
+
+### 3.1 Modern C# Features Implementation
+**Files Affected:** All .cs files
+
+- [ ] **Adopt file-scoped namespaces**
+  - Convert all files to file-scoped namespace syntax
+  - Update using statements accordingly
+
+- [ ] **Implement required properties and init-only setters**
+  - Use `required` keyword for critical properties
+  - Use `init` setters for immutable-after-construction properties
+
+- [ ] **Add nullable reference types**
+  - Enable nullable reference types project-wide
+  - Add proper nullability annotations
+  - Fix all nullable warnings
+
+- [ ] **Use pattern matching enhancements**
+  - Replace if-else with switch expressions where appropriate
+  - Use property patterns and type patterns
+  - Implement tuple patterns for deconstruction
+
+### 3.2 WPF Best Practices Implementation
+**Files Affected:** `Views/MainWindow.xaml.cs`, `Views/MainWindow.xaml`
+
+- [ ] **Implement proper MVVM pattern**
+  - Create ViewModel classes for MainWindow
+  - Implement INotifyPropertyChanged
+  - Use data binding instead of direct UI manipulation
+
+- [ ] **Replace Dispatcher.Invoke with proper binding**
+  - Use data binding for UI updates
+  - Implement commands for user interactions
+  - Reduce direct Dispatcher usage
+
+- [ ] **Add proper resource management**
+  - Implement IDisposable for WPF resources
+  - Use using statements for disposable resources
+  - Add proper cleanup for event handlers
+
+### 3.3 Code Organization Improvements
+**Files Affected:** All files
+
+- [ ] **Standardize error handling patterns**
+  - Create centralized error handling utilities
+  - Implement consistent logging patterns
+  - Add proper exception types for domain-specific errors
+
+- [ ] **Remove code duplication**
+  - Extract common validation logic
+  - Create shared utility classes
+  - Implement base classes for common service functionality
+
+- [ ] **Improve naming and organization**
+  - Use consistent naming conventions
+  - Organize methods by responsibility
+  - Add proper XML documentation
+
+### 3.4 Testing Infrastructure
+**Files Affected:** Project structure
+
+- [ ] **Add unit testing framework**
+  - Add xUnit or NUnit project
+  - Create test classes for all services
+  - Implement mock objects for dependencies
+
+- [ ] **Add integration tests**
+  - Test end-to-end scenarios
+  - Test file processing workflows
+  - Test error handling scenarios
+
+- [ ] **Add UI automation tests**
+  - Test WPF window interactions
+  - Test settings panel functionality
+  - Test context menu integration
+
+---
+
+## 📋 Implementation Checklist by Phase
+
+### Phase 1: Critical Security Fixes (Week 1)
+- [ ] HttpClient management fixes
+- [ ] Input validation enhancements
+- [ ] Command injection protection
+- [ ] Path validation improvements
+
+### Phase 2: Stability & Performance (Week 2)
+- [ ] UI thread blocking fixes
+- [ ] Memory leak prevention
+- [ ] Resource management improvements
+- [ ] Thread safety enhancements
+
+### Phase 3: Architecture Refactoring (Week 3-4)
+- [ ] Circular dependency removal
+- [ ] God class refactoring
+- [ ] Proper DI pattern implementation
+- [ ] Exception handling improvements
+
+### Phase 4: Code Quality & Modernization (Week 5-6)
+- [ ] Modern C# features adoption
+- [ ] WPF best practices implementation
+- [ ] Code organization improvements
+- [ ] Testing infrastructure setup
+
+---
+
+## 🎯 Success Criteria
+
+### Security Criteria
+- [ ] No path traversal vulnerabilities
+- [ ] No command injection possibilities
+- [ ] Proper input validation for all user inputs
+- [ ] Secure process execution
+
+### Stability Criteria
+- [ ] No UI thread blocking
+- [ ] No memory leaks
+- [ ] Proper resource disposal
+- [ ] Graceful error handling
+
+### Performance Criteria
+- [ ] Responsive UI under all conditions
+- [ ] Efficient resource usage
+- [ ] Proper async/await patterns
+- [ ] No deadlocks or race conditions
+
+### Maintainability Criteria
+- [ ] Clear separation of concerns
+- [ ] Proper dependency injection
+- [ ] Modern C# patterns
+- [ ] Comprehensive test coverage
+
+---
+
+## 📝 Notes
+
+### Implementation Guidelines
+1. **Test each fix thoroughly** before moving to the next
+2. **Commit frequently** with descriptive messages
+3. **Update this document** as progress is made
+4. **Communicate blockers** immediately
+5. **Follow existing code style** and conventions
+
+### Risk Mitigation
+1. **Backup working code** before major refactoring
+2. **Implement feature flags** for breaking changes
+3. **Add comprehensive logging** for debugging
+4. **Create rollback plan** for each major change
+5. **Test on multiple environments** before deployment
+
+### Quality Assurance
+1. **Run all existing tests** after each change
+2. **Perform manual testing** for UI changes
+3. **Check for performance regressions**
+4. **Verify security fixes** with penetration testing
+5. **Get code review** for all major changes
+
+---
+
+*Last Updated: September 16, 2025*
+*Status: Planning Phase - Ready to Start Implementation*

@@ -118,7 +118,6 @@ namespace wolle
 
             // Register application services
             services.AddSingleton<MarkdownService>();
-            services.AddSingleton<OllamaService>();
             services.AddSingleton<IMarkdownConversionService, MarkdownConversionService>();
             services.AddSingleton<IMarkdownDebounceService, MarkdownDebounceService>();
             services.AddSingleton<IResponseStateService, ResponseStateService>();
@@ -128,6 +127,13 @@ namespace wolle
             services.AddSingleton<IStatusManagementService, StatusManagementService>();
             services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
+            
+            // Add HttpClient factory for OllamaService
+            services.AddHttpClient<OllamaService>();
+            
+            // Register OllamaService after HttpClient factory is configured
+            services.AddSingleton<OllamaService>();
+
             services.AddSingleton<IErrorManagementService>(provider =>
                 new ErrorManagementService(provider.GetRequiredService<IResourceManagementService>()));
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
