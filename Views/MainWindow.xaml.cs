@@ -9,6 +9,7 @@ using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using wolle.Services;
+using wolle.Services.Events;
 
 namespace wolle
 {
@@ -33,9 +34,9 @@ namespace wolle
         private readonly IWindowManagementService _windowManagementService;
         private readonly IEventManagementService _eventManagementService;
         private readonly IResourceManagementService _resourceManagementService;
-        private IMessageDisplayService? _messageDisplayService;
+        private IEventAggregator? _eventAggregator;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IEventManagementService eventManagementService, IResourceManagementService resourceManagementService)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IEventManagementService eventManagementService, IResourceManagementService resourceManagementService, IEventAggregator eventAggregator)
         {
             try
             {
@@ -56,6 +57,7 @@ namespace wolle
                 _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
                 _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
                 _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
+                _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
                 InitializeComponent();
 
@@ -100,15 +102,309 @@ namespace wolle
         }
 
         /// <summary>
-        /// Initializes MessageDisplayService after MainWindow is created
+        /// Initializes EventAggregator for event-based communication
         /// </summary>
-        /// <param name="messageDisplayService">The message display service</param>
-        public void InitializeMessageDisplayService(IMessageDisplayService messageDisplayService)
+        /// <param name="eventAggregator">The event aggregator instance</param>
+        public void InitializeEventAggregator(IEventAggregator eventAggregator)
         {
-            _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
+            var eventAggregatorInstance = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
-            // Update SettingsManagementService with MessageDisplayService
-            (_settingsManagementService as SettingsManagementService)?.Initialize(SettingsPanel, ResponseScrollViewer, ErrorTextBlock, ApiTimeoutTextBox, ContextWindowSizeComboBox, InfoMessageBorder, InfoMessageTextBlock, _settingsService, _ollamaService, _serviceProvider!, _messageDisplayService);
+            // Subscribe to UI events
+            eventAggregatorInstance.Subscribe<ShowMessageEvent>(OnShowMessage);
+            eventAggregatorInstance.Subscribe<UpdateStatusEvent>(OnUpdateStatus);
+            eventAggregatorInstance.Subscribe<UpdateProgressEvent>(OnUpdateProgress);
+            eventAggregatorInstance.Subscribe<ShowWindowEvent>(OnShowWindow);
+            eventAggregatorInstance.Subscribe<HideWindowEvent>(OnHideWindow);
+            eventAggregatorInstance.Subscribe<CloseWindowEvent>(OnCloseWindow);
+            eventAggregatorInstance.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition);
+            eventAggregatorInstance.Subscribe<ShowSettingsEvent>(OnShowSettings);
+            eventAggregatorInstance.Subscribe<UpdateResponseEvent>(OnUpdateResponse);
+            eventAggregatorInstance.Subscribe<ClearResponseEvent>(OnClearResponse);
+            eventAggregatorInstance.Subscribe<RequestFocusEvent>(OnRequestFocus);
+            eventAggregatorInstance.Subscribe<SetWindowTitleEvent>(OnSetWindowTitle);
+        }
+
+        /// <summary>
+        /// Handles ShowMessageEvent
+        /// </summary>
+        private void OnShowMessage(ShowMessageEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (@event.IsError)
+                {
+                    ShowError(@event.Message, @event.Duration);
+                }
+                else
+                {
+                    ShowSuccess(@event.Message, @event.Duration);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Shows error message
+        /// </summary>
+        /// <param name="message">The error message to display</param>
+        /// <param name="durationMs">Duration in milliseconds to show message</param>
+        private void ShowError(string message, int durationMs = 0)
+        {
+            if (InfoMessageBorder != null && InfoMessageTextBlock != null)
+            {
+                InfoMessageTextBlock.Text = message;
+                InfoMessageBorder.Background = GetAdaptiveBrush("SystemControlErrorTextBrush", "SystemControlErrorTextBrush") ?? Brushes.Red;
+                InfoMessageTextBlock.Foreground = GetAdaptiveBrush("TextFillColorPrimaryBrush", "TextFillColorPrimaryBrush") ?? Brushes.White;
+                InfoMessageBorder.Visibility = Visibility.Visible;
+
+                if (durationMs > 0)
+                {
+                    Task.Delay(durationMs).ContinueWith(_ =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (InfoMessageBorder != null)
+                            {
+                                InfoMessageBorder.Visibility = Visibility.Collapsed;
+                            }
+                        });
+                    }, TaskScheduler.Default);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Shows success message
+        /// </summary>
+        /// <param name="message">The success message to display</param>
+        /// <param name="durationMs">Duration in milliseconds to show message</param>
+        private void ShowSuccess(string message, int durationMs = 0)
+        {
+            if (InfoMessageBorder != null && InfoMessageTextBlock != null)
+            {
+                InfoMessageTextBlock.Text = message;
+                InfoMessageBorder.Background = GetAdaptiveBrush("CardBackgroundFillColorDefaultBrush", "SolidBackgroundFillColorBaseBrush") ?? Brushes.Green;
+                InfoMessageTextBlock.Foreground = GetAdaptiveBrush("TextFillColorPrimaryBrush", "TextFillColorPrimaryBrush") ?? Brushes.White;
+                InfoMessageBorder.Visibility = Visibility.Visible;
+
+                if (durationMs > 0)
+                {
+                    Task.Delay(durationMs).ContinueWith(_ =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (InfoMessageBorder != null)
+                            {
+                                InfoMessageBorder.Visibility = Visibility.Collapsed;
+                            }
+                        });
+                    }, TaskScheduler.Default);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles UpdateStatusEvent
+        /// </summary>
+        private void OnUpdateStatus(UpdateStatusEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (ProgressDetails != null)
+                {
+                    ProgressDetails.Text = @event.Status;
+                    ProgressDetails.Foreground = @event.IsError ?
+                        GetAdaptiveBrush("SystemControlErrorTextBrush", "SystemControlErrorTextBrush") ?? Brushes.Red :
+                        GetAdaptiveBrush("TextFillColorSecondaryBrush", "TextFillColorSecondaryBrush") ?? Brushes.Black;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Handles UpdateProgressEvent
+        /// </summary>
+        private void OnUpdateProgress(UpdateProgressEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (ProgressBar != null)
+                {
+                    ProgressBar.Visibility = @event.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+                    ProgressBar.IsIndeterminate = @event.IsIndeterminate;
+                    ProgressBar.Value = @event.ProgressValue;
+                }
+
+                if (ProgressRing != null)
+                {
+                    ProgressRing.Visibility = @event.IsVisible && @event.IsIndeterminate ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                if (ProgressDetails != null && @event.Message != null)
+                {
+                    ProgressDetails.Text = @event.Message;
+                    ProgressDetails.Visibility = Visibility.Visible;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Handles ShowWindowEvent
+        /// </summary>
+        private void OnShowWindow(ShowWindowEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (@event.Owner != null)
+                {
+                    Owner = @event.Owner;
+                }
+                Show();
+                Activate();
+            });
+        }
+
+        /// <summary>
+        /// Handles HideWindowEvent
+        /// </summary>
+        private void OnHideWindow(HideWindowEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                Hide();
+            });
+        }
+
+        /// <summary>
+        /// Handles CloseWindowEvent
+        /// </summary>
+        private void OnCloseWindow(CloseWindowEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (@event.ForceClose)
+                {
+                    Close();
+                }
+                else
+                {
+                    // Graceful close with proper cleanup
+                    Close();
+                }
+            });
+        }
+
+        /// <summary>
+        /// Handles SetWindowPositionEvent
+        /// </summary>
+        private void OnSetWindowPosition(SetWindowPositionEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                Left = @event.X;
+                Top = @event.Y;
+            });
+        }
+
+        /// <summary>
+        /// Handles ShowSettingsEvent
+        /// </summary>
+        private void OnShowSettings(ShowSettingsEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (SettingsPanel != null)
+                {
+                    SettingsPanel.Visibility = @event.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Handles UpdateResponseEvent
+        /// </summary>
+        private void OnUpdateResponse(UpdateResponseEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (ResponseScrollViewer != null)
+                {
+                    if (@event.Append)
+                    {
+                        _coordinator.AppendResponseText(@event.Content);
+                    }
+                    else
+                    {
+                        // For non-append, clear first then append
+                        _coordinator.ClearResponse();
+                        _coordinator.AppendResponseText(@event.Content);
+                    }
+
+                    if (@event.IsComplete)
+                    {
+                        ShowResponseComplete();
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Handles ClearResponseEvent
+        /// </summary>
+        private void OnClearResponse(ClearResponseEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _coordinator.ClearResponse();
+            });
+        }
+
+        /// <summary>
+        /// Handles RequestFocusEvent
+        /// </summary>
+        private void OnRequestFocus(RequestFocusEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                Activate();
+                Focus();
+            });
+        }
+
+        /// <summary>
+        /// Handles SetWindowTitleEvent
+        /// </summary>
+        private void OnSetWindowTitle(SetWindowTitleEvent @event)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                Title = @event.Title;
+            });
+        }
+
+        /// <summary>
+        /// Gets adaptive brush with fallback support
+        /// </summary>
+        private Brush? GetAdaptiveBrush(string primaryResourceKey, string fallbackResourceKey)
+        {
+            try
+            {
+                // Try primary resource first
+                if (Application.Current.Resources[primaryResourceKey] is Brush primaryBrush)
+                {
+                    return primaryBrush;
+                }
+
+                // Try fallback resource
+                if (Application.Current.Resources[fallbackResourceKey] is Brush fallbackBrush)
+                {
+                    return fallbackBrush;
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public void ProcessFile(string filePath)
@@ -185,10 +481,9 @@ namespace wolle
             {
                 // Use status management service to format and display status
                 string currentStatus = _statusManagementService.GetCurrentStatus();
-                var currentProcessingTime = _ollamaService.GetCurrentProcessingTime();
 
-                // Use message display service to update progress
-                _messageDisplayService?.UpdateProgress(currentStatus, currentProcessingTime);
+                // Use event aggregator to update progress
+                _eventAggregator?.Publish(new UpdateStatusEvent(currentStatus, false));
             }
             else
             {
@@ -255,8 +550,8 @@ namespace wolle
         {
             _logger?.LogInformation("ShowLoading called - showing loading panel");
 
-            // Use message display service to show loading
-            _messageDisplayService?.ShowLoading();
+            // Use event aggregator to show loading
+            _eventAggregator?.Publish(new ShowMessageEvent("Processing file...", false, 0));
 
             // Handle error text in MainWindow
             ErrorTextBlock.Text = "";
@@ -279,8 +574,8 @@ namespace wolle
         {
             _logger?.LogInformation("ShowResponseComplete called");
 
-            // Use message display service to show success
-            _messageDisplayService?.ShowSuccess("Processing completed successfully", 3000);
+            // Use event aggregator to show success
+            _eventAggregator?.Publish(new ShowMessageEvent("Processing completed successfully", false, 3000));
 
             // Progress section is already hidden, response is visible
         }
@@ -289,8 +584,8 @@ namespace wolle
         {
             _logger?.LogError($"ShowError called: {message}");
 
-            // Use message display service to show error
-            _messageDisplayService?.ShowError(message, 5000);
+            // Use event aggregator to show error
+            _eventAggregator?.Publish(new ShowMessageEvent(message, true, 5000));
 
             // Hide progress section
             ProgressSection.Visibility = Visibility.Collapsed;

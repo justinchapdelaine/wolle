@@ -63,14 +63,32 @@ namespace wolle
                     var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
                     Log.Information("MainWindow created successfully");
 
-                    // Initialize MessageDisplayService with MainWindow
+                    // Initialize MessageDisplayService with EventAggregator
                     var messageDisplayService = _serviceProvider.GetRequiredService<IMessageDisplayService>();
-                    (messageDisplayService as MessageDisplayService)?.Initialize(mainWindow);
+                    (messageDisplayService as MessageDisplayService)?.InitializeEventAggregator(_serviceProvider.GetRequiredService<IEventAggregator>());
                     Log.Information("MessageDisplayService initialized successfully");
 
-                    // Initialize MainWindow with MessageDisplayService
-                    mainWindow.InitializeMessageDisplayService(messageDisplayService);
-                    Log.Information("MainWindow MessageDisplayService initialized successfully");
+                    // Initialize MainWindow with EventAggregator for UI events
+                    mainWindow.InitializeEventAggregator(_serviceProvider.GetRequiredService<IEventAggregator>());
+                    Log.Information("MainWindow EventAggregator initialized successfully");
+
+                    // Initialize SettingsManagementService with EventAggregator
+                    var settingsManagementService = _serviceProvider.GetRequiredService<ISettingsManagementService>();
+                    var settingsServiceInstance = _serviceProvider.GetRequiredService<SettingsService>();
+                    var ollamaServiceInstance = _serviceProvider.GetRequiredService<OllamaService>();
+                    (settingsManagementService as SettingsManagementService)?.Initialize(
+                        mainWindow.SettingsPanel,
+                        mainWindow.ResponseScrollViewer,
+                        mainWindow.ErrorTextBlock,
+                        mainWindow.ApiTimeoutTextBox,
+                        mainWindow.ContextWindowSizeComboBox,
+                        mainWindow.InfoMessageBorder,
+                        mainWindow.InfoMessageTextBlock,
+                        settingsServiceInstance,
+                        ollamaServiceInstance,
+                        _serviceProvider!,
+                        _serviceProvider.GetRequiredService<IEventAggregator>());
+                    Log.Information("SettingsManagementService initialized successfully");
 
                     mainWindow.Show();
                     Log.Information("MainWindow shown successfully");
@@ -124,6 +142,9 @@ namespace wolle
                 configure.AddSerilog();
             });
 
+            // Register EventAggregator for event-based communication
+            services.AddSingleton<IEventAggregator, EventAggregator>();
+
             // Register application services
             services.AddSingleton<MarkdownService>();
             services.AddSingleton<IMarkdownConversionService, MarkdownConversionService>();
@@ -162,12 +183,7 @@ namespace wolle
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
             services.AddSingleton<IEventManagementService, EventManagementService>();
             services.AddSingleton<IResourceManagementService, ResourceManagementService>();
-            // Register MessageDisplayService - will be initialized after MainWindow is created
-            services.AddSingleton<IMessageDisplayService>(sp =>
-            {
-                var mainWindow = sp.GetRequiredService<MainWindow>();
-                return new MessageDisplayService(mainWindow);
-            });
+            services.AddSingleton<IMessageDisplayService, MessageDisplayService>();
             services.AddSingleton<IWindowManagementService>(provider =>
                 new WindowManagementService(
                     provider.GetRequiredService<ILogger<WindowManagementService>>(),
@@ -182,7 +198,27 @@ namespace wolle
             }
 
             // Register main window
-            services.AddSingleton<MainWindow>();
+            services.AddSingleton<MainWindow>(sp =>
+            {
+                var eventAggregator = sp.GetRequiredService<IEventAggregator>();
+                return new MainWindow(
+                    sp.GetRequiredService<SettingsService>(),
+                    sp.GetRequiredService<OllamaService>(),
+                    sp.GetRequiredService<MarkdownService>(),
+                    sp.GetRequiredService<ILogger<MainWindow>>(),
+                    sp,
+                    sp.GetRequiredService<IResponseDisplayCoordinator>(),
+                    sp.GetRequiredService<IProgressManagementService>(),
+                    sp.GetRequiredService<IStatusManagementService>(),
+                    sp.GetRequiredService<ISettingsManagementService>(),
+                    sp.GetRequiredService<IUIInteractionService>(),
+                    sp.GetRequiredService<IErrorManagementService>(),
+                    sp.GetRequiredService<IFileProcessingService>(),
+                    sp.GetRequiredService<IWindowManagementService>(),
+                    sp.GetRequiredService<IEventManagementService>(),
+                    sp.GetRequiredService<IResourceManagementService>(),
+                    eventAggregator);
+            });
         }
 
         [SupportedOSPlatform("windows")]
