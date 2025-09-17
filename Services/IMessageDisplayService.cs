@@ -52,10 +52,9 @@ namespace wolle.Services
         void ShowTemporary(string message, int durationMs = 3000);
 
         /// <summary>
-        /// Updates progress message with optional processing time
+        /// Updates progress message
         /// </summary>
         /// <param name="message">The progress message to display</param>
-        /// <param name="processingTime">Optional processing time to display</param>
-        void UpdateProgress(string message, TimeSpan? processingTime = null);
+        void UpdateProgress(string message);
     }
 }

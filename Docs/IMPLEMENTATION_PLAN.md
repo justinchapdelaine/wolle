@@ -96,12 +96,12 @@ This document outlines the implementation plan to fix all critical issues identi
 ### 2.1 Circular Dependencies
 **Files Affected:** `App.xaml.cs`, Multiple service files
 
-- [ ] **Remove MainWindow dependency from services**
+- [x] **Remove MainWindow dependency from services**
   - Implement event-based communication pattern
   - Create mediator or event aggregator service
   - Refactor IMessageDisplayService to not depend on MainWindow
 
-- [ ] **Implement proper DI patterns**
+- [x] **Implement proper DI patterns**
   - Replace manual service registration with automatic discovery
   - Use proper service lifetime management
   - Implement proper factory patterns where needed
@@ -109,42 +109,66 @@ This document outlines the implementation plan to fix all critical issues identi
 ### 2.2 God Class Refactoring
 **Files Affected:** `Services/OllamaService.cs`
 
-- [ ] **Split OllamaService into focused services**
-  - Create `OllamaHttpService` for HTTP operations
-  - Create `OllamaProcessService` for process management
-  - Create `OllamaPerformanceService` for metrics
-  - Create `OllamaFileService` for file operations
+- [x] **Split OllamaService into focused services**
+  - Created `OllamaHttpService` for HTTP operations
+  - Created `OllamaProcessService` for process management
+  - Created `OllamaPerformanceService` for metrics
+  - Created `OllamaFileService` for file operations
+  - Created `OllamaTypes.cs` for shared types
 
-- [ ] **Implement proper separation of concerns**
-  - Each service should have single responsibility
+- [x] **Implement proper separation of concerns**
+  - Each service has single responsibility
   - Use dependency injection between new services
   - Implement proper interface segregation
+  - Main OllamaService now acts as orchestrator
 
 ### 2.3 Exception Handling Improvements
 **Files Affected:** Multiple service files
 
-- [ ] **Replace generic catch blocks**
-  - Catch specific exception types
+- [x] **Replace generic catch blocks**
+  - Catch specific exception types (HttpRequestException, TaskCanceledException, JsonException, etc.)
   - Add proper logging for all exceptions
   - Implement graceful degradation
 
-- [ ] **Implement global exception handling**
-  - Add global try-catch in App.xaml.cs
-  - Create centralized error reporting
-  - Add user-friendly error messages
+- [x] **Implement global exception handling**
+  - Add global try-catch in App.xaml.cs for AppDomain, Dispatcher, and TaskScheduler exceptions
+  - Create centralized error reporting through ExceptionHandlingService
+  - Add user-friendly error messages for different exception types
+
+- [x] **Create centralized exception handling service**
+  - Created `IExceptionHandlingService` interface and `ExceptionHandlingService` implementation
+  - Added exception history tracking with configurable size limits
+  - Added severity levels (Information, Warning, Error, Critical)
+  - Added user-friendly message generation for common exception types
+  - Added critical exception detection for system-level failures
+
+- [x] **Enhance exception handling in key services**
+  - Updated `OllamaHttpService` with specific exception handling and centralized error reporting
+  - Updated `OllamaProcessService` with better process startup error handling
+  - Updated `MainWindow` constructor with centralized exception handling
+  - Added proper cancellation exception handling throughout
+
+- [x] **Add graceful degradation**
+  - Network errors show user-friendly messages with retry suggestions
+  - Timeout errors provide clear guidance to users
+  - File system errors include actionable troubleshooting steps
+  - Critical errors trigger appropriate application shutdown procedures
 
 ### 2.4 Thread Safety Enhancements
 **Files Affected:** Multiple service files
 
-- [ ] **Establish lock hierarchy**
-  - Define clear lock ordering rules
-  - Replace multiple lock objects with single strategy
-  - Add deadlock detection and prevention
+- [x] **Establish lock hierarchy**
+  - Define clear lock ordering rules (Level 1 → Level 4)
+  - Replace multiple lock objects with single strategy per service
+  - Add deadlock detection and prevention through hierarchy
 
-- [ ] **Implement thread-safe patterns**
-  - Use concurrent collections where appropriate
-  - Implement proper async synchronization
-  - Add thread-safe state management
+- [x] **Implement thread-safe patterns**
+  - Use concurrent collections where appropriate (ConcurrentBag, ConcurrentDictionary)
+  - Implement proper async synchronization (SemaphoreSlim instead of lock)
+  - Add thread-safe state management with Interlocked operations
+  - Eliminate race conditions in FileProcessingService
+  - Remove nested lock pattern in EventAggregator
+  - Fix mixed lock/async pattern in OllamaPerformanceService
 
 ---
 
@@ -238,10 +262,10 @@ This document outlines the implementation plan to fix all critical issues identi
 - [x] Resource management improvements
 
 ### Phase 2: Stability & Performance (Week 2)
-- [ ] UI thread blocking fixes
-- [ ] Memory leak prevention
-- [ ] Resource management improvements
-- [ ] Thread safety enhancements
+- [x] UI thread blocking fixes
+- [x] Memory leak prevention
+- [x] Resource management improvements
+- [x] Thread safety enhancements
 
 ### Phase 3: Architecture Refactoring (Week 3-4)
 - [ ] Circular dependency removal
@@ -310,5 +334,5 @@ This document outlines the implementation plan to fix all critical issues identi
 
 ---
 
-*Last Updated: September 16, 2025*
-*Status: Phase 1.6 (Resource Management Issues) - COMPLETED. Ready for Phase 2 (Stability & Performance Issues)*
+*Last Updated: September 17, 2025*
+*Status: Phase 2.4 (Thread Safety Enhancements) - ✅ COMPLETED. Ready for Phase 3.1 (Modern C# Features Implementation)*

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using wolle.Services.Events;
 
 namespace wolle.Services
 {
@@ -22,7 +23,7 @@ namespace wolle.Services
         private SettingsService? _settingsService;
         private OllamaService? _ollamaService;
         private IServiceProvider? _serviceProvider;
-        private IMessageDisplayService? _messageDisplayService;
+        private IEventAggregator? _eventAggregator;
         private int? _pendingApiTimeoutSeconds = null;
         private int? _pendingContextWindowSize = null;
         private bool _isProcessingActive = false;
@@ -40,10 +41,10 @@ namespace wolle.Services
         /// <param name="settingsService">The settings service</param>
         /// <param name="ollamaService">The Ollama service</param>
         /// <param name="serviceProvider">The service provider</param>
-        /// <param name="messageDisplayService">The message display service</param>
+        /// <param name="eventAggregator">The event aggregator for UI communication</param>
         public void Initialize(Panel settingsPanel, FlowDocumentScrollViewer responseScrollViewer, TextBlock errorTextBlock,
             TextBox apiTimeoutTextBox, ComboBox contextWindowSizeComboBox, Border infoMessageBorder, TextBlock infoMessageTextBlock,
-            SettingsService settingsService, OllamaService ollamaService, IServiceProvider serviceProvider, IMessageDisplayService messageDisplayService)
+            SettingsService settingsService, OllamaService ollamaService, IServiceProvider serviceProvider, IEventAggregator eventAggregator)
         {
             _settingsPanel = settingsPanel ?? throw new ArgumentNullException(nameof(settingsPanel));
             _responseScrollViewer = responseScrollViewer ?? throw new ArgumentNullException(nameof(responseScrollViewer));
@@ -55,7 +56,7 @@ namespace wolle.Services
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _messageDisplayService = messageDisplayService ?? throw new ArgumentNullException(nameof(messageDisplayService));
+            _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
         }
 
         /// <summary>
@@ -157,9 +158,9 @@ namespace wolle.Services
                     HideSettingsPanel();
 
                     // Show information message
-                    System.Diagnostics.Debug.WriteLine("About to call ShowTemporary for queued settings message");
-                    _messageDisplayService?.ShowTemporary("Settings queued and will apply after current processing completes.", 3000);
-                    System.Diagnostics.Debug.WriteLine("ShowTemporary call completed");
+                    System.Diagnostics.Debug.WriteLine("About to publish ShowMessageEvent for queued settings message");
+                    _eventAggregator?.Publish(new ShowMessageEvent("Settings queued and will apply after current processing completes.", false, 3000));
+                    System.Diagnostics.Debug.WriteLine("ShowMessageEvent published");
                     return true;
                 }
             }
@@ -223,7 +224,7 @@ namespace wolle.Services
                 _ollamaService = _serviceProvider!.GetRequiredService<OllamaService>();
 
                 // Show success message
-                _messageDisplayService?.ShowSuccess("Settings applied successfully!", 3000);
+                _eventAggregator?.Publish(new ShowMessageEvent("Settings applied successfully!", false, 3000));
             }
         }
 
@@ -262,8 +263,8 @@ namespace wolle.Services
         /// <param name="message">The error message</param>
         public void ShowErrorMessage(string message)
         {
-            // Use message display service to show error
-            _messageDisplayService?.ShowError(message, 5000);
+            // Use event aggregator to show error
+            _eventAggregator?.Publish(new ShowMessageEvent(message, true, 5000));
         }
 
         /// <summary>
@@ -272,8 +273,8 @@ namespace wolle.Services
         /// <param name="message">The success message</param>
         public void ShowSuccessMessage(string message)
         {
-            // Use message display service to show success
-            _messageDisplayService?.ShowSuccess(message, 3000);
+            // Use event aggregator to show success
+            _eventAggregator?.Publish(new ShowMessageEvent(message, false, 3000));
         }
 
         /// <summary>

@@ -14,6 +14,7 @@ namespace wolle.Services
         private readonly OllamaService _ollamaService;
         private readonly ILogger<FileProcessingService> _logger;
         private IStatusManagementService _statusManagementService;
+        private readonly object _processingLock = new();
         private string _currentFilePath = string.Empty;
         private bool _isProcessingActive = false;
         private bool _isProcessingComplete = false;
@@ -90,11 +91,14 @@ namespace wolle.Services
                 return false;
             }
 
-            _currentFilePath = sanitizedPath;
-            _isProcessingActive = true;
-            _isProcessingComplete = false;
-            _processingProgress = 0.0;
-            _processingStatus = "Initializing...";
+            lock (_processingLock)
+            {
+                _currentFilePath = sanitizedPath;
+                _isProcessingActive = true;
+                _isProcessingComplete = false;
+                _processingProgress = 0.0;
+                _processingStatus = "Initializing...";
+            }
 
             _logger?.LogInformation($"Processing file: {sanitizedPath}");
 
@@ -108,12 +112,12 @@ namespace wolle.Services
             try
             {
                 // Ensure Ollama is ready before processing file
-                bool isReady = await _ollamaService.EnsureOllamaReadyAsync(cancellationToken);
+                bool isReady = await _ollamaService.EnsureOllamaReadyAsync();
 
                 if (isReady)
                 {
                     // Use OllamaService to process file
-                    await _ollamaService.ProcessFileAsync(sanitizedPath, cancellationToken);
+                    await _ollamaService.ProcessFileAsync(sanitizedPath);
                 }
                 else
                 {
@@ -122,9 +126,12 @@ namespace wolle.Services
                     return false;
                 }
 
-                _isProcessingComplete = true;
-                _processingProgress = 1.0;
-                _processingStatus = "Processing complete";
+                lock (_processingLock)
+                {
+                    _isProcessingComplete = true;
+                    _processingProgress = 1.0;
+                    _processingStatus = "Processing complete";
+                }
 
                 _logger?.LogInformation($"File processing completed: {sanitizedPath}");
 
@@ -136,18 +143,27 @@ namespace wolle.Services
             catch (OperationCanceledException)
             {
                 _logger?.LogInformation($"File processing cancelled: {sanitizedPath}");
-                _processingStatus = "Processing cancelled";
+                lock (_processingLock)
+                {
+                    _processingStatus = "Processing cancelled";
+                }
                 return false;
             }
             catch (Exception ex)
             {
                 _logger?.LogError($"Error processing file {sanitizedPath}: {ex.Message}");
-                _processingStatus = "Processing failed";
+                lock (_processingLock)
+                {
+                    _processingStatus = "Processing failed";
+                }
                 return false;
             }
             finally
             {
-                _isProcessingActive = false;
+                lock (_processingLock)
+                {
+                    _isProcessingActive = false;
+                }
 
                 // Stop status update timer
                 _statusManagementService.StopStatusTimer();
@@ -208,22 +224,25 @@ namespace wolle.Services
         /// <param name="isComplete">Whether processing is complete</param>
         public void SetProcessingState(bool isActive, bool isComplete)
         {
-            _isProcessingActive = isActive;
-            _isProcessingComplete = isComplete;
+            lock (_processingLock)
+            {
+                _isProcessingActive = isActive;
+                _isProcessingComplete = isComplete;
 
-            if (isActive)
-            {
-                _processingProgress = 0.0;
-                _processingStatus = "Initializing...";
-            }
-            else if (isComplete)
-            {
-                _processingProgress = 1.0;
-                _processingStatus = "Processing complete";
-            }
-            else
-            {
-                _processingStatus = "Processing cancelled";
+                if (isActive)
+                {
+                    _processingProgress = 0.0;
+                    _processingStatus = "Initializing...";
+                }
+                else if (isComplete)
+                {
+                    _processingProgress = 1.0;
+                    _processingStatus = "Processing complete";
+                }
+                else
+                {
+                    _processingStatus = "Processing cancelled";
+                }
             }
 
             _logger?.LogInformation($"Processing state set: Active={isActive}, Complete={isComplete}");
@@ -235,7 +254,10 @@ namespace wolle.Services
         /// <returns>True if processing is active</returns>
         public bool IsProcessingActive()
         {
-            return _isProcessingActive;
+            lock (_processingLock)
+            {
+                return _isProcessingActive;
+            }
         }
 
         /// <summary>
@@ -244,7 +266,10 @@ namespace wolle.Services
         /// <returns>True if processing is complete</returns>
         public bool IsProcessingComplete()
         {
-            return _isProcessingComplete;
+            lock (_processingLock)
+            {
+                return _isProcessingComplete;
+            }
         }
 
         /// <summary>
@@ -253,7 +278,10 @@ namespace wolle.Services
         /// <returns>The current file path</returns>
         public string GetCurrentFilePath()
         {
-            return _currentFilePath;
+            lock (_processingLock)
+            {
+                return _currentFilePath;
+            }
         }
 
         /// <summary>
@@ -261,11 +289,14 @@ namespace wolle.Services
         /// </summary>
         public void CancelProcessing()
         {
-            if (_isProcessingActive)
+            lock (_processingLock)
             {
-                _isProcessingActive = false;
-                _processingStatus = "Processing cancelled";
-                _logger?.LogInformation("Processing cancelled");
+                if (_isProcessingActive)
+                {
+                    _isProcessingActive = false;
+                    _processingStatus = "Processing cancelled";
+                    _logger?.LogInformation("Processing cancelled");
+                }
             }
         }
 
@@ -275,7 +306,10 @@ namespace wolle.Services
         /// <returns>Processing progress (0.0 to 1.0)</returns>
         public double GetProcessingProgress()
         {
-            return _processingProgress;
+            lock (_processingLock)
+            {
+                return _processingProgress;
+            }
         }
 
         /// <summary>
@@ -289,7 +323,10 @@ namespace wolle.Services
         /// <returns>Current processing status</returns>
         public string GetProcessingStatus()
         {
-            return _processingStatus;
+            lock (_processingLock)
+            {
+                return _processingStatus;
+            }
         }
     }
 }
