@@ -146,9 +146,7 @@ namespace wolle.Services
 
             var appSettings = _settings.Value;
             _modelName = appSettings.ModelName;
-            _httpClient = _httpClientFactory.CreateClient();
-            _httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
-            _httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
+            _httpClient = _httpClientFactory.CreateClient("OllamaClient");
             _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
 
             // Initialize periodic cleanup
