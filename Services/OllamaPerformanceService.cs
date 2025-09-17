@@ -82,7 +82,7 @@ namespace wolle.Services
         private int _totalFilesProcessed = 0;
         private int _successfulOperations = 0;
         private int _failedOperations = 0;
-        private DateTime _lastOperationTime = DateTime.MinValue;
+        private long _lastOperationTime = DateTime.MinValue.Ticks;
 
         /// <summary>
         /// Initializes a new instance of OllamaPerformanceService class.
@@ -142,7 +142,7 @@ namespace wolle.Services
 
             // Update operation statistics
             Interlocked.Increment(ref _totalFilesProcessed);
-            _lastOperationTime = DateTime.Now;
+            Interlocked.Exchange(ref _lastOperationTime, DateTime.Now.Ticks);
             if (success)
             {
                 Interlocked.Increment(ref _successfulOperations);
@@ -280,7 +280,7 @@ namespace wolle.Services
         public string GetOperationStatistics()
         {
             double successRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0;
-            string lastOp = _lastOperationTime != DateTime.MinValue ? _lastOperationTime.ToString("g") : "Never";
+            string lastOp = _lastOperationTime != DateTime.MinValue.Ticks ? new DateTime(_lastOperationTime).ToString("g") : "Never";
 
             return $"Operations: {_totalFilesProcessed} total, {_successfulOperations} successful, {_failedOperations} failed ({successRate:F1}% success rate)\nLast operation: {lastOp}";
         }
@@ -296,7 +296,7 @@ namespace wolle.Services
                 _totalFilesProcessed = 0;
                 _successfulOperations = 0;
                 _failedOperations = 0;
-                _lastOperationTime = DateTime.MinValue;
+                _lastOperationTime = DateTime.MinValue.Ticks;
                 _logger?.LogInformation("Operation statistics reset");
             }
             finally
@@ -334,7 +334,7 @@ namespace wolle.Services
                     catch (Exception ex)
                     {
                         _logger?.LogError($"Error in periodic cleanup: {ex.Message}");
-                        // Continue with next cycle despite of error
+                        // Continue with next cycle despite error
                     }
                 }
             }
