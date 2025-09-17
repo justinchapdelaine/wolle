@@ -323,9 +323,9 @@ namespace wolle.Services
                 // Check if file is locked by another process
                 try
                 {
-                    using (var fileStream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.None))
+                    using (var fileStream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
-                        // If we can open with FileShare.None, file is not locked
+                        // If we can open with FileShare.Read, file is not write-locked
                         fileStream.Close();
                     }
                 }
