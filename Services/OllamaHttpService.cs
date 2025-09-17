@@ -67,6 +67,7 @@ namespace wolle.Services
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<OllamaHttpService> _logger;
+        private readonly IExceptionHandlingService _exceptionHandlingService;
         private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1);
         private HttpClient _httpClient;
         private bool _isDisposed = false;
@@ -76,10 +77,12 @@ namespace wolle.Services
         /// </summary>
         /// <param name="httpClientFactory">HTTP client factory.</param>
         /// <param name="logger">Logger service.</param>
-        public OllamaHttpService(IHttpClientFactory httpClientFactory, ILogger<OllamaHttpService> logger)
+        /// <param name="exceptionHandlingService">Exception handling service.</param>
+        public OllamaHttpService(IHttpClientFactory httpClientFactory, ILogger<OllamaHttpService> logger, IExceptionHandlingService exceptionHandlingService)
         {
             _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
             _httpClient = _httpClientFactory.CreateClient("OllamaClient");
         }
 
@@ -154,6 +157,8 @@ namespace wolle.Services
                         {
                             retryCount++;
                             _logger?.LogError($"Network error (attempt {retryCount}): {ex.Message}");
+                            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync", 
+                                $"Network connection issue while checking model (attempt {retryCount})", ExceptionSeverity.Warning);
 
                             if (retryCount < maxRetries)
                             {
@@ -169,6 +174,8 @@ namespace wolle.Services
                         {
                             retryCount++;
                             _logger?.LogError($"Request timeout (attempt {retryCount}): {ex.Message}");
+                            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync", 
+                                $"Request timeout while checking model (attempt {retryCount})", ExceptionSeverity.Warning);
 
                             if (retryCount < maxRetries)
                             {
@@ -180,6 +187,18 @@ namespace wolle.Services
                                 return false;
                             }
                         }
+                        catch (JsonException ex)
+                        {
+                            _logger?.LogError($"JSON parsing error: {ex.Message}");
+                            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync", 
+                                "Invalid response format from Ollama API", ExceptionSeverity.Error);
+                            return false;
+                        }
+                        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+                        {
+                            _logger?.LogInformation("Model existence check was cancelled");
+                            throw; // Re-throw cancellation exceptions
+                        }
                     }
 
                     return false;
@@ -189,16 +208,25 @@ namespace wolle.Services
                     _apiLock.Release();
                 }
             }
+            catch (ObjectDisposedException disposedEx)
+            {
+                _logger?.LogError($"Error checking model existence: Service is disposed - {disposedEx.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(disposedEx, "OllamaHttpService.ModelExistsAsync", 
+                    "Service is no longer available. Please restart the application.", ExceptionSeverity.Error);
+                return false;
+            }
+            catch (InvalidOperationException invalidEx)
+            {
+                _logger?.LogError($"Invalid operation: {invalidEx.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(invalidEx, "OllamaHttpService.ModelExistsAsync", 
+                    "Invalid operation performed. Please restart the application.", ExceptionSeverity.Error);
+                return false;
+            }
             catch (Exception ex)
             {
-                if (ex is ObjectDisposedException disposedEx)
-                {
-                    _logger?.LogError($"Error checking model existence: Service is disposed - {disposedEx.Message}");
-                }
-                else
-                {
-                    _logger?.LogError($"Error checking model existence: {ex.Message}");
-                }
+                _logger?.LogError($"Unexpected error checking model existence: {ex.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync", 
+                    "Failed to check model availability. Please check your network connection.", ExceptionSeverity.Error);
                 return false;
             }
         }
@@ -273,14 +301,44 @@ namespace wolle.Services
                             catch (JsonException ex)
                             {
                                 _logger?.LogError($"Error parsing JSON response: {ex.Message}");
+                                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync", 
+                                    "Invalid response format from Ollama API during model pull", ExceptionSeverity.Warning);
                             }
                         }
                     }
                 }
             }
+            catch (HttpRequestException ex)
+            {
+                _logger?.LogError($"Ollama API pull HTTP error: {ex.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync", 
+                    "Network error occurred while pulling model. Please check your connection.", ExceptionSeverity.Error);
+                throw;
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogError($"Ollama API pull timeout: {ex.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync", 
+                    "Request timed out while pulling model. Please try again.", ExceptionSeverity.Error);
+                throw;
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogInformation("Ollama API pull was cancelled");
+                throw; // Re-throw cancellation exceptions
+            }
+            catch (IOException ex)
+            {
+                _logger?.LogError($"Ollama API pull IO error: {ex.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync", 
+                    "Network or file system error occurred while pulling model.", ExceptionSeverity.Error);
+                throw;
+            }
             catch (Exception ex)
             {
-                _logger?.LogError($"Ollama API pull error: {ex.Message}");
+                _logger?.LogError($"Ollama API pull unexpected error: {ex.Message}");
+                await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync", 
+                    "An unexpected error occurred while pulling the model.", ExceptionSeverity.Error);
                 throw;
             }
         }

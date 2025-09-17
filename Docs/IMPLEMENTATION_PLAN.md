@@ -125,15 +125,34 @@ This document outlines the implementation plan to fix all critical issues identi
 ### 2.3 Exception Handling Improvements
 **Files Affected:** Multiple service files
 
-- [ ] **Replace generic catch blocks**
-  - Catch specific exception types
+- [x] **Replace generic catch blocks**
+  - Catch specific exception types (HttpRequestException, TaskCanceledException, JsonException, etc.)
   - Add proper logging for all exceptions
   - Implement graceful degradation
 
-- [ ] **Implement global exception handling**
-  - Add global try-catch in App.xaml.cs
-  - Create centralized error reporting
-  - Add user-friendly error messages
+- [x] **Implement global exception handling**
+  - Add global try-catch in App.xaml.cs for AppDomain, Dispatcher, and TaskScheduler exceptions
+  - Create centralized error reporting through ExceptionHandlingService
+  - Add user-friendly error messages for different exception types
+
+- [x] **Create centralized exception handling service**
+  - Created `IExceptionHandlingService` interface and `ExceptionHandlingService` implementation
+  - Added exception history tracking with configurable size limits
+  - Added severity levels (Information, Warning, Error, Critical)
+  - Added user-friendly message generation for common exception types
+  - Added critical exception detection for system-level failures
+
+- [x] **Enhance exception handling in key services**
+  - Updated `OllamaHttpService` with specific exception handling and centralized error reporting
+  - Updated `OllamaProcessService` with better process startup error handling
+  - Updated `MainWindow` constructor with centralized exception handling
+  - Added proper cancellation exception handling throughout
+
+- [x] **Add graceful degradation**
+  - Network errors show user-friendly messages with retry suggestions
+  - Timeout errors provide clear guidance to users
+  - File system errors include actionable troubleshooting steps
+  - Critical errors trigger appropriate application shutdown procedures
 
 ### 2.4 Thread Safety Enhancements
 **Files Affected:** Multiple service files
@@ -313,4 +332,4 @@ This document outlines the implementation plan to fix all critical issues identi
 ---
 
 *Last Updated: September 17, 2025*
-*Status: Phase 2.2 (God Class Refactoring) - ✅ COMPLETED. Ready for Phase 2.3 (Exception Handling Improvements)*
+*Status: Phase 2.3 (Exception Handling Improvements) - ✅ COMPLETED. Ready for Phase 2.4 (Thread Safety Enhancements)*

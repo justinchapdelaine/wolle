@@ -34,9 +34,10 @@ namespace wolle
         private readonly IWindowManagementService _windowManagementService;
         private readonly IEventManagementService _eventManagementService;
         private readonly IResourceManagementService _resourceManagementService;
+        private readonly IExceptionHandlingService _exceptionHandlingService;
         private IEventAggregator? _eventAggregator;
 
-        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IEventManagementService eventManagementService, IResourceManagementService resourceManagementService, IEventAggregator eventAggregator)
+        public MainWindow(SettingsService settingsService, OllamaService ollamaService, MarkdownService markdownService, ILogger<MainWindow> logger, IServiceProvider serviceProvider, IResponseDisplayCoordinator coordinator, IProgressManagementService progressManagementService, IStatusManagementService statusManagementService, ISettingsManagementService settingsManagementService, IUIInteractionService uiInteractionService, IErrorManagementService errorManagementService, IFileProcessingService fileProcessingService, IWindowManagementService windowManagementService, IEventManagementService eventManagementService, IResourceManagementService resourceManagementService, IEventAggregator eventAggregator, IExceptionHandlingService exceptionHandlingService)
         {
             try
             {
@@ -58,6 +59,7 @@ namespace wolle
                 _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
                 _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
                 _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
+            _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
 
                 InitializeComponent();
 
@@ -97,6 +99,8 @@ namespace wolle
             {
                 _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
                 _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
+                _exceptionHandlingService.HandleException(ex, "MainWindow.Constructor", 
+                    "Failed to initialize the application window. Please restart the application.", ExceptionSeverity.Critical);
                 throw; // Re-throw to see if it's caught elsewhere
             }
         }

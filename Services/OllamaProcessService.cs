@@ -54,6 +54,7 @@ namespace wolle.Services
     public class OllamaProcessService : IOllamaProcessService, IDisposable
     {
         private readonly ILogger<OllamaProcessService> _logger;
+        private readonly IExceptionHandlingService _exceptionHandlingService;
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
@@ -63,9 +64,11 @@ namespace wolle.Services
         /// Initializes a new instance of OllamaProcessService class.
         /// </summary>
         /// <param name="logger">Logger service.</param>
-        public OllamaProcessService(ILogger<OllamaProcessService> logger)
+        /// <param name="exceptionHandlingService">Exception handling service.</param>
+        public OllamaProcessService(ILogger<OllamaProcessService> logger, IExceptionHandlingService exceptionHandlingService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
         }
 
         /// <summary>
@@ -82,7 +85,10 @@ namespace wolle.Services
 
             if (!ValidationService.ValidateExecutablePath(ollamaPath))
             {
-                _logger?.LogError("Invalid Ollama path");
+                var ex = new ArgumentException("Invalid Ollama executable path provided", nameof(ollamaPath));
+                _logger?.LogError("Invalid Ollama path: {Path}", ollamaPath);
+                _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync", 
+                    "The Ollama executable path is invalid. Please check your settings.", ExceptionSeverity.Error);
                 onError?.Invoke("Invalid Ollama executable path.");
                 return Task.FromResult(false);
             }
@@ -170,10 +176,37 @@ namespace wolle.Services
 
             lock (_processLock)
             {
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                _ollamaServerProcess = process;
+                try
+                {
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+                    _ollamaServerProcess = process;
+                }
+                catch (System.ComponentModel.Win32Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to start Ollama server process - Win32 error");
+                    _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync", 
+                        "Failed to start Ollama server. Please check if Ollama is properly installed.", ExceptionSeverity.Error);
+                    onError?.Invoke("Failed to start Ollama server. Please check if Ollama is properly installed.");
+                    return Task.FromResult(false);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger?.LogError(ex, "Failed to start Ollama server process - invalid operation");
+                    _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync", 
+                        "Invalid operation while starting Ollama server. Please restart the application.", ExceptionSeverity.Error);
+                    onError?.Invoke("Invalid operation while starting Ollama server. Please restart the application.");
+                    return Task.FromResult(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to start Ollama server process - unexpected error");
+                    _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync", 
+                        "Unexpected error while starting Ollama server. Please try again.", ExceptionSeverity.Error);
+                    onError?.Invoke("Unexpected error while starting Ollama server. Please try again.");
+                    return Task.FromResult(false);
+                }
             }
 
             _logger?.LogInformation("Ollama server started successfully");

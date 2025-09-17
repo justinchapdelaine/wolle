@@ -10,7 +10,7 @@ using Serilog;
 using System.Runtime.Versioning;
 using System.Windows.Resources;
 using System.Threading;
-using Polly;
+using System.Windows.Threading;
 using System.Threading.Tasks;
 using wolle.Services;
 
@@ -24,6 +24,11 @@ namespace wolle
         [SupportedOSPlatform("windows")]
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Add global exception handling
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
             base.OnStartup(e);
 
             try
@@ -116,9 +121,7 @@ namespace wolle
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to start application: {ex.Message}",
-                    "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                Shutdown();
+                HandleStartupException(ex);
             }
         }
 
@@ -144,6 +147,9 @@ namespace wolle
 
             // Register EventAggregator for event-based communication
             services.AddSingleton<IEventAggregator, EventAggregator>();
+
+            // Register exception handling service
+            services.AddSingleton<IExceptionHandlingService, ExceptionHandlingService>();
 
             // Auto-register all services using reflection
             RegisterServicesAutomatically(services);
@@ -172,6 +178,16 @@ namespace wolle
                 var eventAggregator = sp.GetRequiredService<IEventAggregator>();
                 return new OllamaService(settings, logger, ollamaHttpService, ollamaProcessService, ollamaPerformanceService, ollamaFileService, eventAggregator);
             });
+
+            // Register Ollama services with exception handling dependency
+            services.AddSingleton<IOllamaHttpService>(sp =>
+                new OllamaHttpService(sp.GetRequiredService<IHttpClientFactory>(), 
+                    sp.GetRequiredService<ILogger<OllamaHttpService>>(),
+                    sp.GetRequiredService<IExceptionHandlingService>()));
+
+            services.AddSingleton<IOllamaProcessService>(sp =>
+                new OllamaProcessService(sp.GetRequiredService<ILogger<OllamaProcessService>>(),
+                    sp.GetRequiredService<IExceptionHandlingService>()));
 
             // Register services with complex dependencies using factory pattern
             services.AddSingleton<IErrorManagementService>(provider =>
@@ -204,7 +220,8 @@ namespace wolle
                     sp.GetRequiredService<IWindowManagementService>(),
                     sp.GetRequiredService<IEventManagementService>(),
                     sp.GetRequiredService<IResourceManagementService>(),
-                    eventAggregator);
+                    eventAggregator,
+                    sp.GetRequiredService<IExceptionHandlingService>());
             });
         }
 
@@ -230,7 +247,9 @@ namespace wolle
                 if (serviceType.Name == "SettingsService" ||
                     serviceType.Name == "OllamaService" ||
                     serviceType.Name == "MainWindow" ||
-                    serviceType.Name == "ContextMenuService")
+                    serviceType.Name == "ContextMenuService" ||
+                    serviceType.Name == "OllamaHttpService" ||
+                    serviceType.Name == "OllamaProcessService")
                     continue;
 
                 // Find the corresponding interface
@@ -322,6 +341,11 @@ namespace wolle
         [SupportedOSPlatform("windows")]
         protected override void OnExit(ExitEventArgs e)
         {
+            // Remove global exception handlers
+            AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+            DispatcherUnhandledException -= OnDispatcherUnhandledException;
+            TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+
             // Dispose services
             if (_serviceProvider is IDisposable disposable)
             {
@@ -332,6 +356,135 @@ namespace wolle
             Log.CloseAndFlush();
 
             base.OnExit(e);
+        }
+
+        /// <summary>
+        /// Handles unhandled exceptions from the AppDomain.
+        /// </summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments.</param>
+        private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            var exception = e.ExceptionObject as Exception;
+            if (exception != null)
+            {
+                Log.Fatal(exception, "Unhandled AppDomain exception occurred");
+                
+                // Try to use exception handling service if available
+                if (_serviceProvider != null)
+                {
+                    try
+                    {
+                        var exceptionService = _serviceProvider.GetService<IExceptionHandlingService>();
+                        exceptionService?.HandleException(exception, "AppDomain.UnhandledException", 
+                            "A critical error occurred. The application will now close.", ExceptionSeverity.Critical);
+                    }
+                    catch
+                    {
+                        // Fallback to simple message box
+                        MessageBox.Show($"A critical error occurred: {exception.Message}\n\nThe application will now close.",
+                            "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show($"A critical error occurred: {exception.Message}\n\nThe application will now close.",
+                        "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles unhandled exceptions from the WPF dispatcher.
+        /// </summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments.</param>
+        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            Log.Error(e.Exception, "Unhandled dispatcher exception occurred");
+            
+            // Try to use exception handling service if available
+            if (_serviceProvider != null)
+            {
+                try
+                {
+                    var exceptionService = _serviceProvider.GetService<IExceptionHandlingService>();
+                    if (exceptionService != null)
+                    {
+                        exceptionService.HandleException(e.Exception, "Dispatcher.UnhandledException");
+                        e.Handled = true;
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Continue to fallback handling
+                }
+            }
+
+            // Fallback to simple message box
+            MessageBox.Show($"An error occurred: {e.Exception.Message}\n\nThe application will continue running.",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Handles unobserved task exceptions.
+        /// </summary>
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments.</param>
+        private void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Log.Error(e.Exception, "Unobserved task exception occurred");
+            
+            // Try to use exception handling service if available
+            if (_serviceProvider != null)
+            {
+                try
+                {
+                    var exceptionService = _serviceProvider.GetService<IExceptionHandlingService>();
+                    exceptionService?.HandleException(e.Exception, "TaskScheduler.UnobservedTaskException", 
+                        "An asynchronous operation failed.", ExceptionSeverity.Warning);
+                }
+                catch
+                {
+                    // Log and continue - don't crash the app for unobserved task exceptions
+                    Log.Warning("Failed to handle unobserved task exception through exception service");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles exceptions that occur during application startup.
+        /// </summary>
+        /// <param name="exception">The exception that occurred.</param>
+        private void HandleStartupException(Exception exception)
+        {
+            Log.Fatal(exception, "Application startup failed");
+            
+            // Try to use exception handling service if available
+            if (_serviceProvider != null)
+            {
+                try
+                {
+                    var exceptionService = _serviceProvider.GetService<IExceptionHandlingService>();
+                    exceptionService?.HandleException(exception, "Application.Startup", 
+                        "Failed to start the application. Please restart and try again.", ExceptionSeverity.Critical);
+                }
+                catch
+                {
+                    // Fallback to simple message box
+                    MessageBox.Show($"Failed to start application: {exception.Message}\n\nPlease restart the application.",
+                        "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show($"Failed to start application: {exception.Message}\n\nPlease restart the application.",
+                    "Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+
+            Shutdown();
         }
     }
 }
