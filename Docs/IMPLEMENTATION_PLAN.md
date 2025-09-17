@@ -65,13 +65,13 @@ This document outlines the implementation plan to fix all critical issues identi
 ### 1.5 Memory Leak Prevention
 **Files Affected:** `Services/OllamaService.cs`
 
-- [ ] **Implement bounded collections**
+- [x] **Implement bounded collections**
   - Add size limits to `_performanceMetrics` queue (max 1000 items)
   - Add size limits to `_errorHistory` queue (max 500 items)
   - Implement automatic cleanup when limits are reached
   - Add periodic cleanup mechanism
 
-- [ ] **Fix Task continuation leaks**
+- [x] **Fix Task continuation leaks**
   - Properly cancel and clean up Task.Delay continuations
   - Add CancellationToken support to all async operations
   - Implement proper Task disposal patterns
@@ -234,7 +234,7 @@ This document outlines the implementation plan to fix all critical issues identi
 - [x] Input validation enhancements
 - [x] UI thread blocking fixes
 - [x] Command injection protection
-- [ ] Path validation improvements
+- [x] Memory leak prevention
 
 ### Phase 2: Stability & Performance (Week 2)
 - [ ] UI thread blocking fixes
@@ -310,4 +310,4 @@ This document outlines the implementation plan to fix all critical issues identi
 ---
 
 *Last Updated: September 16, 2025*
-*Status: Phase 1.4 (Command Injection Protection) - COMPLETED. Ready for Phase 1.5 (Memory Leak Prevention)*
+*Status: Phase 1.5 (Memory Leak Prevention) - COMPLETED. Ready for Phase 1.6 (Resource Management Issues)*

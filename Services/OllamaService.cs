@@ -114,6 +114,7 @@ namespace wolle.Services
         private DateTime _serviceStartTime = DateTime.Now;
         private long _totalBytesProcessed = 0;
         private TimeSpan _totalProcessingTime = TimeSpan.Zero;
+        private CancellationTokenSource? _periodicCleanupCts;
 
         // Advanced error handling
         private readonly Dictionary<string, ErrorRecoveryStrategy> _errorRecoveryStrategies = new();
@@ -123,6 +124,7 @@ namespace wolle.Services
         private DateTime? _lastErrorTime = null;
         private readonly object _processLock = new object(); // For thread-safe process operations
         private DateTime? _currentOperationStartTime = null; // For timing current operation
+        private Task? _periodicCleanupTask;
 
         public event Action<string>? OnStatusUpdate;
         public event Action<string>? OnOutputReceived;
@@ -148,6 +150,10 @@ namespace wolle.Services
             _httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
             _httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
             _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
+
+            // Initialize periodic cleanup
+            _periodicCleanupCts = new CancellationTokenSource();
+            _periodicCleanupTask = Task.Run(() => PeriodicCleanupAsync(_periodicCleanupCts.Token));
         }
 
         /// <summary>
@@ -1599,7 +1605,8 @@ namespace wolle.Services
                 // Keep only last 1000 metrics
                 while (_performanceMetrics.Count > 1000)
                 {
-                    _performanceMetrics.Dequeue();
+                    var removedMetric = _performanceMetrics.Dequeue();
+                    _logger?.LogDebug($"Removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
                 }
 
                 // Update totals
@@ -1721,7 +1728,8 @@ namespace wolle.Services
                 // Keep only last 500 errors
                 while (_errorHistory.Count > 500)
                 {
-                    _errorHistory.Dequeue();
+                    var removedError = _errorHistory.Dequeue();
+                    _logger?.LogDebug($"Removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
                 }
 
                 // Update consecutive error tracking
@@ -1822,6 +1830,78 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Performs periodic cleanup of old metrics and errors.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing periodic cleanup operation.</returns>
+        private async Task PeriodicCleanupAsync(CancellationToken cancellationToken)
+        {
+            _logger?.LogInformation("Periodic cleanup task started");
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        // Wait for 5 minutes between cleanup cycles
+                        await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+
+                        // Clean up old performance metrics (older than 24 hours)
+                        lock (_metricsLock)
+                        {
+                            var cutoffTime = DateTime.Now.AddHours(-24);
+                            var initialCount = _performanceMetrics.Count;
+                            
+                            while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
+                            {
+                                var removedMetric = _performanceMetrics.Dequeue();
+                                _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
+                            }
+                            
+                            if (_performanceMetrics.Count < initialCount)
+                            {
+                                _logger?.LogInformation($"Periodic cleanup: removed {initialCount - _performanceMetrics.Count} old performance metrics");
+                            }
+                        }
+
+                        // Clean up old error events (older than 7 days)
+                        lock (_errorLock)
+                        {
+                            var cutoffTime = DateTime.Now.AddDays(-7);
+                            var initialCount = _errorHistory.Count;
+                            
+                            while (_errorHistory.Count > 0 && _errorHistory.Peek().Timestamp < cutoffTime)
+                            {
+                                var removedError = _errorHistory.Dequeue();
+                                _logger?.LogDebug($"Periodic cleanup: removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
+                            }
+                            
+                            if (_errorHistory.Count < initialCount)
+                            {
+                                _logger?.LogInformation($"Periodic cleanup: removed {initialCount - _errorHistory.Count} old error events");
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Task was cancelled, exit gracefully
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError($"Error in periodic cleanup: {ex.Message}");
+                        // Continue with next cycle despite the error
+                    }
+                }
+            }
+            finally
+            {
+                _logger?.LogInformation("Periodic cleanup task stopped");
+            }
+        }
+
+        /// <summary>
         /// Disposes resources used by OllamaService.
         /// </summary>
         public void Dispose()
@@ -1836,6 +1916,29 @@ namespace wolle.Services
                 }
 
                 _isDisposed = true;
+
+                // Cancel and wait for periodic cleanup task to complete
+                try
+                {
+                    if (_periodicCleanupCts != null)
+                    {
+                        _periodicCleanupCts.Cancel();
+                        _periodicCleanupCts.Dispose();
+                    }
+
+                    if (_periodicCleanupTask != null)
+                    {
+                        // Wait up to 2 seconds for task to complete gracefully
+                        if (!_periodicCleanupTask.Wait(TimeSpan.FromSeconds(2)))
+                        {
+                            _logger?.LogWarning("Periodic cleanup task did not complete gracefully within timeout");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error stopping periodic cleanup task: {ex.Message}");
+                }
 
                 // Clean up Ollama server process
                 if (_ollamaServerProcess != null)
