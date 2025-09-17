@@ -8,7 +8,6 @@
                       Title="" 
                       Width="350" 
                       SizeToContent="Height"
-                      MaxHeight="400"
                       WindowStyle="None" 
                       ResizeMode="NoResize"
                       Background="Transparent"

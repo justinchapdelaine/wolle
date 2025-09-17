@@ -47,14 +47,15 @@ namespace wolle.Services
         /// Processes a file synchronously
         /// </summary>
         /// <param name="filePath">The file path to process</param>
-        public void ProcessFile(string filePath)
+        /// <param name="cancellationToken">The cancellation token</param>
+        public void ProcessFile(string filePath, CancellationToken cancellationToken)
         {
             // Start processing in background task
             Task.Run(async () =>
             {
                 try
                 {
-                    bool result = await ProcessFileAsync(filePath, CancellationToken.None);
+                    bool result = await ProcessFileAsync(filePath, cancellationToken);
                     if (result)
                     {
                         _logger?.LogInformation("File processing completed successfully");
@@ -64,11 +65,15 @@ namespace wolle.Services
                         _logger?.LogError("File processing failed");
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogInformation("File processing was cancelled");
+                }
                 catch (Exception ex)
                 {
                     _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
                 }
-            });
+            }, cancellationToken);
         }
 
         /// <summary>

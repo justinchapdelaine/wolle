@@ -66,25 +66,7 @@ namespace wolle.Services
                 // Check if processing is complete or user wants to force close
                 if (!_isProcessingComplete)
                 {
-                    _logger?.LogInformation("Processing not complete - asking user if they want to force close");
-
-                    // Ask user if they want to force close
-                    var result = System.Windows.MessageBox.Show(
-                        "Ollama is still processing. Do you want to force close the application?",
-                        "Force Close",
-                        System.Windows.MessageBoxButton.YesNo,
-                        System.Windows.MessageBoxImage.Question);
-
-                    if (result == System.Windows.MessageBoxResult.No)
-                    {
-                        _logger?.LogInformation("User chose not to force close - cancelling window close");
-                        e.Cancel = true;
-                        return;
-                    }
-
-                    _logger?.LogInformation("User chose to force close");
-                    _isWindowClosing = true; // Force close
-                    _isProcessingComplete = true; // Allow close
+                    _logger?.LogInformation("Processing not complete - allowing close with cancellation");
                 }
 
                 // Mark that we're attempting to close

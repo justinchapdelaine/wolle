@@ -22,7 +22,7 @@ namespace wolle
         private bool _isClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
-        private CancellationTokenSource? _cancellationTokenSource = new();
+        private CancellationTokenSource _cancellationTokenSource = new();
         private readonly IResponseDisplayCoordinator _coordinator;
         private readonly IProgressManagementService _progressManagementService;
         private readonly IStatusManagementService _statusManagementService;
@@ -118,8 +118,8 @@ namespace wolle
             // Notify settings service that processing is starting
             _settingsManagementService.SetProcessingState(true);
 
-            // Use file processing service to handle file processing
-            _fileProcessingService.ProcessFile(filePath);
+            // Use file processing service to handle file processing with cancellation support
+            _fileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
         }
 
         private void OnFileProcessingComplete(object? sender, EventArgs e)
@@ -307,26 +307,6 @@ namespace wolle
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isProcessingComplete)
-            {
-                _logger?.LogInformation("Close button clicked but processing not complete - asking user");
-
-                // Ask user if they want to force close
-                var result = System.Windows.MessageBox.Show(
-                    "Ollama is still processing. Do you want to force close the application?",
-                    "Force Close",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Question);
-
-                if (result == System.Windows.MessageBoxResult.Yes)
-                {
-                    _logger?.LogInformation("User chose to force close");
-                    _isClosing = true; // Force close
-                    _isProcessingComplete = true; // Allow close
-                    Close();
-                }
-                return;
-            }
             Close();
         }
 
@@ -351,7 +331,7 @@ namespace wolle
         private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("SaveSettingsButton_Click called!");
-            
+
             // Get timeout value from text box
             if (!int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
             {
@@ -412,13 +392,10 @@ namespace wolle
             }
 
             // Cancel any ongoing processing
-            _cancellationTokenSource?.Cancel();
-
-            // Wait for cancellation to take effect
-            System.Threading.Thread.Sleep(100);
+            _cancellationTokenSource.Cancel();
 
             // Dispose cancellation token source
-            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource.Dispose();
 
             // Unsubscribe from status timer events
             _statusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
@@ -433,10 +410,7 @@ namespace wolle
             try
             {
                 // Cancel any ongoing processing first
-                _cancellationTokenSource?.Cancel();
-
-                // Wait a moment for cancellation to take effect
-                System.Threading.Thread.Sleep(100);
+                _cancellationTokenSource.Cancel();
 
                 // Now dispose the service
                 _ollamaService?.Dispose();

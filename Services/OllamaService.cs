@@ -94,6 +94,7 @@ namespace wolle.Services
     {
         private readonly IOptions<AppSettings> _settings;
         private readonly ILogger<OllamaService> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
         private Process? _ollamaServerProcess;
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
@@ -113,6 +114,7 @@ namespace wolle.Services
         private DateTime _serviceStartTime = DateTime.Now;
         private long _totalBytesProcessed = 0;
         private TimeSpan _totalProcessingTime = TimeSpan.Zero;
+        private CancellationTokenSource? _periodicCleanupCts;
 
         // Advanced error handling
         private readonly Dictionary<string, ErrorRecoveryStrategy> _errorRecoveryStrategies = new();
@@ -122,6 +124,7 @@ namespace wolle.Services
         private DateTime? _lastErrorTime = null;
         private readonly object _processLock = new object(); // For thread-safe process operations
         private DateTime? _currentOperationStartTime = null; // For timing current operation
+        private Task? _periodicCleanupTask;
 
         public event Action<string>? OnStatusUpdate;
         public event Action<string>? OnOutputReceived;
@@ -134,17 +137,21 @@ namespace wolle.Services
         /// </summary>
         /// <param name="settings">The application settings configuration.</param>
         /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaService(IOptions<AppSettings> settings, ILogger<OllamaService> logger)
+        /// <param name="httpClientFactory">HTTP client factory for creating HTTP clients.</param>
+        public OllamaService(IOptions<AppSettings> settings, ILogger<OllamaService> logger, IHttpClientFactory httpClientFactory)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
             var appSettings = _settings.Value;
             _modelName = appSettings.ModelName;
-            _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
-            _httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
+            _httpClient = _httpClientFactory.CreateClient("OllamaClient");
             _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
+
+            // Initialize periodic cleanup
+            _periodicCleanupCts = new CancellationTokenSource();
+            _periodicCleanupTask = PeriodicCleanupAsync(_periodicCleanupCts.Token);
         }
 
         /// <summary>
@@ -340,18 +347,17 @@ namespace wolle.Services
                 return Task.FromResult(false);
             }
 
-            // Sanitize arguments
-            var sanitizedArgs = SanitizeProcessArguments("serve");
-
             var startInfo = new ProcessStartInfo
             {
                 FileName = ollamaPath,
-                Arguments = sanitizedArgs,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+
+            // Use ArgumentList for secure argument passing
+            startInfo.ArgumentList.Add("serve");
 
             // Don't use using block - we need to keep the process alive
             var process = new Process { StartInfo = startInfo };
@@ -446,54 +452,107 @@ namespace wolle.Services
 
 
         /// <summary>
-        /// Sanitizes process arguments to prevent injection attacks.
+        /// Validates process arguments to prevent injection attacks.
         /// </summary>
-        /// <param name="arguments">The arguments to sanitize.</param>
-        /// <returns>Sanitized arguments string.</returns>
-        private string SanitizeProcessArguments(string arguments)
+        /// <param name="arguments">The arguments to validate.</param>
+        /// <returns>True if arguments are safe, false otherwise.</returns>
+        private bool ValidateProcessArguments(string arguments)
         {
             if (string.IsNullOrEmpty(arguments))
             {
-                return string.Empty;
+                return true; // Empty arguments are safe
             }
 
-            // Validate that arguments don't contain dangerous command sequences
-            // Instead of removing characters, we'll validate and properly escape
-            var dangerousPatterns = new[] { "&&", "||", ";", "&", "|", "`", "$(", "$`", "\n", "\r" };
+            // Comprehensive shell injection pattern detection
+            var dangerousPatterns = new[]
+            {
+                // Command chaining
+                "&&", "||", ";", "&", "|",
+                // Command substitution
+                "`", "$(", "$`", ")",
+                // Input/output redirection
+                ">", ">>", "<", "<<",
+                // Pipes and background processes
+                "|", "&",
+                // Newlines and carriage returns
+                "\n", "\r",
+                // Potential script execution
+                "$(", "${", "$[",
+                // Backtick execution
+                "`",
+                // Environment variable manipulation
+                "$", "%",
+                // Quotes that could break argument boundaries
+                "\"", "'",
+                // Escape characters
+                "\\",
+                // Potential remote execution
+                "curl", "wget", "nc", "netcat", "telnet",
+                // File operations
+                "rm", "del", "rmdir", "rd",
+                // System commands
+                "cmd", "powershell", "bash", "sh",
+                // Network operations
+                "net", "netstat", "ipconfig", "ifconfig"
+            };
 
+            // Check for dangerous patterns (case-insensitive)
+            var lowerArguments = arguments.ToLowerInvariant();
             foreach (var pattern in dangerousPatterns)
             {
-                if (arguments.Contains(pattern))
+                if (lowerArguments.Contains(pattern.ToLowerInvariant()))
                 {
-                    throw new ArgumentException($"Arguments contain dangerous pattern: {pattern}", nameof(arguments));
+                    _logger?.LogError($"Argument validation failed: dangerous pattern detected - {pattern}");
+                    return false;
                 }
             }
 
-            // Properly escape arguments for command line
-            return EscapeCommandLineArgument(arguments);
+            // Validate argument length to prevent buffer overflow attempts
+            if (arguments.Length > 1000)
+            {
+                _logger?.LogError("Argument validation failed: argument too long");
+                return false;
+            }
+
+            // Validate character set (allow only safe characters)
+            var safeChars = new Regex("^[a-zA-Z0-9._\\-\\s]+$", RegexOptions.None, TimeSpan.FromSeconds(1));
+            if (!safeChars.IsMatch(arguments))
+            {
+                _logger?.LogError("Argument validation failed: contains invalid characters");
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
-        /// Escapes a command line argument to prevent injection.
+        /// Safely adds arguments to ProcessStartInfo.ArgumentList with validation.
         /// </summary>
-        /// <param name="argument">The argument to escape.</param>
-        /// <returns>Escaped argument string.</returns>
-        private string EscapeCommandLineArgument(string argument)
+        /// <param name="startInfo">The ProcessStartInfo to add arguments to.</param>
+        /// <param name="arguments">The arguments to add.</param>
+        private void AddSafeArguments(ProcessStartInfo startInfo, params string[] arguments)
         {
-            if (string.IsNullOrEmpty(argument))
-            {
-                return "\"\"";
-            }
+            if (startInfo == null)
+                throw new ArgumentNullException(nameof(startInfo));
 
-            // If argument contains spaces or special characters, wrap in quotes
-            if (argument.Contains(" ") || argument.Contains("\"") || argument.Contains("\\"))
-            {
-                // Escape existing quotes and backslashes
-                var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                return $"\"{escaped}\"";
-            }
+            if (arguments == null || arguments.Length == 0)
+                return;
 
-            return argument;
+            foreach (var argument in arguments)
+            {
+                if (string.IsNullOrEmpty(argument))
+                    continue;
+
+                // Validate each argument before adding
+                if (!ValidateProcessArguments(argument))
+                {
+                    throw new ArgumentException($"Invalid argument detected: {argument}", nameof(arguments));
+                }
+
+                // Add to ArgumentList (automatically handles escaping)
+                startInfo.ArgumentList.Add(argument);
+                _logger?.LogDebug($"Added safe argument: {argument}");
+            }
         }
 
         /// <summary>
@@ -881,7 +940,7 @@ namespace wolle.Services
         }
 
         /// <summary>
-        /// Gets Ollama executable path.
+        /// Gets Ollama executable path with enhanced security validation.
         /// </summary>
         /// <returns>The path to Ollama executable, or null if not found.</returns>
         private string? GetOllamaPath()
@@ -889,14 +948,13 @@ namespace wolle.Services
             _logger?.LogInformation("GetOllamaPath started");
             var settings = _settings.Value;
 
-            // Check configured path first
-            if (!string.IsNullOrEmpty(settings.OllamaPath) && File.Exists(settings.OllamaPath))
+            // Check configured path first with enhanced validation
+            if (!string.IsNullOrEmpty(settings.OllamaPath))
             {
-                _logger?.LogInformation($"Found configured Ollama path: {settings.OllamaPath}");
-
-                // Validate the path before returning
-                if (ValidationService.ValidateExecutablePath(settings.OllamaPath))
+                if (ValidationService.ValidateExecutablePath(settings.OllamaPath) &&
+                    IsSafeExecutablePath(settings.OllamaPath))
                 {
+                    _logger?.LogInformation($"Found configured Ollama path: {settings.OllamaPath}");
                     return settings.OllamaPath;
                 }
                 else
@@ -905,30 +963,38 @@ namespace wolle.Services
                 }
             }
 
-            // Check PATH environment variable
+            // Check PATH environment variable with enhanced validation
             var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-            var pathDirs = pathEnv.Split(';');
+            var pathDirs = pathEnv.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var dir in pathDirs)
             {
-                var ollamaPath = Path.Combine(dir, "ollama.exe");
-                if (File.Exists(ollamaPath))
+                try
                 {
-                    _logger?.LogInformation($"Found Ollama in PATH: {ollamaPath}");
-
-                    // Validate the path before returning
-                    if (ValidationService.ValidateExecutablePath(ollamaPath))
+                    // Validate directory path first
+                    if (!IsSafeDirectoryPath(dir))
                     {
+                        _logger?.LogWarning($"Skipping unsafe PATH directory: {dir}");
+                        continue;
+                    }
+
+                    var ollamaPath = Path.Combine(dir, "ollama.exe");
+                    if (File.Exists(ollamaPath) &&
+                        ValidationService.ValidateExecutablePath(ollamaPath) &&
+                        IsSafeExecutablePath(ollamaPath))
+                    {
+                        _logger?.LogInformation($"Found Ollama in PATH: {ollamaPath}");
                         return ollamaPath;
                     }
-                    else
-                    {
-                        _logger?.LogError("PATH Ollama path validation failed");
-                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning($"Error checking PATH directory {dir}: {ex.Message}");
+                    continue;
                 }
             }
 
-            // Check common installation paths
+            // Check common installation paths with enhanced validation
             var commonPaths = new[]
             {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Ollama", "ollama.exe"),
@@ -938,15 +1004,162 @@ namespace wolle.Services
 
             foreach (var commonPath in commonPaths)
             {
-                if (File.Exists(commonPath))
+                try
                 {
-                    _logger?.LogInformation($"Found Ollama in common path: {commonPath}");
-                    return commonPath;
+                    if (File.Exists(commonPath) &&
+                        ValidationService.ValidateExecutablePath(commonPath) &&
+                        IsSafeExecutablePath(commonPath))
+                    {
+                        _logger?.LogInformation($"Found Ollama in common path: {commonPath}");
+                        return commonPath;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning($"Error checking common path {commonPath}: {ex.Message}");
+                    continue;
                 }
             }
 
             _logger?.LogError("Ollama not found in PATH or common locations");
             return null;
+        }
+
+        /// <summary>
+        /// Validates that an executable path is safe and not suspicious.
+        /// </summary>
+        /// <param name="executablePath">The path to validate.</param>
+        /// <returns>True if path is safe, false otherwise.</returns>
+        private bool IsSafeExecutablePath(string executablePath)
+        {
+            if (string.IsNullOrEmpty(executablePath))
+                return false;
+
+            try
+            {
+                // Get full path to resolve any relative paths or ..
+                var fullPath = Path.GetFullPath(executablePath);
+
+                // Check if file is actually an executable
+                var extension = Path.GetExtension(fullPath).ToLowerInvariant();
+                if (extension != ".exe" && extension != ".com" && extension != ".bat" && extension != ".cmd")
+                {
+                    _logger?.LogError($"File is not an executable: {fullPath}");
+                    return false;
+                }
+
+                // Check for suspicious file names
+                var fileName = Path.GetFileName(fullPath).ToLowerInvariant();
+                var suspiciousNames = new[]
+                {
+                    "cmd.exe", "powershell.exe", "bash.exe", "sh.exe",
+                    "wscript.exe", "cscript.exe", "rundll32.exe",
+                    "regsvr32.exe", "reg.exe", "net.exe", "netstat.exe",
+                    "taskkill.exe", "tasklist.exe", "whoami.exe",
+                    "systeminfo.exe", "ipconfig.exe", "ping.exe",
+                    "tracert.exe", "nslookup.exe", "ftp.exe", "tftp.exe"
+                };
+
+                if (suspiciousNames.Contains(fileName))
+                {
+                    _logger?.LogError($"Suspicious executable name detected: {fileName}");
+                    return false;
+                }
+
+                // Check for suspicious directory patterns
+                var directoryName = Path.GetDirectoryName(fullPath) ?? "";
+                var suspiciousDirs = new[]
+                {
+                    "temp", "tmp", "windows\\system32", "windows\\syswow64",
+                    "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
+                };
+
+                var lowerDir = directoryName.ToLowerInvariant();
+                foreach (var suspiciousDir in suspiciousDirs)
+                {
+                    if (lowerDir.Contains(suspiciousDir))
+                    {
+                        _logger?.LogWarning($"Executable in potentially suspicious directory: {directoryName}");
+                        // This is a warning, not an error, as some legitimate installs may use these paths
+                    }
+                }
+
+                // Verify file signature (basic check)
+                var fileInfo = new FileInfo(fullPath);
+                if (fileInfo.Length == 0)
+                {
+                    _logger?.LogError("Executable file is empty");
+                    return false;
+                }
+
+                if (fileInfo.Length > 100 * 1024 * 1024) // 100MB
+                {
+                    _logger?.LogError("Executable file is suspiciously large");
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error validating executable path {executablePath}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Validates that a directory path is safe for searching executables.
+        /// </summary>
+        /// <param name="directoryPath">The directory path to validate.</param>
+        /// <returns>True if directory path is safe, false otherwise.</returns>
+        private bool IsSafeDirectoryPath(string directoryPath)
+        {
+            if (string.IsNullOrEmpty(directoryPath))
+                return false;
+
+            try
+            {
+                // Get full path to resolve any relative paths or ..
+                var fullPath = Path.GetFullPath(directoryPath);
+
+                // Check for path traversal attempts
+                if (fullPath.Contains("..\\") || fullPath.Contains("../") ||
+                    fullPath.Contains("\\..\\") || fullPath.Contains("/../"))
+                {
+                    _logger?.LogError($"Path traversal detected in directory: {directoryPath}");
+                    return false;
+                }
+
+                // Check for suspicious directory patterns
+                var lowerDir = fullPath.ToLowerInvariant();
+                var suspiciousDirs = new[]
+                {
+                    "temp", "tmp", "windows\\system32", "windows\\syswow64",
+                    "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
+                };
+
+                foreach (var suspiciousDir in suspiciousDirs)
+                {
+                    if (lowerDir.Contains(suspiciousDir))
+                    {
+                        _logger?.LogWarning($"Directory path is potentially suspicious: {fullPath}");
+                        // This is a warning, not an error
+                    }
+                }
+
+                // Check if directory actually exists
+                if (!Directory.Exists(fullPath))
+                {
+                    return false; // Directory doesn't exist, but this is not an error
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error validating directory path {directoryPath}: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
@@ -1390,7 +1603,8 @@ namespace wolle.Services
                 // Keep only last 1000 metrics
                 while (_performanceMetrics.Count > 1000)
                 {
-                    _performanceMetrics.Dequeue();
+                    var removedMetric = _performanceMetrics.Dequeue();
+                    _logger?.LogDebug($"Removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
                 }
 
                 // Update totals
@@ -1494,7 +1708,7 @@ namespace wolle.Services
         /// <param name="exception">Optional exception.</param>
         /// <param name="context">Additional context information.</param>
         /// <returns>True if error was recovered, false otherwise.</returns>
-        private bool HandleErrorWithRecovery(string errorType, string errorMessage, Exception? exception = null, Dictionary<string, string>? context = null)
+        private async Task<bool> HandleErrorWithRecovery(string errorType, string errorMessage, Exception? exception = null, Dictionary<string, string>? context = null)
         {
             var errorEvent = new ErrorEvent
             {
@@ -1512,7 +1726,8 @@ namespace wolle.Services
                 // Keep only last 500 errors
                 while (_errorHistory.Count > 500)
                 {
-                    _errorHistory.Dequeue();
+                    var removedError = _errorHistory.Dequeue();
+                    _logger?.LogDebug($"Removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
                 }
 
                 // Update consecutive error tracking
@@ -1533,10 +1748,10 @@ namespace wolle.Services
             // Try to recover using registered strategies
             if (_errorRecoveryStrategies.TryGetValue(errorType, out var strategy))
             {
-                return TryRecoverFromError(errorEvent, strategy);
+                return await TryRecoverFromError(errorEvent, strategy);
             }
 
-            return false;
+            return await Task.FromResult(false);
         }
 
         /// <summary>
@@ -1544,8 +1759,9 @@ namespace wolle.Services
         /// </summary>
         /// <param name="errorEvent">The error event.</param>
         /// <param name="strategy">The recovery strategy to use.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if recovery was successful, false otherwise.</returns>
-        private bool TryRecoverFromError(ErrorEvent errorEvent, ErrorRecoveryStrategy strategy)
+        private async Task<bool> TryRecoverFromError(ErrorEvent errorEvent, ErrorRecoveryStrategy strategy, CancellationToken cancellationToken = default)
         {
             if (!strategy.ShouldRetry)
                 return false;
@@ -1576,7 +1792,8 @@ namespace wolle.Services
 
                         if (attempt < strategy.MaxRetries)
                         {
-                            Thread.Sleep(strategy.RetryDelay);
+                            using var retryTimeout = new CancellationTokenSource(strategy.RetryDelay);
+                            await Task.Delay(strategy.RetryDelay, retryTimeout.Token);
                         }
                     }
                 }
@@ -1613,6 +1830,137 @@ namespace wolle.Services
         }
 
         /// <summary>
+        /// Performs periodic cleanup of old metrics and errors.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing periodic cleanup operation.</returns>
+        private async Task PeriodicCleanupAsync(CancellationToken cancellationToken)
+        {
+            _logger?.LogInformation("Periodic cleanup task started");
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        // Wait for 5 minutes between cleanup cycles
+                        await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+
+                        // Perform cleanup outside of lock blocks to prevent blocking
+                        await PerformCleanupAsync(cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Task was cancelled, exit gracefully
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError($"Error in periodic cleanup: {ex.Message}");
+                        // Continue with next cycle despite the error
+                    }
+                }
+            }
+            finally
+            {
+                _logger?.LogInformation("Periodic cleanup task stopped");
+            }
+        }
+
+        /// <summary>
+        /// Performs actual cleanup operations with proper exception handling.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing cleanup operation.</returns>
+        private async Task PerformCleanupAsync(CancellationToken cancellationToken)
+        {
+            // Clean up old performance metrics (older than 24 hours)
+            var metricsRemoved = await CleanupPerformanceMetricsAsync(cancellationToken);
+            if (metricsRemoved > 0)
+            {
+                _logger?.LogInformation($"Periodic cleanup: removed {metricsRemoved} old performance metrics");
+            }
+
+            // Clean up old error events (older than 7 days)
+            var errorsRemoved = await CleanupErrorHistoryAsync(cancellationToken);
+            if (errorsRemoved > 0)
+            {
+                _logger?.LogInformation($"Periodic cleanup: removed {errorsRemoved} old error events");
+            }
+        }
+
+        /// <summary>
+        /// Cleans up old performance metrics asynchronously.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Number of metrics removed.</returns>
+        private async Task<int> CleanupPerformanceMetricsAsync(CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    lock (_metricsLock)
+                    {
+                        var cutoffTime = DateTime.Now.AddHours(-24);
+                        var initialCount = _performanceMetrics.Count;
+                        var removedCount = 0;
+
+                        while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
+                        {
+                            var removedMetric = _performanceMetrics.Dequeue();
+                            _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
+                            removedCount++;
+                        }
+
+                        return removedCount;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error cleaning up performance metrics: {ex.Message}");
+                    return 0;
+                }
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Cleans up old error events asynchronously.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Number of errors removed.</returns>
+        private async Task<int> CleanupErrorHistoryAsync(CancellationToken cancellationToken)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    lock (_errorLock)
+                    {
+                        var cutoffTime = DateTime.Now.AddDays(-7);
+                        var initialCount = _errorHistory.Count;
+                        var removedCount = 0;
+
+                        while (_errorHistory.Count > 0 && _errorHistory.Peek().Timestamp < cutoffTime)
+                        {
+                            var removedError = _errorHistory.Dequeue();
+                            _logger?.LogDebug($"Periodic cleanup: removed old error event: {removedError.ErrorType} - {removedError.ErrorMessage}");
+                            removedCount++;
+                        }
+
+                        return removedCount;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error cleaning up error history: {ex.Message}");
+                    return 0;
+                }
+            }, cancellationToken);
+        }
+
+        /// <summary>
         /// Disposes resources used by OllamaService.
         /// </summary>
         public void Dispose()
@@ -1627,6 +1975,29 @@ namespace wolle.Services
                 }
 
                 _isDisposed = true;
+
+                // Cancel and wait for periodic cleanup task to complete
+                try
+                {
+                    if (_periodicCleanupCts != null)
+                    {
+                        _periodicCleanupCts.Cancel();
+                        _periodicCleanupCts.Dispose();
+                    }
+
+                    if (_periodicCleanupTask != null)
+                    {
+                        // Wait up to 2 seconds for task to complete gracefully
+                        if (!_periodicCleanupTask.Wait(TimeSpan.FromSeconds(2)))
+                        {
+                            _logger?.LogWarning("Periodic cleanup task did not complete gracefully within timeout");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error stopping periodic cleanup task: {ex.Message}");
+                }
 
                 // Clean up Ollama server process
                 if (_ollamaServerProcess != null)
@@ -1644,16 +2015,7 @@ namespace wolle.Services
                     _ollamaProcess = null;
                 }
 
-                // Clean up HttpClient and SemaphoreSlim
-                try
-                {
-                    _httpClient?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Error disposing HttpClient: {ex.Message}");
-                }
-
+                // Clean up SemaphoreSlim (HttpClient is managed by factory)
                 try
                 {
                     // Only dispose SemaphoreSlim if no API calls are active

@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Diagnostics;
+using System.Linq;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace wolle.Services
 {
@@ -9,13 +12,19 @@ namespace wolle.Services
     /// </summary>
     public static class ValidationService
     {
+        private static readonly string[] _allowedBaseDirectories = Array.Empty<string>();
+        private static readonly string[] _suspiciousFilePatterns = new[] { "..", "|", "<", ">", "\"", "'", "*", "?", "\0" };
+        private static readonly string[] _allowedExtensions = new[] { ".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py" };
+        private static readonly Regex ConsecutiveDotsRegex = new(@"\.\.{2,}", RegexOptions.Compiled);
+
         /// <summary>
-        /// Validates a file path for security and existence.
+        /// Validates a file path for security and existence with comprehensive checks.
         /// </summary>
         /// <param name="filePath">The file path to validate.</param>
         /// <param name="sanitizedPath">The sanitized full path if validation succeeds.</param>
+        /// <param name="allowedBaseDirs">Optional allowed base directories. If null, allows current directory and drive root.</param>
         /// <returns>True if the path is valid, false otherwise.</returns>
-        public static bool ValidateFilePath(string filePath, out string sanitizedPath)
+        public static bool ValidateFilePath(string filePath, out string sanitizedPath, string[]? allowedBaseDirs = null)
         {
             sanitizedPath = string.Empty;
 
@@ -23,41 +32,352 @@ namespace wolle.Services
             {
                 if (string.IsNullOrEmpty(filePath))
                 {
+                    Debug.WriteLine("Path validation failed: path is null or empty");
                     return false;
                 }
 
-                // Check for path traversal attacks and suspicious characters
-                if (filePath.Contains("..") || filePath.Contains("|") || filePath.Contains("<") || filePath.Contains(">") ||
-                    filePath.Contains("\"") || filePath.Contains("'") || filePath.Contains("*") || filePath.Contains("?"))
+                // Check for suspicious characters and patterns
+                if (ContainsSuspiciousPatterns(filePath))
                 {
+                    Debug.WriteLine($"Path validation failed: contains suspicious patterns: {filePath}");
                     return false;
                 }
 
-                // Normalize the path and check for traversal attempts
-                string normalizedPath = Path.GetFullPath(filePath);
-                string currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
-
-                // Additional security check - ensure path doesn't escape current directory structure
-                if (!normalizedPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase) &&
-                    !normalizedPath.StartsWith(Path.GetPathRoot(currentDir)!, StringComparison.OrdinalIgnoreCase))
+                // Normalize the path to resolve relative paths and remove redundant separators
+                string normalizedPath;
+                try
                 {
-                    return false;
+                    normalizedPath = Path.GetFullPath(filePath);
                 }
-
-                // Get full path to resolve relative paths
-                string fullPath = Path.GetFullPath(filePath);
-
-                // Check if file exists
-                if (!File.Exists(fullPath))
+                catch (Exception ex)
                 {
+                    Debug.WriteLine($"Path normalization failed: {ex.Message}");
                     return false;
                 }
 
-                sanitizedPath = fullPath;
+                // Validate against allowed base directories
+                var baseDirs = allowedBaseDirs ?? _allowedBaseDirectories;
+                if (!IsPathAllowed(normalizedPath, baseDirs))
+                {
+                    Debug.WriteLine($"Path validation failed: path not in allowed directories: {normalizedPath}");
+                    return false;
+                }
+
+                // Check file extension if allowed extensions are configured
+                if (_allowedExtensions.Length > 0)
+                {
+                    string extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
+                    if (!string.IsNullOrEmpty(extension) && !_allowedExtensions.Contains(extension))
+                    {
+                        Debug.WriteLine($"Path validation failed: file extension not allowed: {extension}");
+                        return false;
+                    }
+                }
+
+                // Check if file exists and is accessible
+                if (!File.Exists(normalizedPath))
+                {
+                    Debug.WriteLine($"Path validation failed: file does not exist: {normalizedPath}");
+                    return false;
+                }
+
+                // Additional security checks
+                if (!IsFileAccessible(normalizedPath))
+                {
+                    Debug.WriteLine($"Path validation failed: file is not accessible: {normalizedPath}");
+                    return false;
+                }
+
+                sanitizedPath = normalizedPath;
+                Debug.WriteLine($"Path validation successful: {sanitizedPath}");
                 return true;
             }
-            catch
+            catch (UnauthorizedAccessException ex)
             {
+                Debug.WriteLine($"Path validation failed: unauthorized access: {ex.Message}");
+                return false;
+            }
+            catch (PathTooLongException ex)
+            {
+                Debug.WriteLine($"Path validation failed: path too long: {ex.Message}");
+                return false;
+            }
+            catch (NotSupportedException ex)
+            {
+                Debug.WriteLine($"Path validation failed: unsupported path format: {ex.Message}");
+                return false;
+            }
+            catch (IOException ex)
+            {
+                Debug.WriteLine($"Path validation failed: IO error: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Path validation failed: unexpected error: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Checks if a path contains suspicious patterns that could indicate attacks.
+        /// </summary>
+        private static bool ContainsSuspiciousPatterns(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return true;
+
+            // Check for null bytes and other suspicious characters
+            if (_suspiciousFilePatterns.Any(pattern => path.Contains(pattern)))
+                return true;
+
+            // Check for encoded path traversal attempts
+            if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("%2f", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Check for multiple consecutive dots that could be obfuscated traversal
+            if (ConsecutiveDotsRegex.IsMatch(path))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Validates that a path is within allowed base directories.
+        /// </summary>
+        private static bool IsPathAllowed(string normalizedPath, string[] allowedBaseDirs)
+        {
+            if (string.IsNullOrEmpty(normalizedPath))
+                return false;
+
+            // If no specific base directories are configured, allow current directory and drive root
+            if (allowedBaseDirs == null || allowedBaseDirs.Length == 0)
+            {
+                string currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
+                string driveRoot = Path.GetPathRoot(currentDir) ?? string.Empty;
+
+                // Check if path is within current directory or drive root
+                return normalizedPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase) ||
+                       normalizedPath.StartsWith(driveRoot, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Check against each allowed base directory
+            foreach (string baseDir in allowedBaseDirs)
+            {
+                if (string.IsNullOrEmpty(baseDir))
+                    continue;
+
+                try
+                {
+                    string normalizedBaseDir = Path.GetFullPath(baseDir);
+                    if (normalizedPath.StartsWith(normalizedBaseDir, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Base directory normalization failed for {baseDir}: {ex.Message}");
+                    continue;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if a file is accessible and safe to read.
+        /// </summary>
+        private static bool IsFileAccessible(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+
+                // Check for reasonable file size (100MB max as per requirements)
+                if (fileInfo.Length > 100 * 1024 * 1024)
+                {
+                    Debug.WriteLine($"File too large: {fileInfo.Length} bytes");
+                    return false;
+                }
+
+                // Check if file is not a directory
+                if (fileInfo.Attributes.HasFlag(FileAttributes.Directory))
+                {
+                    Debug.WriteLine("Path points to a directory, not a file");
+                    return false;
+                }
+
+                // Check if file is not hidden or system (unless explicitly allowed)
+                if (fileInfo.Attributes.HasFlag(FileAttributes.Hidden) || fileInfo.Attributes.HasFlag(FileAttributes.System))
+                {
+                    Debug.WriteLine("File is hidden or system file");
+                    return false;
+                }
+
+                // Try to open file for reading to verify accessibility
+                using (var fileStream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    // If we get here, file is accessible
+                    return fileStream.CanRead;
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.WriteLine($"Access denied to file: {ex.Message}");
+                return false;
+            }
+            catch (IOException ex)
+            {
+                Debug.WriteLine($"IO error accessing file: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking file accessibility: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Validates a file with comprehensive size and accessibility checks.
+        /// </summary>
+        /// <param name="filePath">The file path to validate.</param>
+        /// <param name="errorMessage">Output parameter for error message if validation fails.</param>
+        /// <param name="maxSizeBytes">Maximum allowed file size in bytes (default: 10MB).</param>
+        /// <param name="minSizeBytes">Minimum allowed file size in bytes (default: 1 byte).</param>
+        /// <returns>True if the file is valid, false otherwise.</returns>
+        public static bool ValidateFileWithSizeChecks(string filePath, out string errorMessage, long maxSizeBytes = 10 * 1024 * 1024, long minSizeBytes = 1)
+        {
+            errorMessage = string.Empty;
+
+            try
+            {
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    errorMessage = "File path is null or empty";
+                    return false;
+                }
+
+                // First validate the path using the comprehensive path validation
+                if (!ValidateFilePath(filePath, out string sanitizedPath))
+                {
+                    errorMessage = $"Invalid file path: {filePath}";
+                    return false;
+                }
+
+                var fileInfo = new FileInfo(sanitizedPath);
+
+                // Check file size limits
+                if (fileInfo.Length < minSizeBytes)
+                {
+                    errorMessage = $"File is too small: {fileInfo.Length} bytes (minimum: {minSizeBytes} bytes)";
+                    return false;
+                }
+
+                if (fileInfo.Length > maxSizeBytes)
+                {
+                    errorMessage = $"File is too large: {fileInfo.Length} bytes (maximum: {maxSizeBytes} bytes)";
+                    return false;
+                }
+
+                // Additional file-specific validations
+                if (!ValidateFileCharacteristics(fileInfo, out string fileError))
+                {
+                    errorMessage = fileError;
+                    return false;
+                }
+
+                Debug.WriteLine($"File validation successful: {sanitizedPath}, Size: {fileInfo.Length} bytes");
+                return true;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                errorMessage = $"Access denied to file: {ex.Message}";
+                return false;
+            }
+            catch (IOException ex)
+            {
+                errorMessage = $"IO error accessing file: {ex.Message}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error validating file: {ex.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Validates file characteristics beyond basic existence and size.
+        /// </summary>
+        private static bool ValidateFileCharacteristics(FileInfo fileInfo, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            try
+            {
+                // Check if file is locked by another process
+                try
+                {
+                    using (var fileStream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        // If we can open with FileShare.Read, file is not write-locked
+                        fileStream.Close();
+                    }
+                }
+                catch (IOException)
+                {
+                    errorMessage = "File is locked by another process";
+                    return false;
+                }
+
+                // Check for reasonable file characteristics based on extension
+                string extension = fileInfo.Extension.ToLowerInvariant();
+                switch (extension)
+                {
+                    case ".txt":
+                    case ".md":
+                    case ".cs":
+                    case ".js":
+                    case ".py":
+                        // Text files should be reasonable size for processing
+                        if (fileInfo.Length > 50 * 1024 * 1024) // 50MB for text files
+                        {
+                            errorMessage = $"Text file too large for processing: {fileInfo.Length} bytes";
+                            return false;
+                        }
+                        break;
+
+                    case ".png":
+                    case ".jpg":
+                    case ".jpeg":
+                        // Image files should have reasonable dimensions
+                        if (fileInfo.Length > 20 * 1024 * 1024) // 20MB for images
+                        {
+                            errorMessage = $"Image file too large for processing: {fileInfo.Length} bytes";
+                            return false;
+                        }
+                        break;
+                }
+
+                // Check if file has been modified recently (optional security check)
+                var lastModified = fileInfo.LastWriteTime;
+                var age = DateTime.Now - lastModified;
+                if (age.TotalDays > 365) // Older than 1 year
+                {
+                    Debug.WriteLine($"Warning: File is older than 1 year: {fileInfo.FullName}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error checking file characteristics: {ex.Message}";
                 return false;
             }
         }

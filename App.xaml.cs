@@ -1,10 +1,17 @@
 using System;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Runtime.Versioning;
 using System.Windows.Resources;
+using System.Threading;
+using Polly;
+using System.Threading.Tasks;
 using wolle.Services;
 
 namespace wolle
@@ -104,10 +111,11 @@ namespace wolle
         private void ConfigureServices(IServiceCollection services)
         {
             // Register SettingsService first for Serilog configuration
-            services.AddSingleton<SettingsService>();
+            var settingsService = new SettingsService();
+            services.AddSingleton<SettingsService>(settingsService);
+            services.AddSingleton<IOptions<AppSettings>>(settingsService);
 
             // Configure Serilog
-            var settingsService = new SettingsService();
             Log.Logger = SerilogConfig.ConfigureSerilog(settingsService);
 
             // Add logging with Serilog
@@ -118,7 +126,6 @@ namespace wolle
 
             // Register application services
             services.AddSingleton<MarkdownService>();
-            services.AddSingleton<OllamaService>();
             services.AddSingleton<IMarkdownConversionService, MarkdownConversionService>();
             services.AddSingleton<IMarkdownDebounceService, MarkdownDebounceService>();
             services.AddSingleton<IResponseStateService, ResponseStateService>();
@@ -128,7 +135,29 @@ namespace wolle
             services.AddSingleton<IStatusManagementService, StatusManagementService>();
             services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
-            services.AddSingleton<IErrorManagementService>(provider => 
+
+            // Add HttpClient factory for OllamaService with proper configuration
+            services.AddHttpClient("OllamaClient", (sp, httpClient) =>
+            {
+                var settings = sp.GetRequiredService<IOptions<AppSettings>>();
+                var appSettings = settings.Value;
+
+                httpClient.BaseAddress = new Uri(appSettings.OllamaEndpoint);
+                httpClient.Timeout = TimeSpan.FromSeconds(appSettings.ApiTimeoutSeconds);
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "wolle/1.0.0");
+                httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            });
+
+            // Register OllamaService as singleton with all dependencies
+            services.AddSingleton<OllamaService>(sp =>
+            {
+                var settings = sp.GetRequiredService<IOptions<AppSettings>>();
+                var logger = sp.GetRequiredService<ILogger<OllamaService>>();
+                var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+                return new OllamaService(settings, logger, httpClientFactory);
+            });
+
+            services.AddSingleton<IErrorManagementService>(provider =>
                 new ErrorManagementService(provider.GetRequiredService<IResourceManagementService>()));
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
             services.AddSingleton<IEventManagementService, EventManagementService>();
