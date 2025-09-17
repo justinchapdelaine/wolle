@@ -59,7 +59,7 @@ namespace wolle
                 _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
                 _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
                 _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-            _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
+                _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
 
                 InitializeComponent();
 
