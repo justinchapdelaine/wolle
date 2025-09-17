@@ -79,10 +79,20 @@ namespace wolle.Services
             else // 128000 or any other value
                 _contextWindowSizeComboBox.SelectedIndex = 2;
 
-            // Show settings panel, hide other content
+            // Show settings panel
             _settingsPanel.Visibility = Visibility.Visible;
-            _responseScrollViewer!.Visibility = Visibility.Collapsed;
-            _errorTextBlock!.Visibility = Visibility.Collapsed;
+
+            // Only hide response and error if processing is still active
+            if (_isProcessingActive)
+            {
+                _responseScrollViewer!.Visibility = Visibility.Collapsed;
+                _errorTextBlock!.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                // When processing is complete, keep response visible, just hide error
+                _errorTextBlock!.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
@@ -95,7 +105,13 @@ namespace wolle.Services
 
             // Hide settings panel, restore normal UI
             _settingsPanel.Visibility = Visibility.Collapsed;
-            _responseScrollViewer!.Visibility = Visibility.Visible;
+
+            // Only show response scroll viewer if it has content
+            if (_responseScrollViewer.Document != null && _responseScrollViewer.Document.Blocks.Count > 0)
+            {
+                _responseScrollViewer!.Visibility = Visibility.Visible;
+            }
+
             _errorTextBlock!.Visibility = Visibility.Collapsed;
         }
 
@@ -108,7 +124,7 @@ namespace wolle.Services
         public bool SaveSettings(int timeoutSeconds, int contextWindowSize)
         {
             System.Diagnostics.Debug.WriteLine($"SettingsManagementService.SaveSettings called: timeout={timeoutSeconds}, contextSize={contextWindowSize}, isProcessingActive={_isProcessingActive}");
-            
+
             if (!ValidateSettings(timeoutSeconds, contextWindowSize))
             {
                 System.Diagnostics.Debug.WriteLine("Settings validation failed");
@@ -125,6 +141,9 @@ namespace wolle.Services
                     _pendingApiTimeoutSeconds = timeoutSeconds;
                     _pendingContextWindowSize = contextWindowSize;
                     ApplyPendingSettings();
+
+                    // Hide settings panel after applying settings
+                    HideSettingsPanel();
                     return true;
                 }
                 else

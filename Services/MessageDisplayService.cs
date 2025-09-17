@@ -214,11 +214,11 @@ namespace wolle.Services
         private void ShowMessageInternal(string message, string messageType, int autoHideMs)
         {
             System.Diagnostics.Debug.WriteLine($"ShowMessageInternal called: message='{message}', type={messageType}, autoHide={autoHideMs}ms");
-            
+
             lock (_messageLock)
             {
                 System.Diagnostics.Debug.WriteLine("Message lock acquired");
-                
+
                 // Cancel any auto-hide timer and hide existing message
                 if (_autoHideTimer != null)
                 {
@@ -249,7 +249,7 @@ namespace wolle.Services
                         _mainWindow.FindName("InfoMessageTextBlock") is System.Windows.Controls.TextBlock infoMessageTextBlock)
                     {
                         System.Diagnostics.Debug.WriteLine("UI elements found, setting message");
-                        
+
                         // Set message text
                         infoMessageTextBlock.Text = message;
                         System.Diagnostics.Debug.WriteLine($"Message text set: '{message}'");
@@ -282,7 +282,7 @@ namespace wolle.Services
                         {
                             // Use Task.Delay with cancellation token to prevent memory leaks
                             var currentToken = _cancellationTokenSource?.Token ?? CancellationToken.None;
-                            Task.Delay(autoHideMs, currentToken).ContinueWith(_ => 
+                            Task.Delay(autoHideMs, currentToken).ContinueWith(_ =>
                             {
                                 if (!currentToken.IsCancellationRequested)
                                 {
@@ -296,7 +296,7 @@ namespace wolle.Services
                                     });
                                 }
                             }, TaskScheduler.Default);
-                            
+
                             System.Diagnostics.Debug.WriteLine($"Task.Delay started for {autoHideMs}ms at {DateTime.Now:HH:mm:ss.fff}");
                         }
                     }
@@ -331,11 +331,11 @@ namespace wolle.Services
         private void OnAutoHideTimerTick(object? sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("OnAutoHideTimerTick called!");
-            
+
             lock (_messageLock)
             {
                 System.Diagnostics.Debug.WriteLine("Timer tick lock acquired");
-                
+
                 // Hide message immediately (timer interval is set to the duration)
                 _mainWindow.Dispatcher.Invoke(() =>
                 {
@@ -359,7 +359,7 @@ namespace wolle.Services
                     _autoHideTimer.Interval = TimeSpan.FromMilliseconds(100);
                     System.Diagnostics.Debug.WriteLine("Timer stopped and reset to 100ms");
                 }
-                
+
                 // Debug: Log message hidden
                 System.Diagnostics.Debug.WriteLine($"Message hidden by timer at {DateTime.Now:HH:mm:ss.fff}");
             }

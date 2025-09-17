@@ -128,7 +128,7 @@ namespace wolle
             services.AddSingleton<IStatusManagementService, StatusManagementService>();
             services.AddSingleton<ISettingsManagementService, SettingsManagementService>();
             services.AddSingleton<IUIInteractionService, UIInteractionService>();
-            services.AddSingleton<IErrorManagementService>(provider => 
+            services.AddSingleton<IErrorManagementService>(provider =>
                 new ErrorManagementService(provider.GetRequiredService<IResourceManagementService>()));
             services.AddSingleton<IFileProcessingService, FileProcessingService>();
             services.AddSingleton<IEventManagementService, EventManagementService>();

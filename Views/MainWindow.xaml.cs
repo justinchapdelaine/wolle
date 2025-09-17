@@ -351,7 +351,7 @@ namespace wolle
         private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("SaveSettingsButton_Click called!");
-            
+
             // Get timeout value from text box
             if (!int.TryParse(ApiTimeoutTextBox.Text, out int timeoutSeconds))
             {
