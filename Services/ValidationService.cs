@@ -15,6 +15,7 @@ namespace wolle.Services
         private static readonly string[] _allowedBaseDirectories = Array.Empty<string>();
         private static readonly string[] _suspiciousFilePatterns = new[] { "..", "|", "<", ">", "\"", "'", "*", "?", "\0" };
         private static readonly string[] _allowedExtensions = new[] { ".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py" };
+        private static readonly Regex ConsecutiveDotsRegex = new(@"\.\.{2,}", RegexOptions.Compiled);
 
         /// <summary>
         /// Validates a file path for security and existence with comprehensive checks.
@@ -136,7 +137,7 @@ namespace wolle.Services
                 return true;
 
             // Check for multiple consecutive dots that could be obfuscated traversal
-            if (Regex.IsMatch(path, @"\.\.{2,}"))
+            if (ConsecutiveDotsRegex.IsMatch(path))
                 return true;
 
             return false;
