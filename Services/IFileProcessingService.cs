@@ -27,7 +27,8 @@ namespace wolle.Services
         /// Processes a file synchronously
         /// </summary>
         /// <param name="filePath">The file path to process</param>
-        void ProcessFile(string filePath);
+        /// <param name="cancellationToken">The cancellation token</param>
+        void ProcessFile(string filePath, CancellationToken cancellationToken);
 
         /// <summary>
         /// Validates and sanitizes file path for security

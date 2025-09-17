@@ -118,8 +118,8 @@ namespace wolle
             // Notify settings service that processing is starting
             _settingsManagementService.SetProcessingState(true);
 
-            // Use file processing service to handle file processing
-            _fileProcessingService.ProcessFile(filePath);
+            // Use file processing service to handle file processing with cancellation support
+            _fileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
         }
 
         private void OnFileProcessingComplete(object? sender, EventArgs e)
@@ -307,26 +307,6 @@ namespace wolle
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isProcessingComplete)
-            {
-                _logger?.LogInformation("Close button clicked but processing not complete - asking user");
-
-                // Ask user if they want to force close
-                var result = System.Windows.MessageBox.Show(
-                    "Ollama is still processing. Do you want to force close the application?",
-                    "Force Close",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Question);
-
-                if (result == System.Windows.MessageBoxResult.Yes)
-                {
-                    _logger?.LogInformation("User chose to force close");
-                    _isClosing = true; // Force close
-                    _isProcessingComplete = true; // Allow close
-                    Close();
-                }
-                return;
-            }
             Close();
         }
 
@@ -392,7 +372,7 @@ namespace wolle
             base.OnClosing(e);
         }
 
-        protected override async void OnClosed(EventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
             _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
             lock (_stateLock)
@@ -414,16 +394,6 @@ namespace wolle
             // Cancel any ongoing processing
             _cancellationTokenSource.Cancel();
 
-            // Wait for cancellation to take effect
-            try
-            {
-                await Task.Delay(100, _cancellationTokenSource.Token);
-            }
-            catch (TaskCanceledException)
-            {
-                // Expected when cancellation token is triggered
-            }
-
             // Dispose cancellation token source
             _cancellationTokenSource.Dispose();
 
@@ -441,16 +411,6 @@ namespace wolle
             {
                 // Cancel any ongoing processing first
                 _cancellationTokenSource.Cancel();
-
-                // Wait a moment for cancellation to take effect
-                try
-                {
-                    await Task.Delay(100, _cancellationTokenSource.Token);
-                }
-                catch (TaskCanceledException)
-                {
-                    // Expected when cancellation token is triggered
-                }
 
                 // Now dispose the service
                 _ollamaService?.Dispose();
