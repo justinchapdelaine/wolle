@@ -99,7 +99,7 @@ namespace wolle.Services
         private Process? _ollamaProcess;
         private bool _isDisposed = false;
         private readonly string _modelName;
-        private HttpClient _httpClient;
+        private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1); // For thread-safe API calls
 
         // Basic operation statistics
