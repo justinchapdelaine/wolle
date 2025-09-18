@@ -376,7 +376,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private void ShowLoading()
     {
         _logger.LogInformation("ShowLoading called - showing loading panel");
-        ShowSuccess("Processing file...", 0);
         IsProgressVisible = true;
         IsProgressIndeterminate = true;
         IsProgressRingVisible = true;
