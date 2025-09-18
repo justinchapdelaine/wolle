@@ -77,7 +77,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
         SettingsCommand = new RelayCommand(ExecuteSettings);
         SaveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
         CancelSettingsCommand = new RelayCommand(ExecuteCancelSettings);
-        TitleBarMouseDownCommand = new RelayCommand<MouseButtonEventArgs>(ExecuteTitleBarMouseDown);
 
         // Subscribe to events
         SubscribeToEvents();
@@ -213,7 +212,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SettingsCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand CancelSettingsCommand { get; }
-    public ICommand TitleBarMouseDownCommand { get; }
 
     private void SubscribeToEvents()
     {
@@ -429,13 +427,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _settingsManagementService.CancelSettings();
     }
 
-    public void ExecuteTitleBarMouseDown(MouseButtonEventArgs? e)
-    {
-        if (e != null)
-        {
-            _uiInteractionService.EnableWindowDrag(this, e);
-        }
-    }
+
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {

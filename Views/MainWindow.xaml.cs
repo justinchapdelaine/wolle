@@ -204,7 +204,10 @@ public partial class MainWindow : Window, IDisposable
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _viewModel.ExecuteTitleBarMouseDown(e);
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            DragMove();
+        }
     }
 
 
