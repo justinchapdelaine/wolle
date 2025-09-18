@@ -442,7 +442,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                // field = value;  // TODO: Fix threading issue - ref parameter can't be used in lambda
+                field = value;
                 OnPropertyChanged(propertyName);
             });
         }
