@@ -33,6 +33,11 @@ public interface IOllamaProcessService
     void StopAllProcesses();
 
     /// <summary>
+    /// Stops only Wolle's Ollama processes.
+    /// </summary>
+    void StopWolleProcesses();
+
+    /// <summary>
     /// Validates that an executable path is safe and not suspicious.
     /// </summary>
     /// <param name="executablePath">The path to validate.</param>
@@ -230,6 +235,23 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             SafeKillProcess(_ollamaServerProcess, "Ollama server");
             SafeKillProcess(_ollamaProcess, "Ollama");
+
+            _ollamaServerProcess?.Dispose();
+            _ollamaProcess?.Dispose();
+            _ollamaServerProcess = null;
+            _ollamaProcess = null;
+        }
+    }
+
+    /// <summary>
+    /// Stops only Wolle's Ollama processes.
+    /// </summary>
+    public void StopWolleProcesses()
+    {
+        lock (_processLock)
+        {
+            SafeKillProcess(_ollamaServerProcess, "Wolle Ollama server");
+            SafeKillProcess(_ollamaProcess, "Wolle Ollama");
 
             _ollamaServerProcess?.Dispose();
             _ollamaProcess?.Dispose();

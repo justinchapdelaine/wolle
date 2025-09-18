@@ -117,7 +117,7 @@ namespace wolle.Services
                 if (isReady)
                 {
                     // Use OllamaService to process file
-                    await _ollamaService.ProcessFileAsync(sanitizedPath);
+                    await _ollamaService.ProcessFileAsync(sanitizedPath, cancellationToken);
                 }
                 else
                 {

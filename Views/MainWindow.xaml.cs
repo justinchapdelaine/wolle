@@ -34,7 +34,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             logger.LogInformation("MainWindow constructor - Starting initialization");
-            
+
             InitializeComponent();
 
             // Set DataContext to ViewModel

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -116,8 +117,9 @@ public class OllamaService : IDisposable
     /// Processes a file asynchronously using Ollama.
     /// </summary>
     /// <param name="filePath">The path to file to process.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task representing asynchronous operation.</returns>
-    public async Task ProcessFileAsync(string filePath)
+    public async Task ProcessFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
         _logger?.LogInformation($"ProcessFileAsync started for: {filePath}");
 
@@ -190,7 +192,8 @@ public class OllamaService : IDisposable
                 request,
                 OnOutputReceived,
                 OnProcessComplete,
-                OnErrorReceived);
+                OnErrorReceived,
+                cancellationToken);
 
             operationSuccess = true;
             _logger?.LogInformation("ProcessFileAsync completed successfully");
@@ -276,8 +279,8 @@ public class OllamaService : IDisposable
 
         _isDisposed = true;
 
-        // Stop all processes
-        _ollamaProcessService.StopAllProcesses();
+        // Stop only Wolle's processes
+        _ollamaProcessService.StopWolleProcesses();
 
         // Dispose of services if they implement IDisposable
         if (_ollamaHttpService is IDisposable disposableHttpService)

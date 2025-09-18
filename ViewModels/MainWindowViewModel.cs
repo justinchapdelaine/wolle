@@ -25,6 +25,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly IWindowManagementService _windowManagementService;
     private readonly IResourceManagementService _resourceManagementService;
     private readonly IExceptionHandlingService _exceptionHandlingService;
+    private CancellationTokenSource? _cancellationTokenSource;
 
     private string _title = "Wolle";
     private string _progressDetails = "This may take a few minutes on first run...";
@@ -366,11 +367,18 @@ public class MainWindowViewModel : INotifyPropertyChanged
         IsProcessing = true;
         ShowLoading();
 
+        // Cancel any existing operation
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        // Pass cancellation token source to window management service
+        _windowManagementService.SetCancellationTokenSource(_cancellationTokenSource);
+
         // Notify settings service that processing is starting
         _settingsManagementService.SetProcessingState(true);
 
         // Use file processing service to handle file processing with cancellation support
-        _fileProcessingService.ProcessFile(filePath, CancellationToken.None);
+        _fileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
     }
 
     private void ShowLoading()
@@ -387,6 +395,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void ExecuteClose()
     {
+        // Cancel any ongoing operation before closing
+        _cancellationTokenSource?.Cancel();
         _eventAggregator.Publish(new CloseWindowEvent(true));
     }
 
