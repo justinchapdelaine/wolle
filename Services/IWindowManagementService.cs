@@ -86,5 +86,16 @@ namespace wolle.Services
         /// Restores window
         /// </summary>
         void RestoreWindow();
+
+        /// <summary>
+        /// Sets the cancellation token source for operation cancellation
+        /// </summary>
+        /// <param name="cancellationTokenSource">The cancellation token source</param>
+        void SetCancellationTokenSource(System.Threading.CancellationTokenSource? cancellationTokenSource);
+
+        /// <summary>
+        /// Cancels any ongoing operations
+        /// </summary>
+        void CancelOperations();
     }
 }

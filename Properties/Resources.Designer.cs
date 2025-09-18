@@ -7,7 +7,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace wolle.Properties {
+namespace wolle.Properties;
     using System;
     
     
@@ -59,4 +59,3 @@ namespace wolle.Properties {
             }
         }
     }
-}

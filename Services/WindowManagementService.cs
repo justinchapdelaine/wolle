@@ -16,6 +16,7 @@ namespace wolle.Services
         private readonly OllamaService _ollamaService;
         private readonly IStatusManagementService _statusManagementService;
         private readonly IEventManagementService _eventManagementService;
+        private CancellationTokenSource? _cancellationTokenSource;
         private bool _isWindowClosing = false;
         private bool _isProcessingComplete = false;
         private readonly object _stateLock = new object();
@@ -89,15 +90,18 @@ namespace wolle.Services
                 _isWindowClosing = true;
             }
 
-            // Don't perform cleanup if processing is not complete
-            // Let it continue in the background
+            // First: Attempt graceful cancellation
             if (!_isProcessingComplete)
             {
-                _logger?.LogInformation("Window closing but processing not complete - performing minimal cleanup");
+                _logger?.LogInformation("Processing not complete - attempting graceful cancellation");
+                CancelOperations();
+
+                // Give a moment for graceful shutdown
+                System.Threading.Thread.Sleep(1000);
             }
             else
             {
-                _logger?.LogInformation("Processing complete - performing full cleanup");
+                _logger?.LogInformation("Processing complete - performing cleanup");
             }
 
             // Perform cleanup operations
@@ -286,6 +290,34 @@ namespace wolle.Services
                 _mainWindow.WindowState = WindowState.Normal;
                 _logger?.LogInformation("Window restored");
             });
+        }
+
+        /// <summary>
+        /// Sets the cancellation token source for operation cancellation
+        /// </summary>
+        /// <param name="cancellationTokenSource">The cancellation token source</param>
+        public void SetCancellationTokenSource(CancellationTokenSource? cancellationTokenSource)
+        {
+            _cancellationTokenSource = cancellationTokenSource;
+            _logger?.LogInformation("Cancellation token source set in WindowManagementService");
+        }
+
+        /// <summary>
+        /// Cancels any ongoing operations
+        /// </summary>
+        public void CancelOperations()
+        {
+            _logger?.LogInformation("CancelOperations called - attempting graceful cancellation");
+
+            try
+            {
+                _cancellationTokenSource?.Cancel();
+                _logger?.LogInformation("Cancellation token cancelled successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error during cancellation: {ex.Message}");
+            }
         }
     }
 }

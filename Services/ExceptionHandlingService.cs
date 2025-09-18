@@ -134,7 +134,7 @@ namespace wolle.Services
             return exception switch
             {
                 HttpRequestException httpEx => GetHttpRequestExceptionMessage(httpEx),
-                TaskCanceledException taskEx when (!taskEx.CancellationToken.IsCancellationRequested) => 
+                TaskCanceledException taskEx when (!taskEx.CancellationToken.IsCancellationRequested) =>
                     "The request timed out. Please check your network connection and try again.",
                 TaskCanceledException => "The operation was cancelled.",
                 OperationCanceledException => "The operation was cancelled.",
