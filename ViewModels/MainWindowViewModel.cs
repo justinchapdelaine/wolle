@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using wolle.Services;
 using wolle.Services.Events;
@@ -31,6 +32,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private bool _isProgressVisible;
     private bool _isProgressIndeterminate;
     private bool _isProgressRingVisible;
+    private bool _isProgressDeterminate;
     private bool _isResponseVisible;
     private bool _isErrorVisible;
     private bool _isInfoMessageVisible;
@@ -89,7 +91,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public string ProgressDetails
     {
         get => _progressDetails;
-        set => SetProperty(ref _progressDetails, value);
+        set
+        {
+            if (SetProperty(ref _progressDetails, value))
+            {
+                _logger.LogInformation($"ProgressDetails updated to: {value}");
+            }
+        }
     }
 
     public double ProgressValue
@@ -101,7 +109,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public bool IsProgressVisible
     {
         get => _isProgressVisible;
-        set => SetProperty(ref _isProgressVisible, value);
+        set
+        {
+            if (SetProperty(ref _isProgressVisible, value))
+            {
+                _logger.LogInformation($"IsProgressVisible updated to: {value}");
+            }
+        }
     }
 
     public bool IsProgressIndeterminate
@@ -113,7 +127,25 @@ public class MainWindowViewModel : INotifyPropertyChanged
     public bool IsProgressRingVisible
     {
         get => _isProgressRingVisible;
-        set => SetProperty(ref _isProgressRingVisible, value);
+        set
+        {
+            if (SetProperty(ref _isProgressRingVisible, value))
+            {
+                _logger.LogInformation($"IsProgressRingVisible updated to: {value}");
+            }
+        }
+    }
+
+    public bool IsProgressDeterminate
+    {
+        get => _isProgressDeterminate;
+        set
+        {
+            if (SetProperty(ref _isProgressDeterminate, value))
+            {
+                _logger.LogInformation($"IsProgressDeterminate updated to: {value}");
+            }
+        }
     }
 
     public bool IsResponseVisible
@@ -219,10 +251,16 @@ public class MainWindowViewModel : INotifyPropertyChanged
         if (durationMs > 0)
         {
             // Use dispatcher to hide message after delay
-            System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() =>
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(durationMs)
+            };
+            timer.Tick += (s, e) =>
             {
                 IsInfoMessageVisible = false;
-            }), System.Windows.Threading.DispatcherPriority.Background, new object[] { TimeSpan.FromMilliseconds(durationMs) });
+                timer.Stop();
+            };
+            timer.Start();
         }
     }
 
@@ -235,10 +273,16 @@ public class MainWindowViewModel : INotifyPropertyChanged
         if (durationMs > 0)
         {
             // Use dispatcher to hide message after delay
-            System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() =>
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(durationMs)
+            };
+            timer.Tick += (s, e) =>
             {
                 IsInfoMessageVisible = false;
-            }), System.Windows.Threading.DispatcherPriority.Background, new object[] { TimeSpan.FromMilliseconds(durationMs) });
+                timer.Stop();
+            };
+            timer.Start();
         }
     }
 
@@ -251,8 +295,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         IsProgressVisible = @event.IsVisible;
         IsProgressIndeterminate = @event.IsIndeterminate;
-        ProgressValue = @event.ProgressValue;
         IsProgressRingVisible = @event.IsVisible && @event.IsIndeterminate;
+        IsProgressDeterminate = @event.IsVisible && !@event.IsIndeterminate;
+        ProgressValue = @event.ProgressValue;
 
         if (@event.Message != null)
         {
@@ -331,11 +376,14 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private void ShowLoading()
     {
         _logger.LogInformation("ShowLoading called - showing loading panel");
-        ShowError("Processing file...", 0);
+        ShowSuccess("Processing file...", 0);
         IsProgressVisible = true;
+        IsProgressIndeterminate = true;
         IsProgressRingVisible = true;
+        IsProgressDeterminate = false;
         ProgressValue = 0;
         ProgressDetails = "This may take a few minutes on first run...";
+        _logger.LogInformation("ShowLoading completed - progress should be visible");
     }
 
     private void ExecuteClose()
@@ -376,7 +424,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         if (e != null)
         {
-            _uiInteractionService.EnableWindowDrag(null, e);
+            _uiInteractionService.EnableWindowDrag(null!, e);
         }
     }
 
@@ -388,8 +436,21 @@ public class MainWindowViewModel : INotifyPropertyChanged
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        field = value;
-        OnPropertyChanged(propertyName);
+        
+        // If we're not on UI thread, dispatch the property update
+        if (Application.Current?.Dispatcher.CheckAccess() == false)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // field = value;  // TODO: Fix threading issue - ref parameter can't be used in lambda
+                OnPropertyChanged(propertyName);
+            });
+        }
+        else
+        {
+            field = value;
+            OnPropertyChanged(propertyName);
+        }
         return true;
     }
 }

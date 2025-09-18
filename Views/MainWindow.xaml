@@ -15,13 +15,9 @@
                       AllowsTransparency="True"
                       Topmost="True"
                       WindowStartupLocation="CenterScreen"
-                      ThemeMode="System"
-                      DataContext="{StaticResource MainWindowViewModel}">
+                      ThemeMode="System">
     
     <Window.Resources>
-        <!-- View Model Instance -->
-        <viewModels:MainWindowViewModel x:Key="MainWindowViewModel"/>
-        
         <!-- Boolean to Visibility Converter -->
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         
@@ -131,9 +127,8 @@
                     <ProgressBar x:Name="ProgressRing" 
                                      Minimum="0" 
                                      Maximum="100" 
-                                     Value="50"
                                      IsIndeterminate="{Binding IsProgressIndeterminate}"
-                                     Visibility="{Binding IsProgressRingVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                     Visibility="{Binding IsProgressIndeterminate, Converter={StaticResource BooleanToVisibilityConverter}}"
                                      Height="20"
                                      Foreground="{DynamicResource AccentFillColorDefaultBrush}"
                                      Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
@@ -144,7 +139,8 @@
                                    Minimum="0" 
                                    Maximum="100" 
                                    Value="{Binding ProgressValue}"
-                                   Visibility="{Binding IsProgressVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Visibility="{Binding IsProgressDeterminate, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Height="20"
                                    Foreground="{DynamicResource AccentFillColorDefaultBrush}"
                                    Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
                                    BorderThickness="0"/>
@@ -171,7 +167,7 @@
                 <!-- Error Area -->
                 <TextBlock x:Name="ErrorTextBlock" 
                            Grid.Row="2"
-                           Text="{Binding InfoMessage}" 
+                           Text="{Binding ErrorMessage}" 
                            TextWrapping="Wrap" 
                            FontSize="14"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"

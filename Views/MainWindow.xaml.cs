@@ -118,43 +118,16 @@ namespace wolle;
         {
             var eventAggregatorInstance = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
-            // Subscribe to UI events
-            eventAggregatorInstance.Subscribe<ShowMessageEvent>(OnShowMessage);
-            eventAggregatorInstance.Subscribe<UpdateStatusEvent>(OnUpdateStatus);
-            eventAggregatorInstance.Subscribe<UpdateProgressEvent>(OnUpdateProgress);
+            // Subscribe to window-related events only (ViewModel handles UI events)
             eventAggregatorInstance.Subscribe<ShowWindowEvent>(OnShowWindow);
             eventAggregatorInstance.Subscribe<HideWindowEvent>(OnHideWindow);
             eventAggregatorInstance.Subscribe<CloseWindowEvent>(OnCloseWindow);
             eventAggregatorInstance.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition);
-            eventAggregatorInstance.Subscribe<ShowSettingsEvent>(OnShowSettings);
+            eventAggregatorInstance.Subscribe<RequestFocusEvent>(OnRequestFocus);
+            
+            // Subscribe to response events (MainWindow handles response display)
             eventAggregatorInstance.Subscribe<UpdateResponseEvent>(OnUpdateResponse);
             eventAggregatorInstance.Subscribe<ClearResponseEvent>(OnClearResponse);
-            eventAggregatorInstance.Subscribe<RequestFocusEvent>(OnRequestFocus);
-            eventAggregatorInstance.Subscribe<SetWindowTitleEvent>(OnSetWindowTitle);
-        }
-
-        /// <summary>
-        /// Handles ShowMessageEvent
-        /// </summary>
-        private void OnShowMessage(ShowMessageEvent @event)
-        {
-            // ViewModel handles this through data binding
-        }
-
-        /// <summary>
-        /// Handles UpdateStatusEvent
-        /// </summary>
-        private void OnUpdateStatus(UpdateStatusEvent @event)
-        {
-            // ViewModel handles this through data binding
-        }
-
-        /// <summary>
-        /// Handles UpdateProgressEvent
-        /// </summary>
-        private void OnUpdateProgress(UpdateProgressEvent @event)
-        {
-            // ViewModel handles this through data binding
         }
 
         /// <summary>
@@ -204,11 +177,12 @@ namespace wolle;
         }
 
         /// <summary>
-        /// Handles ShowSettingsEvent
+        /// Handles RequestFocusEvent
         /// </summary>
-        private void OnShowSettings(ShowSettingsEvent @event)
+        private void OnRequestFocus(RequestFocusEvent @event)
         {
-            // ViewModel handles this through data binding
+            Activate();
+            Focus();
         }
 
         /// <summary>
@@ -244,23 +218,6 @@ namespace wolle;
             _coordinator.ClearResponse();
         }
 
-        /// <summary>
-        /// Handles RequestFocusEvent
-        /// </summary>
-        private void OnRequestFocus(RequestFocusEvent @event)
-        {
-            Activate();
-            Focus();
-        }
-
-        /// <summary>
-        /// Handles SetWindowTitleEvent
-        /// </summary>
-        private void OnSetWindowTitle(SetWindowTitleEvent @event)
-        {
-            // ViewModel handles this through data binding
-        }
-
         
 
         private void ShowResponseComplete()
@@ -284,11 +241,8 @@ namespace wolle;
         {
             _logger?.LogInformation($"ProcessFile called with: {filePath}");
 
-            // Notify settings service that processing is starting
-            _settingsManagementService.SetProcessingState(true);
-
-            // Use file processing service to handle file processing with cancellation support
-            _fileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
+            // Delegate to ViewModel for handling file processing
+            _viewModel.ProcessFile(filePath);
         }
 
         private void OnFileProcessingComplete(object? sender, EventArgs e)
@@ -368,12 +322,16 @@ namespace wolle;
         {
             if (!_isClosing && _ollamaService != null)
             {
-                // Hide progress section when first output is received
-                if (ProgressSection.Visibility == Visibility.Visible)
+                // Use Dispatcher to update UI from background thread
+                Dispatcher.Invoke(() =>
                 {
-                    ProgressSection.Visibility = Visibility.Collapsed;
-                }
-                AppendResponseText(output);
+                    // Hide progress section when first output is received
+                    if (ProgressSection.Visibility == Visibility.Visible)
+                    {
+                        ProgressSection.Visibility = Visibility.Collapsed;
+                    }
+                    AppendResponseText(output);
+                });
             }
         }
 
@@ -408,14 +366,18 @@ namespace wolle;
                 _statusManagementService.StopStatusTimer();
                 _logger?.LogInformation("Status update timer stopped");
 
-                // Ensure progress section is hidden
-                ProgressSection.Visibility = Visibility.Collapsed;
-
-                // Apply any pending settings changes, but don't dispose service if still processing UI
-                if (!_isClosing)
+                // Use Dispatcher to update UI from background thread
+                Dispatcher.Invoke(() =>
                 {
-                    ApplyPendingSettings();
-                }
+                    // Ensure progress section is hidden
+                    ProgressSection.Visibility = Visibility.Collapsed;
+
+                    // Apply any pending settings changes, but don't dispose service if still processing UI
+                    if (!_isClosing)
+                    {
+                        ApplyPendingSettings();
+                    }
+                });
             }
         }
 
