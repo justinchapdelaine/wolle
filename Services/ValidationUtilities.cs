@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 namespace wolle.Services;
@@ -17,9 +18,9 @@ public static class ValidationUtilities
     /// </summary>
     /// <typeparam name="T">The type of the parameter.</typeparam>
     /// <param name="value">The parameter value to validate.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated parameter value.</returns>
-    public static T ValidateNotNull<T>(T value, string paramName) where T : class
+    public static T ValidateNotNull<T>(T value, [CallerArgumentExpression(nameof(value))] string paramName = "") where T : class
     {
         if (value == null)
         {
@@ -32,9 +33,9 @@ public static class ValidationUtilities
     /// Validates that a string parameter is not null or empty and throws ArgumentException if it is.
     /// </summary>
     /// <param name="value">The string value to validate.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated string value.</returns>
-    public static string ValidateNotNullOrEmpty(string value, string paramName)
+    public static string ValidateNotNullOrEmpty(string value, [CallerArgumentExpression(nameof(value))] string paramName = "")
     {
         if (string.IsNullOrEmpty(value))
         {
@@ -47,9 +48,9 @@ public static class ValidationUtilities
     /// Validates that a string parameter is not null, empty, or whitespace and throws ArgumentException if it is.
     /// </summary>
     /// <param name="value">The string value to validate.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated string value.</returns>
-    public static string ValidateNotNullOrWhiteSpace(string value, string paramName)
+    public static string ValidateNotNullOrWhiteSpace(string value, [CallerArgumentExpression(nameof(value))] string paramName = "")
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -65,9 +66,9 @@ public static class ValidationUtilities
     /// <param name="value">The value to validate.</param>
     /// <param name="min">The minimum allowed value.</param>
     /// <param name="max">The maximum allowed value.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated value.</returns>
-    public static T ValidateRange<T>(T value, T min, T max, string paramName) where T : IComparable<T>
+    public static T ValidateRange<T>(T value, T min, T max, [CallerArgumentExpression(nameof(value))] string paramName = "") where T : IComparable<T>
     {
         if (value.CompareTo(min) < 0 || value.CompareTo(max) > 0)
         {
@@ -115,9 +116,9 @@ public static class ValidationUtilities
     /// </summary>
     /// <typeparam name="T">The type of elements in the collection.</typeparam>
     /// <param name="collection">The collection to validate.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated collection.</returns>
-    public static ICollection<T> ValidateNotNullOrEmpty<T>(ICollection<T> collection, string paramName)
+    public static ICollection<T> ValidateNotNullOrEmpty<T>(ICollection<T> collection, [CallerArgumentExpression(nameof(collection))] string paramName = "")
     {
         ValidateNotNull(collection, paramName);
 
@@ -134,9 +135,9 @@ public static class ValidationUtilities
     /// </summary>
     /// <typeparam name="T">The type of elements in the enumerable.</typeparam>
     /// <param name="enumerable">The enumerable to validate.</param>
-    /// <param name="paramName">The name of the parameter.</param>
+    /// <param name="paramName">The name of the parameter (automatically captured).</param>
     /// <returns>The validated enumerable.</returns>
-    public static IEnumerable<T> ValidateNotNullOrEmpty<T>(IEnumerable<T> enumerable, string paramName)
+    public static IEnumerable<T> ValidateNotNullOrEmpty<T>(IEnumerable<T> enumerable, [CallerArgumentExpression(nameof(enumerable))] string paramName = "")
     {
         ValidateNotNull(enumerable, paramName);
 
