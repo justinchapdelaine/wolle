@@ -423,7 +423,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         if (e != null)
         {
-            _uiInteractionService.EnableWindowDrag(null!, e);
+            _uiInteractionService.EnableWindowDrag(this, e);
         }
     }
 
