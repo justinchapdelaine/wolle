@@ -13,6 +13,7 @@ using System.Threading;
 using System.Windows.Threading;
 using System.Threading.Tasks;
 using wolle.Services;
+using wolle.ViewModels;
 
 namespace wolle;
     [SupportedOSPlatform("windows")]
@@ -147,6 +148,9 @@ namespace wolle;
             // Register EventAggregator for event-based communication
             services.AddSingleton<IEventAggregator, EventAggregator>();
 
+            // Register ViewModel
+            services.AddSingleton<MainWindowViewModel>();
+
             // Register exception handling service
             services.AddSingleton<IExceptionHandlingService, ExceptionHandlingService>();
 
@@ -203,6 +207,7 @@ namespace wolle;
             services.AddSingleton<MainWindow>(sp =>
             {
                 var eventAggregator = sp.GetRequiredService<IEventAggregator>();
+                var viewModel = sp.GetRequiredService<MainWindowViewModel>();
                 return new MainWindow(
                     sp.GetRequiredService<SettingsService>(),
                     sp.GetRequiredService<OllamaService>(),
@@ -220,7 +225,8 @@ namespace wolle;
                     sp.GetRequiredService<IEventManagementService>(),
                     sp.GetRequiredService<IResourceManagementService>(),
                     eventAggregator,
-                    sp.GetRequiredService<IExceptionHandlingService>());
+                    sp.GetRequiredService<IExceptionHandlingService>(),
+                    viewModel);
             });
         }
 
@@ -248,7 +254,8 @@ namespace wolle;
                     serviceType.Name == "MainWindow" ||
                     serviceType.Name == "ContextMenuService" ||
                     serviceType.Name == "OllamaHttpService" ||
-                    serviceType.Name == "OllamaProcessService")
+                    serviceType.Name == "OllamaProcessService" ||
+                    serviceType.Name == "MainWindowViewModel")
                     continue;
 
                 // Find the corresponding interface

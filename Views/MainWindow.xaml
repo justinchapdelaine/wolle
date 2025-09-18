@@ -4,8 +4,9 @@
                       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
                       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                       xmlns:local="clr-namespace:wolle"
+                      xmlns:viewModels="clr-namespace:wolle.ViewModels"
                       mc:Ignorable="d"
-                      Title="" 
+                      Title="{Binding Title}" 
                       Width="350" 
                       SizeToContent="Height"
                       WindowStyle="None" 
@@ -14,9 +15,16 @@
                       AllowsTransparency="True"
                       Topmost="True"
                       WindowStartupLocation="CenterScreen"
-                      ThemeMode="System">
+                      ThemeMode="System"
+                      DataContext="{StaticResource MainWindowViewModel}">
     
     <Window.Resources>
+        <!-- View Model Instance -->
+        <viewModels:MainWindowViewModel x:Key="MainWindowViewModel"/>
+        
+        <!-- Boolean to Visibility Converter -->
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        
         <!-- Shared button style for title bar buttons -->
         <Style x:Key="TitleBarButtonStyle" TargetType="Button">
             <Setter Property="Template">
@@ -52,7 +60,6 @@
             
             <!-- Title Bar -->
             <Grid Grid.Row="0" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" 
-                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                   Margin="0,0,0,1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -68,17 +75,21 @@
                     </RectangleGeometry>
                 </Grid.Clip>
                 
-                <TextBlock Grid.Column="0" 
-                           Text="Wolle" 
+                <Grid Grid.Column="0" 
+                      Background="Transparent"
+                      MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <TextBlock 
+                           Text="{Binding Title}" 
                            Margin="12,8,8,8" 
                            VerticalAlignment="Center"
                            FontSize="14"
                            FontWeight="Medium"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                </Grid>
                 
                 <Button Grid.Column="1" 
+                        Command="{Binding SettingsCommand}"
                         Content="⚙️" 
-                        Click="SettingsButton_Click" 
                         Background="Transparent"
                         BorderThickness="0"
                         Width="32" 
@@ -91,8 +102,8 @@
                         Style="{StaticResource TitleBarButtonStyle}"/>
                 
                 <Button Grid.Column="2" 
+                        Command="{Binding CloseCommand}"
                         Content="✕" 
-                        Click="CloseButton_Click" 
                         Background="Transparent"
                         BorderThickness="0"
                         Width="32" 
@@ -115,14 +126,14 @@
                     </Grid.RowDefinitions>
                 
                 <!-- Progress Section -->
-                <StackPanel x:Name="ProgressSection" Grid.Row="0">
+                <StackPanel x:Name="ProgressSection" Grid.Row="0" Visibility="{Binding IsProgressVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!-- Indeterminate Progress Bar -->
                     <ProgressBar x:Name="ProgressRing" 
                                      Minimum="0" 
                                      Maximum="100" 
                                      Value="50"
-                                     IsIndeterminate="True"
-                                     Visibility="Visible"
+                                     IsIndeterminate="{Binding IsProgressIndeterminate}"
+                                     Visibility="{Binding IsProgressRingVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                      Height="20"
                                      Foreground="{DynamicResource AccentFillColorDefaultBrush}"
                                      Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
@@ -132,16 +143,15 @@
                     <ProgressBar x:Name="ProgressBar" 
                                    Minimum="0" 
                                    Maximum="100" 
-                                   Value="0"
-                                   Visibility="Collapsed"
-                                   Height="20"
+                                   Value="{Binding ProgressValue}"
+                                   Visibility="{Binding IsProgressVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                    Foreground="{DynamicResource AccentFillColorDefaultBrush}"
                                    Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
                                    BorderThickness="0"/>
                     
                     <!-- Progress Details -->
                     <TextBlock x:Name="ProgressDetails" 
-                               Text="This may take a few minutes on first run..." 
+                               Text="{Binding ProgressDetails}" 
                                FontSize="12" 
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>
@@ -152,7 +162,7 @@
                             MaxHeight="300"
                             VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled"
-                            Visibility="Collapsed"
+                            Visibility="{Binding IsResponseVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                             Background="Transparent"
                             BorderThickness="0"
                             Padding="0"
@@ -161,10 +171,11 @@
                 <!-- Error Area -->
                 <TextBlock x:Name="ErrorTextBlock" 
                            Grid.Row="2"
+                           Text="{Binding InfoMessage}" 
                            TextWrapping="Wrap" 
                            FontSize="14"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           Visibility="Collapsed"/>
+                           Visibility="{Binding IsErrorVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 
                 <!-- Information Message Area -->
                 <Border x:Name="InfoMessageBorder" 
@@ -176,9 +187,9 @@
                         Padding="16,12"
                         CornerRadius="8"
                         Effect="{DynamicResource CardShadow}"
-                        Visibility="Collapsed">
+                        Visibility="{Binding IsInfoMessageVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock x:Name="InfoMessageTextBlock" 
-                               TextWrapping="Wrap" 
+                               Text="{Binding InfoMessage}" 
                                FontSize="14"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                VerticalAlignment="Center"/>
@@ -188,7 +199,7 @@
                 <StackPanel x:Name="SettingsPanel" 
                             Grid.Row="2"
                             Margin="0,12,0,0"
-                            Visibility="Collapsed">
+                            Visibility="{Binding IsSettingsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBlock Text="Settings" 
                                FontSize="16" 
                                FontWeight="Medium"
@@ -206,7 +217,7 @@
                         
                         <TextBox x:Name="ApiTimeoutTextBox" 
                                  Grid.Column="1"
-                                 Text="600"
+                                 Text="{Binding ApiTimeout, UpdateSourceTrigger=PropertyChanged}"
                                  VerticalAlignment="Center"/>
                     </Grid>
                     
@@ -223,7 +234,7 @@
                         <ComboBox x:Name="ContextWindowSizeComboBox" 
                                   Grid.Column="1"
                                   VerticalAlignment="Center"
-                                  SelectedIndex="2">
+                                  SelectedIndex="{Binding SelectedContextWindowSizeIndex}">
                             <ComboBoxItem Content="32K" Tag="32000"/>
                             <ComboBoxItem Content="64K" Tag="64000"/>
                             <ComboBoxItem Content="128K" Tag="128000"/>
@@ -232,11 +243,11 @@
                     
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,16,0">
                         <Button Style="{DynamicResource AccentButtonStyle}" Content="Save" 
-                                Click="SaveSettingsButton_Click" 
+                                Command="{Binding SaveSettingsCommand}" 
                                 Margin="0,0,8,0" />
                         
                         <Button Content="Cancel" 
-                                Click="CancelSettingsButton_Click" />
+                                Command="{Binding CancelSettingsCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
