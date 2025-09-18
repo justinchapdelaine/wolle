@@ -26,15 +26,15 @@ public partial class MainWindow : Window, IDisposable
 
     public MainWindow(IMainWindowServiceFacade serviceFacade, IServiceProvider serviceProvider, MainWindowViewModel viewModel, ILogger<MainWindow> logger)
     {
+        _serviceFacade = ValidationUtilities.ValidateNotNull(serviceFacade, nameof(serviceFacade));
+        _serviceProvider = ValidationUtilities.ValidateNotNull(serviceProvider, nameof(serviceProvider));
+        _viewModel = ValidationUtilities.ValidateNotNull(viewModel, nameof(viewModel));
+        _logger = ValidationUtilities.ValidateNotNull(logger, nameof(logger));
+
         try
         {
             logger.LogInformation("MainWindow constructor - Starting initialization");
-            // Initialize services via facade
-            _serviceFacade = ValidationUtilities.ValidateNotNull(serviceFacade, nameof(serviceFacade));
-            _serviceProvider = ValidationUtilities.ValidateNotNull(serviceProvider, nameof(serviceProvider));
-            _viewModel = ValidationUtilities.ValidateNotNull(viewModel, nameof(viewModel));
-            _logger = ValidationUtilities.ValidateNotNull(logger, nameof(logger));
-
+            
             InitializeComponent();
 
             // Set DataContext to ViewModel
@@ -76,7 +76,7 @@ public partial class MainWindow : Window, IDisposable
         {
             _logger?.LogError($"MainWindow constructor exception: {ex.Message}");
             _logger?.LogError($"Exception stack trace: {ex.StackTrace}");
-            _serviceFacade.ExceptionHandlingService?.HandleException(ex, "MainWindow.Constructor",
+            _serviceFacade.ExceptionHandlingService.HandleException(ex, "MainWindow.Constructor",
                 "Failed to initialize the application window. Please restart the application.", ExceptionSeverity.Critical);
             throw; // Re-throw to see if it's caught elsewhere
         }
