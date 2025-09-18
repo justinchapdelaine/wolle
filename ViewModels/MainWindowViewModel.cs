@@ -15,16 +15,7 @@ namespace wolle.ViewModels;
 public class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<MainWindowViewModel> _logger;
-    private readonly IEventAggregator _eventAggregator;
-    private readonly IProgressManagementService _progressManagementService;
-    private readonly IStatusManagementService _statusManagementService;
-    private readonly ISettingsManagementService _settingsManagementService;
-    private readonly IUIInteractionService _uiInteractionService;
-    private readonly IErrorManagementService _errorManagementService;
-    private readonly IFileProcessingService _fileProcessingService;
-    private readonly IWindowManagementService _windowManagementService;
-    private readonly IResourceManagementService _resourceManagementService;
-    private readonly IExceptionHandlingService _exceptionHandlingService;
+    private readonly IMainWindowServiceFacade _serviceFacade;
     private CancellationTokenSource? _cancellationTokenSource;
 
     private string _title = "Wolle";
@@ -49,28 +40,10 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public MainWindowViewModel(
         ILogger<MainWindowViewModel> logger,
-        IEventAggregator eventAggregator,
-        IProgressManagementService progressManagementService,
-        IStatusManagementService statusManagementService,
-        ISettingsManagementService settingsManagementService,
-        IUIInteractionService uiInteractionService,
-        IErrorManagementService errorManagementService,
-        IFileProcessingService fileProcessingService,
-        IWindowManagementService windowManagementService,
-        IResourceManagementService resourceManagementService,
-        IExceptionHandlingService exceptionHandlingService)
+        IMainWindowServiceFacade serviceFacade)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _eventAggregator = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
-        _progressManagementService = progressManagementService ?? throw new ArgumentNullException(nameof(progressManagementService));
-        _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
-        _settingsManagementService = settingsManagementService ?? throw new ArgumentNullException(nameof(settingsManagementService));
-        _uiInteractionService = uiInteractionService ?? throw new ArgumentNullException(nameof(uiInteractionService));
-        _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
-        _fileProcessingService = fileProcessingService ?? throw new ArgumentNullException(nameof(fileProcessingService));
-        _windowManagementService = windowManagementService ?? throw new ArgumentNullException(nameof(windowManagementService));
-        _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
-        _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
+        _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
 
         // Initialize commands
         CloseCommand = new RelayCommand(ExecuteClose);
@@ -215,18 +188,18 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void SubscribeToEvents()
     {
-        _eventAggregator.Subscribe<ShowMessageEvent>(OnShowMessage);
-        _eventAggregator.Subscribe<UpdateStatusEvent>(OnUpdateStatus);
-        _eventAggregator.Subscribe<UpdateProgressEvent>(OnUpdateProgress);
-        _eventAggregator.Subscribe<ShowWindowEvent>(OnShowWindow);
-        _eventAggregator.Subscribe<HideWindowEvent>(OnHideWindow);
-        _eventAggregator.Subscribe<CloseWindowEvent>(OnCloseWindow);
-        _eventAggregator.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition);
-        _eventAggregator.Subscribe<ShowSettingsEvent>(OnShowSettings);
-        _eventAggregator.Subscribe<UpdateResponseEvent>(OnUpdateResponse);
-        _eventAggregator.Subscribe<ClearResponseEvent>(OnClearResponse);
-        _eventAggregator.Subscribe<RequestFocusEvent>(OnRequestFocus);
-        _eventAggregator.Subscribe<SetWindowTitleEvent>(OnSetWindowTitle);
+        _serviceFacade.EventAggregator.Subscribe<ShowMessageEvent>(OnShowMessage);
+        _serviceFacade.EventAggregator.Subscribe<UpdateStatusEvent>(OnUpdateStatus);
+        _serviceFacade.EventAggregator.Subscribe<UpdateProgressEvent>(OnUpdateProgress);
+        _serviceFacade.EventAggregator.Subscribe<ShowWindowEvent>(OnShowWindow);
+        _serviceFacade.EventAggregator.Subscribe<HideWindowEvent>(OnHideWindow);
+        _serviceFacade.EventAggregator.Subscribe<CloseWindowEvent>(OnCloseWindow);
+        _serviceFacade.EventAggregator.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition);
+        _serviceFacade.EventAggregator.Subscribe<ShowSettingsEvent>(OnShowSettings);
+        _serviceFacade.EventAggregator.Subscribe<UpdateResponseEvent>(OnUpdateResponse);
+        _serviceFacade.EventAggregator.Subscribe<ClearResponseEvent>(OnClearResponse);
+        _serviceFacade.EventAggregator.Subscribe<RequestFocusEvent>(OnRequestFocus);
+        _serviceFacade.EventAggregator.Subscribe<SetWindowTitleEvent>(OnSetWindowTitle);
     }
 
     private void OnShowMessage(ShowMessageEvent @event)
@@ -370,13 +343,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _cancellationTokenSource = new CancellationTokenSource();
 
         // Pass cancellation token source to window management service
-        _windowManagementService.SetCancellationTokenSource(_cancellationTokenSource);
+        _serviceFacade.WindowManagementService.SetCancellationTokenSource(_cancellationTokenSource);
 
         // Notify settings service that processing is starting
-        _settingsManagementService.SetProcessingState(true);
+        _serviceFacade.SettingsManagementService.SetProcessingState(true);
 
         // Use file processing service to handle file processing with cancellation support
-        _fileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
+        _serviceFacade.FileProcessingService.ProcessFile(filePath, _cancellationTokenSource.Token);
     }
 
     private void ShowLoading()
@@ -395,19 +368,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         // Cancel any ongoing operation before closing
         _cancellationTokenSource?.Cancel();
-        _eventAggregator.Publish(new CloseWindowEvent(true));
+        _serviceFacade.EventAggregator.Publish(new CloseWindowEvent(true));
     }
 
     private void ExecuteSettings()
     {
-        _settingsManagementService.ShowSettingsPanel();
+        _serviceFacade.SettingsManagementService.ShowSettingsPanel();
     }
 
     private void ExecuteSaveSettings()
     {
         if (!int.TryParse(ApiTimeout, out int timeoutSeconds))
         {
-            _settingsManagementService.ShowErrorMessage("Please enter a valid timeout value.");
+            _serviceFacade.SettingsManagementService.ShowErrorMessage("Please enter a valid timeout value.");
             return;
         }
 
@@ -419,12 +392,12 @@ public class MainWindowViewModel : INotifyPropertyChanged
             _ => 128000
         };
 
-        _settingsManagementService.SaveSettings(timeoutSeconds, contextWindowSize);
+        _serviceFacade.SettingsManagementService.SaveSettings(timeoutSeconds, contextWindowSize);
     }
 
     private void ExecuteCancelSettings()
     {
-        _settingsManagementService.CancelSettings();
+        _serviceFacade.SettingsManagementService.CancelSettings();
     }
 
 
