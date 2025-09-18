@@ -365,7 +365,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _logger.LogInformation($"ProcessFile called with: {filePath}");
         IsProcessing = true;
         ShowLoading();
-        
+
         // Notify settings service that processing is starting
         _settingsManagementService.SetProcessingState(true);
 
@@ -435,7 +435,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        
+
         field = value;
         OnPropertyChanged(propertyName);
         return true;

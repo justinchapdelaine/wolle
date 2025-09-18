@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace wolle.Services
 {
@@ -20,14 +21,18 @@ namespace wolle.Services
         private readonly string _appDataPath;
         private readonly string _settingsPath;
         private readonly ILogger<SettingsService>? _logger;
+        private readonly IExceptionHandlingService? _exceptionHandlingService;
         private AppSettings _currentSettings;
 
         /// <summary>
         /// Initializes a new instance of SettingsService class.
         /// </summary>
         /// <param name="logger">Optional logger for dependency injection.</param>
-        public SettingsService(ILogger<SettingsService>? logger = null)
+        /// <param name="exceptionHandlingService">Optional exception handling service.</param>
+        public SettingsService(ILogger<SettingsService>? logger = null, IExceptionHandlingService? exceptionHandlingService = null)
         {
+            _logger = logger;
+            _exceptionHandlingService = exceptionHandlingService;
             _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Wolle");
             _settingsPath = Path.Combine(_appDataPath, "settings.json");
             _logger = logger;
@@ -129,7 +134,8 @@ namespace wolle.Services
             {
                 // Log error but continue with defaults
                 _logger?.LogError($"Failed to load settings: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
+                _exceptionHandlingService?.HandleException(ex, "SettingsService.LoadSettings",
+                    "Failed to load application settings. Using default settings instead.", ExceptionSeverity.Warning);
             }
 
             return GetDefaultSettings();
@@ -155,7 +161,8 @@ namespace wolle.Services
             catch (Exception ex)
             {
                 _logger?.LogError($"Failed to save settings: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
+                _exceptionHandlingService?.HandleException(ex, "SettingsService.SaveSettings",
+                    "Failed to save application settings. Please check file permissions.", ExceptionSeverity.Error);
                 throw;
             }
         }

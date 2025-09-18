@@ -8,257 +8,382 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace wolle.Services;
+/// <summary>
+/// Provides performance monitoring and statistics for Ollama operations.
+/// </summary>
+public interface IOllamaPerformanceService
+{
     /// <summary>
-    /// Provides performance monitoring and statistics for Ollama operations.
+    /// Records a performance metric for an operation.
     /// </summary>
-    public interface IOllamaPerformanceService
+    /// <param name="operationType">Type of operation performed.</param>
+    /// <param name="fileName">Name of the file processed.</param>
+    /// <param name="fileSizeBytes">Size of the file in bytes.</param>
+    /// <param name="processingTime">Time taken to process the file.</param>
+    /// <param name="success">Whether the operation was successful.</param>
+    /// <param name="errorMessage">Optional error message if operation failed.</param>
+    Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null);
+
+    /// <summary>
+    /// Gets detailed performance statistics.
+    /// </summary>
+    /// <returns>Performance statistics object.</returns>
+    Task<PerformanceStats> GetPerformanceStatsAsync();
+
+    /// <summary>
+    /// Gets performance metrics for a specific time range.
+    /// </summary>
+    /// <param name="startTime">Start time for metrics.</param>
+    /// <param name="endTime">End time for metrics.</param>
+    /// <returns>List of performance metrics in time range.</returns>
+    Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime);
+
+    /// <summary>
+    /// Clears performance metrics.
+    /// </summary>
+    Task ClearPerformanceMetricsAsync();
+
+    /// <summary>
+    /// Exports performance metrics to CSV file.
+    /// </summary>
+    /// <param name="exportPath">Path to export CSV file.</param>
+    /// <returns>True if export was successful, false otherwise.</returns>
+    Task<bool> ExportPerformanceMetricsAsync(string exportPath);
+
+    /// <summary>
+    /// Gets basic operation statistics.
+    /// </summary>
+    /// <returns>Statistics string with operation counts.</returns>
+    string GetOperationStatistics();
+
+    /// <summary>
+    /// Resets operation statistics.
+    /// </summary>
+    Task ResetStatisticsAsync();
+}
+
+/// <summary>
+/// Implements performance monitoring and statistics for Ollama operations.
+/// </summary>
+public class OllamaPerformanceService : IOllamaPerformanceService, IDisposable
+{
+    private readonly ILogger<OllamaPerformanceService> _logger;
+    private readonly Queue<PerformanceMetric> _performanceMetrics = new();
+    private readonly SemaphoreSlim _metricsLock = new(1, 1);
+    private DateTime _serviceStartTime = DateTime.Now;
+    private long _totalBytesProcessed = 0;
+    private TimeSpan _totalProcessingTime = TimeSpan.Zero;
+    private CancellationTokenSource? _periodicCleanupCts;
+    private Task? _periodicCleanupTask;
+    private bool _isDisposed = false;
+
+    // Basic operation statistics
+    private int _totalFilesProcessed = 0;
+    private int _successfulOperations = 0;
+    private int _failedOperations = 0;
+    private long _lastOperationTime = DateTime.MinValue.Ticks;
+
+    /// <summary>
+    /// Initializes a new instance of OllamaPerformanceService class.
+    /// </summary>
+    /// <param name="logger">Logger service for logging operations.</param>
+    public OllamaPerformanceService(ILogger<OllamaPerformanceService> logger)
     {
-        /// <summary>
-        /// Records a performance metric for an operation.
-        /// </summary>
-        /// <param name="operationType">Type of operation performed.</param>
-        /// <param name="fileName">Name of the file processed.</param>
-        /// <param name="fileSizeBytes">Size of the file in bytes.</param>
-        /// <param name="processingTime">Time taken to process the file.</param>
-        /// <param name="success">Whether the operation was successful.</param>
-        /// <param name="errorMessage">Optional error message if operation failed.</param>
-        Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null);
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        /// <summary>
-        /// Gets detailed performance statistics.
-        /// </summary>
-        /// <returns>Performance statistics object.</returns>
-        Task<PerformanceStats> GetPerformanceStatsAsync();
-
-        /// <summary>
-        /// Gets performance metrics for a specific time range.
-        /// </summary>
-        /// <param name="startTime">Start time for metrics.</param>
-        /// <param name="endTime">End time for metrics.</param>
-        /// <returns>List of performance metrics in time range.</returns>
-        Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime);
-
-        /// <summary>
-        /// Clears performance metrics.
-        /// </summary>
-        Task ClearPerformanceMetricsAsync();
-
-        /// <summary>
-        /// Exports performance metrics to CSV file.
-        /// </summary>
-        /// <param name="exportPath">Path to export CSV file.</param>
-        /// <returns>True if export was successful, false otherwise.</returns>
-        Task<bool> ExportPerformanceMetricsAsync(string exportPath);
-
-        /// <summary>
-        /// Gets basic operation statistics.
-        /// </summary>
-        /// <returns>Statistics string with operation counts.</returns>
-        string GetOperationStatistics();
-
-        /// <summary>
-        /// Resets operation statistics.
-        /// </summary>
-        Task ResetStatisticsAsync();
+        // Initialize periodic cleanup
+        _periodicCleanupCts = new CancellationTokenSource();
+        _periodicCleanupTask = PeriodicCleanupAsync(_periodicCleanupCts.Token);
     }
 
     /// <summary>
-    /// Implements performance monitoring and statistics for Ollama operations.
+    /// Records a performance metric for an operation.
     /// </summary>
-    public class OllamaPerformanceService : IOllamaPerformanceService, IDisposable
+    /// <param name="operationType">Type of operation performed.</param>
+    /// <param name="fileName">Name of the file processed.</param>
+    /// <param name="fileSizeBytes">Size of the file in bytes.</param>
+    /// <param name="processingTime">Time taken to process the file.</param>
+    /// <param name="success">Whether the operation was successful.</param>
+    /// <param name="errorMessage">Optional error message if operation failed.</param>
+    public async Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null)
     {
-        private readonly ILogger<OllamaPerformanceService> _logger;
-        private readonly Queue<PerformanceMetric> _performanceMetrics = new();
-        private readonly SemaphoreSlim _metricsLock = new(1, 1);
-        private DateTime _serviceStartTime = DateTime.Now;
-        private long _totalBytesProcessed = 0;
-        private TimeSpan _totalProcessingTime = TimeSpan.Zero;
-        private CancellationTokenSource? _periodicCleanupCts;
-        private Task? _periodicCleanupTask;
-        private bool _isDisposed = false;
-
-        // Basic operation statistics
-        private int _totalFilesProcessed = 0;
-        private int _successfulOperations = 0;
-        private int _failedOperations = 0;
-        private long _lastOperationTime = DateTime.MinValue.Ticks;
-
-        /// <summary>
-        /// Initializes a new instance of OllamaPerformanceService class.
-        /// </summary>
-        /// <param name="logger">Logger service for logging operations.</param>
-        public OllamaPerformanceService(ILogger<OllamaPerformanceService> logger)
+        var metric = new PerformanceMetric
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            Timestamp = DateTime.Now,
+            OperationType = operationType,
+            FileName = Path.GetFileName(fileName),
+            FileSizeBytes = fileSizeBytes,
+            ProcessingTime = processingTime,
+            Success = success,
+            ErrorMessage = errorMessage
+        };
 
-            // Initialize periodic cleanup
-            _periodicCleanupCts = new CancellationTokenSource();
-            _periodicCleanupTask = PeriodicCleanupAsync(_periodicCleanupCts.Token);
+        await _metricsLock.WaitAsync();
+        try
+        {
+            _performanceMetrics.Enqueue(metric);
+
+            // Keep only last 1000 metrics
+            while (_performanceMetrics.Count > 1000)
+            {
+                var removedMetric = _performanceMetrics.Dequeue();
+                _logger?.LogDebug($"Removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
+            }
+
+            // Update totals
+            _totalBytesProcessed += fileSizeBytes;
+            _totalProcessingTime += processingTime;
+        }
+        finally
+        {
+            _metricsLock.Release();
         }
 
-        /// <summary>
-        /// Records a performance metric for an operation.
-        /// </summary>
-        /// <param name="operationType">Type of operation performed.</param>
-        /// <param name="fileName">Name of the file processed.</param>
-        /// <param name="fileSizeBytes">Size of the file in bytes.</param>
-        /// <param name="processingTime">Time taken to process the file.</param>
-        /// <param name="success">Whether the operation was successful.</param>
-        /// <param name="errorMessage">Optional error message if operation failed.</param>
-        public async Task RecordPerformanceMetricAsync(string operationType, string fileName, long fileSizeBytes, TimeSpan processingTime, bool success, string? errorMessage = null)
+        // Update operation statistics
+        Interlocked.Increment(ref _totalFilesProcessed);
+        Interlocked.Exchange(ref _lastOperationTime, DateTime.Now.Ticks);
+        if (success)
         {
-            var metric = new PerformanceMetric
+            Interlocked.Increment(ref _successfulOperations);
+        }
+        else
+        {
+            Interlocked.Increment(ref _failedOperations);
+        }
+    }
+
+    /// <summary>
+    /// Gets detailed performance statistics.
+    /// </summary>
+    /// <returns>Performance statistics object.</returns>
+    public async Task<PerformanceStats> GetPerformanceStatsAsync()
+    {
+        await _metricsLock.WaitAsync();
+        try
+        {
+            var uptime = DateTime.Now - _serviceStartTime;
+            var avgProcessingTime = _totalFilesProcessed > 0 ? _totalProcessingTime.TotalMilliseconds / _totalFilesProcessed : 0;
+            var avgFileSize = _totalFilesProcessed > 0 ? _totalBytesProcessed / _totalFilesProcessed : 0;
+            var throughput = _totalProcessingTime.TotalSeconds > 0 ? _totalBytesProcessed / _totalProcessingTime.TotalSeconds : 0;
+
+            return new PerformanceStats
             {
-                Timestamp = DateTime.Now,
-                OperationType = operationType,
-                FileName = Path.GetFileName(fileName),
-                FileSizeBytes = fileSizeBytes,
-                ProcessingTime = processingTime,
-                Success = success,
-                ErrorMessage = errorMessage
+                ServiceUptime = uptime,
+                TotalFilesProcessed = _totalFilesProcessed,
+                SuccessfulOperations = _successfulOperations,
+                FailedOperations = _failedOperations,
+                SuccessRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0,
+                TotalBytesProcessed = _totalBytesProcessed,
+                AverageFileSizeBytes = avgFileSize,
+                AverageProcessingTimeMs = avgProcessingTime,
+                ThroughputBytesPerSecond = throughput,
+                RecentMetrics = _performanceMetrics.ToList()
             };
-
-            await _metricsLock.WaitAsync();
-            try
-            {
-                _performanceMetrics.Enqueue(metric);
-
-                // Keep only last 1000 metrics
-                while (_performanceMetrics.Count > 1000)
-                {
-                    var removedMetric = _performanceMetrics.Dequeue();
-                    _logger?.LogDebug($"Removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
-                }
-
-                // Update totals
-                _totalBytesProcessed += fileSizeBytes;
-                _totalProcessingTime += processingTime;
-            }
-            finally
-            {
-                _metricsLock.Release();
-            }
-
-            // Update operation statistics
-            Interlocked.Increment(ref _totalFilesProcessed);
-            Interlocked.Exchange(ref _lastOperationTime, DateTime.Now.Ticks);
-            if (success)
-            {
-                Interlocked.Increment(ref _successfulOperations);
-            }
-            else
-            {
-                Interlocked.Increment(ref _failedOperations);
-            }
         }
+        finally
+        {
+            _metricsLock.Release();
+        }
+    }
 
-        /// <summary>
-        /// Gets detailed performance statistics.
-        /// </summary>
-        /// <returns>Performance statistics object.</returns>
-        public async Task<PerformanceStats> GetPerformanceStatsAsync()
+    /// <summary>
+    /// Gets performance metrics for a specific time range.
+    /// </summary>
+    /// <param name="startTime">Start time for metrics.</param>
+    /// <param name="endTime">End time for metrics.</param>
+    /// <returns>List of performance metrics in time range.</returns>
+    public async Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime)
+    {
+        await _metricsLock.WaitAsync();
+        try
+        {
+            return _performanceMetrics
+                .Where(m => m.Timestamp >= startTime && m.Timestamp <= endTime)
+                .ToList();
+        }
+        finally
+        {
+            _metricsLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Clears performance metrics.
+    /// </summary>
+    public async Task ClearPerformanceMetricsAsync()
+    {
+        await _metricsLock.WaitAsync();
+        try
+        {
+            _performanceMetrics.Clear();
+            _serviceStartTime = DateTime.Now;
+            _totalBytesProcessed = 0;
+            _totalProcessingTime = TimeSpan.Zero;
+            _logger?.LogInformation("Performance metrics cleared");
+        }
+        finally
+        {
+            _metricsLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Exports performance metrics to CSV file.
+    /// </summary>
+    /// <param name="exportPath">Path to export CSV file.</param>
+    /// <returns>True if export was successful, false otherwise.</returns>
+    public async Task<bool> ExportPerformanceMetricsAsync(string exportPath)
+    {
+        try
         {
             await _metricsLock.WaitAsync();
             try
             {
-                var uptime = DateTime.Now - _serviceStartTime;
-                var avgProcessingTime = _totalFilesProcessed > 0 ? _totalProcessingTime.TotalMilliseconds / _totalFilesProcessed : 0;
-                var avgFileSize = _totalFilesProcessed > 0 ? _totalBytesProcessed / _totalFilesProcessed : 0;
-                var throughput = _totalProcessingTime.TotalSeconds > 0 ? _totalBytesProcessed / _totalProcessingTime.TotalSeconds : 0;
-
-                return new PerformanceStats
-                {
-                    ServiceUptime = uptime,
-                    TotalFilesProcessed = _totalFilesProcessed,
-                    SuccessfulOperations = _successfulOperations,
-                    FailedOperations = _failedOperations,
-                    SuccessRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0,
-                    TotalBytesProcessed = _totalBytesProcessed,
-                    AverageFileSizeBytes = avgFileSize,
-                    AverageProcessingTimeMs = avgProcessingTime,
-                    ThroughputBytesPerSecond = throughput,
-                    RecentMetrics = _performanceMetrics.ToList()
-                };
-            }
-            finally
-            {
-                _metricsLock.Release();
-            }
-        }
-
-        /// <summary>
-        /// Gets performance metrics for a specific time range.
-        /// </summary>
-        /// <param name="startTime">Start time for metrics.</param>
-        /// <param name="endTime">End time for metrics.</param>
-        /// <returns>List of performance metrics in time range.</returns>
-        public async Task<List<PerformanceMetric>> GetMetricsInRangeAsync(DateTime startTime, DateTime endTime)
-        {
-            await _metricsLock.WaitAsync();
-            try
-            {
-                return _performanceMetrics
-                    .Where(m => m.Timestamp >= startTime && m.Timestamp <= endTime)
-                    .ToList();
-            }
-            finally
-            {
-                _metricsLock.Release();
-            }
-        }
-
-        /// <summary>
-        /// Clears performance metrics.
-        /// </summary>
-        public async Task ClearPerformanceMetricsAsync()
-        {
-            await _metricsLock.WaitAsync();
-            try
-            {
-                _performanceMetrics.Clear();
-                _serviceStartTime = DateTime.Now;
-                _totalBytesProcessed = 0;
-                _totalProcessingTime = TimeSpan.Zero;
-                _logger?.LogInformation("Performance metrics cleared");
-            }
-            finally
-            {
-                _metricsLock.Release();
-            }
-        }
-
-        /// <summary>
-        /// Exports performance metrics to CSV file.
-        /// </summary>
-        /// <param name="exportPath">Path to export CSV file.</param>
-        /// <returns>True if export was successful, false otherwise.</returns>
-        public async Task<bool> ExportPerformanceMetricsAsync(string exportPath)
-        {
-            try
-            {
-                await _metricsLock.WaitAsync();
-                try
-                {
-                    var lines = new List<string>
+                var lines = new List<string>
                     {
                         "Timestamp,OperationType,FileName,FileSizeBytes,ProcessingTimeMs,Success,ErrorMessage"
                     };
 
-                    foreach (var metric in _performanceMetrics)
+                foreach (var metric in _performanceMetrics)
+                {
+                    var line = $"{metric.Timestamp:yyyy-MM-dd HH:mm:ss.fff}," +
+                               $"{metric.OperationType}," +
+                               $"{EscapeCsv(metric.FileName)}," +
+                               $"{metric.FileSizeBytes}," +
+                               $"{metric.ProcessingTime.TotalMilliseconds:F2}," +
+                               $"{metric.Success}," +
+                               $"{EscapeCsv(metric.ErrorMessage ?? "")}";
+                    lines.Add(line);
+                }
+
+                await File.WriteAllLinesAsync(exportPath, lines);
+                _logger?.LogInformation($"Performance metrics exported to {exportPath}");
+                return true;
+            }
+            finally
+            {
+                _metricsLock.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Failed to export performance metrics: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets basic operation statistics.
+    /// </summary>
+    /// <returns>Statistics string with operation counts.</returns>
+    public string GetOperationStatistics()
+    {
+        double successRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0;
+        string lastOp = _lastOperationTime != DateTime.MinValue.Ticks ? new DateTime(_lastOperationTime).ToString("g") : "Never";
+
+        return $"Operations: {_totalFilesProcessed} total, {_successfulOperations} successful, {_failedOperations} failed ({successRate:F1}% success rate)\nLast operation: {lastOp}";
+    }
+
+    /// <summary>
+    /// Resets operation statistics.
+    /// </summary>
+    public async Task ResetStatisticsAsync()
+    {
+        await _metricsLock.WaitAsync();
+        try
+        {
+            _totalFilesProcessed = 0;
+            _successfulOperations = 0;
+            _failedOperations = 0;
+            _lastOperationTime = DateTime.MinValue.Ticks;
+            _logger?.LogInformation("Operation statistics reset");
+        }
+        finally
+        {
+            _metricsLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Performs periodic cleanup of old metrics.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing periodic cleanup operation.</returns>
+    private async Task PeriodicCleanupAsync(CancellationToken cancellationToken)
+    {
+        _logger?.LogInformation("Periodic cleanup task started");
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    // Wait for 5 minutes between cleanup cycles
+                    await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
+
+                    // Perform cleanup outside of lock blocks to prevent blocking
+                    await PerformCleanupAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Task was cancelled, exit gracefully
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error in periodic cleanup: {ex.Message}");
+                    // Continue with next cycle despite error
+                }
+            }
+        }
+        finally
+        {
+            _logger?.LogInformation("Periodic cleanup task stopped");
+        }
+    }
+
+    /// <summary>
+    /// Performs actual cleanup operations with proper exception handling.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing cleanup operation.</returns>
+    private async Task PerformCleanupAsync(CancellationToken cancellationToken)
+    {
+        // Clean up old performance metrics (older than 24 hours)
+        var metricsRemoved = await CleanupPerformanceMetricsAsync(cancellationToken);
+        if (metricsRemoved > 0)
+        {
+            _logger?.LogInformation($"Periodic cleanup: removed {metricsRemoved} old performance metrics");
+        }
+    }
+
+    /// <summary>
+    /// Cleans up old performance metrics asynchronously.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Number of metrics removed.</returns>
+    private async Task<int> CleanupPerformanceMetricsAsync(CancellationToken cancellationToken)
+    {
+        return await Task.Run(async () =>
+        {
+            try
+            {
+                await _metricsLock.WaitAsync(cancellationToken);
+                try
+                {
+                    var cutoffTime = DateTime.Now.AddHours(-24);
+                    var initialCount = _performanceMetrics.Count;
+                    var removedCount = 0;
+
+                    while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
                     {
-                        var line = $"{metric.Timestamp:yyyy-MM-dd HH:mm:ss.fff}," +
-                                   $"{metric.OperationType}," +
-                                   $"{EscapeCsv(metric.FileName)}," +
-                                   $"{metric.FileSizeBytes}," +
-                                   $"{metric.ProcessingTime.TotalMilliseconds:F2}," +
-                                   $"{metric.Success}," +
-                                   $"{EscapeCsv(metric.ErrorMessage ?? "")}";
-                        lines.Add(line);
+                        var removedMetric = _performanceMetrics.Dequeue();
+                        _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
+                        removedCount++;
                     }
 
-                    await File.WriteAllLinesAsync(exportPath, lines);
-                    _logger?.LogInformation($"Performance metrics exported to {exportPath}");
-                    return true;
+                    return removedCount;
                 }
                 finally
                 {
@@ -267,196 +392,71 @@ namespace wolle.Services;
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Failed to export performance metrics: {ex.Message}");
-                return false;
+                _logger?.LogError($"Error cleaning up performance metrics: {ex.Message}");
+                return 0;
             }
-        }
-
-        /// <summary>
-        /// Gets basic operation statistics.
-        /// </summary>
-        /// <returns>Statistics string with operation counts.</returns>
-        public string GetOperationStatistics()
-        {
-            double successRate = _totalFilesProcessed > 0 ? (double)_successfulOperations / _totalFilesProcessed * 100 : 0;
-            string lastOp = _lastOperationTime != DateTime.MinValue.Ticks ? new DateTime(_lastOperationTime).ToString("g") : "Never";
-
-            return $"Operations: {_totalFilesProcessed} total, {_successfulOperations} successful, {_failedOperations} failed ({successRate:F1}% success rate)\nLast operation: {lastOp}";
-        }
-
-        /// <summary>
-        /// Resets operation statistics.
-        /// </summary>
-        public async Task ResetStatisticsAsync()
-        {
-            await _metricsLock.WaitAsync();
-            try
-            {
-                _totalFilesProcessed = 0;
-                _successfulOperations = 0;
-                _failedOperations = 0;
-                _lastOperationTime = DateTime.MinValue.Ticks;
-                _logger?.LogInformation("Operation statistics reset");
-            }
-            finally
-            {
-                _metricsLock.Release();
-            }
-        }
-
-        /// <summary>
-        /// Performs periodic cleanup of old metrics.
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>A task representing periodic cleanup operation.</returns>
-        private async Task PeriodicCleanupAsync(CancellationToken cancellationToken)
-        {
-            _logger?.LogInformation("Periodic cleanup task started");
-
-            try
-            {
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        // Wait for 5 minutes between cleanup cycles
-                        await Task.Delay(TimeSpan.FromMinutes(5), cancellationToken);
-
-                        // Perform cleanup outside of lock blocks to prevent blocking
-                        await PerformCleanupAsync(cancellationToken);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Task was cancelled, exit gracefully
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError($"Error in periodic cleanup: {ex.Message}");
-                        // Continue with next cycle despite error
-                    }
-                }
-            }
-            finally
-            {
-                _logger?.LogInformation("Periodic cleanup task stopped");
-            }
-        }
-
-        /// <summary>
-        /// Performs actual cleanup operations with proper exception handling.
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>A task representing cleanup operation.</returns>
-        private async Task PerformCleanupAsync(CancellationToken cancellationToken)
-        {
-            // Clean up old performance metrics (older than 24 hours)
-            var metricsRemoved = await CleanupPerformanceMetricsAsync(cancellationToken);
-            if (metricsRemoved > 0)
-            {
-                _logger?.LogInformation($"Periodic cleanup: removed {metricsRemoved} old performance metrics");
-            }
-        }
-
-        /// <summary>
-        /// Cleans up old performance metrics asynchronously.
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Number of metrics removed.</returns>
-        private async Task<int> CleanupPerformanceMetricsAsync(CancellationToken cancellationToken)
-        {
-            return await Task.Run(async () =>
-            {
-                try
-                {
-                    await _metricsLock.WaitAsync(cancellationToken);
-                    try
-                    {
-                        var cutoffTime = DateTime.Now.AddHours(-24);
-                        var initialCount = _performanceMetrics.Count;
-                        var removedCount = 0;
-
-                        while (_performanceMetrics.Count > 0 && _performanceMetrics.Peek().Timestamp < cutoffTime)
-                        {
-                            var removedMetric = _performanceMetrics.Dequeue();
-                            _logger?.LogDebug($"Periodic cleanup: removed old performance metric: {removedMetric.OperationType} for {removedMetric.FileName}");
-                            removedCount++;
-                        }
-
-                        return removedCount;
-                    }
-                    finally
-                    {
-                        _metricsLock.Release();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError($"Error cleaning up performance metrics: {ex.Message}");
-                    return 0;
-                }
-            }, cancellationToken);
-        }
-
-        /// <summary>
-        /// Escapes CSV field values to handle commas and quotes.
-        /// </summary>
-        /// <param name="value">The value to escape.</param>
-        /// <returns>Escaped CSV-safe string.</returns>
-        private string EscapeCsv(string? value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return "";
-
-            // Escape quotes and wrap in quotes if contains comma, quote, or newline
-            if (value.Contains("\"") || value.Contains(",") || value.Contains("\n"))
-            {
-                return "\"" + value.Replace("\"", "\"\"") + "\"";
-            }
-
-            return value;
-        }
-
-        /// <summary>
-        /// Disposes resources used by OllamaPerformanceService.
-        /// </summary>
-        public void Dispose()
-        {
-            _logger?.LogInformation("OllamaPerformanceService Dispose called");
-
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            _isDisposed = true;
-
-            // Cancel and wait for periodic cleanup task to complete
-            try
-            {
-                if (_periodicCleanupCts != null)
-                {
-                    _periodicCleanupCts.Cancel();
-                    _periodicCleanupCts.Dispose();
-                }
-
-                if (_periodicCleanupTask != null)
-                {
-                    // Wait up to 2 seconds for task to complete gracefully
-                    if (!_periodicCleanupTask.Wait(TimeSpan.FromSeconds(2)))
-                    {
-                        _logger?.LogWarning("Periodic cleanup task did not complete gracefully within timeout");
-                    }
-                }
-
-                // Dispose the semaphore
-                _metricsLock.Dispose();
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError($"Error stopping periodic cleanup task: {ex.Message}");
-            }
-
-            _logger?.LogInformation("OllamaPerformanceService Dispose completed");
-        }
+        }, cancellationToken);
     }
+
+    /// <summary>
+    /// Escapes CSV field values to handle commas and quotes.
+    /// </summary>
+    /// <param name="value">The value to escape.</param>
+    /// <returns>Escaped CSV-safe string.</returns>
+    private string EscapeCsv(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "";
+
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        if (value.Contains("\"") || value.Contains(",") || value.Contains("\n"))
+        {
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Disposes resources used by OllamaPerformanceService.
+    /// </summary>
+    public void Dispose()
+    {
+        _logger?.LogInformation("OllamaPerformanceService Dispose called");
+
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+
+        // Cancel and wait for periodic cleanup task to complete
+        try
+        {
+            if (_periodicCleanupCts != null)
+            {
+                _periodicCleanupCts.Cancel();
+                _periodicCleanupCts.Dispose();
+            }
+
+            if (_periodicCleanupTask != null)
+            {
+                // Wait up to 2 seconds for task to complete gracefully
+                if (!_periodicCleanupTask.Wait(TimeSpan.FromSeconds(2)))
+                {
+                    _logger?.LogWarning("Periodic cleanup task did not complete gracefully within timeout");
+                }
+            }
+
+            // Dispose the semaphore
+            _metricsLock.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error stopping periodic cleanup task: {ex.Message}");
+        }
+
+        _logger?.LogInformation("OllamaPerformanceService Dispose completed");
+    }
+}
