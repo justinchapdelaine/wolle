@@ -89,12 +89,6 @@ public interface IMainWindowServiceFacade : IDisposable
     IExceptionHandlingService ExceptionHandlingService { get; }
 
     /// <summary>
-    /// Initializes all services and performs startup configuration.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    Task InitializeServicesAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Disposes all managed services.
     /// </summary>
     void DisposeServices();

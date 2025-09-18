@@ -87,32 +87,6 @@ public class MainWindowServiceFacade : IMainWindowServiceFacade, IDisposable
     }
 
     /// <summary>
-    /// Initializes all services and performs startup configuration.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task InitializeServicesAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("Initializing MainWindow services");
-
-            // Initialize any services that require async startup
-            await Task.WhenAll(
-                Task.CompletedTask // No async initialization needed for now
-            );
-
-            _logger.LogInformation("MainWindow services initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to initialize MainWindow services");
-            await ExceptionHandlingService.HandleExceptionAsync(ex, "MainWindowServiceFacade.InitializeServicesAsync",
-                "Failed to initialize application services. Some features may not work properly.", ExceptionSeverity.Error);
-            throw;
-        }
-    }
-
-    /// <summary>
     /// Disposes all managed services.
     /// </summary>
     public void DisposeServices()
