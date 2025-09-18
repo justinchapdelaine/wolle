@@ -436,20 +436,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         
-        // If we're not on UI thread, dispatch the property update
-        if (Application.Current?.Dispatcher.CheckAccess() == false)
-        {
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                field = value;
-                OnPropertyChanged(propertyName);
-            });
-        }
-        else
-        {
-            field = value;
-            OnPropertyChanged(propertyName);
-        }
+        field = value;
+        OnPropertyChanged(propertyName);
         return true;
     }
 }
