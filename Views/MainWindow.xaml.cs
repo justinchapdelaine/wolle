@@ -495,6 +495,9 @@ public partial class MainWindow : Window, IDisposable
         finally
         {
             base.OnClosed(e);
+            
+            // Shutdown the application after window closes
+            Application.Current.Shutdown();
         }
     }
 
