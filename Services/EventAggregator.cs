@@ -49,10 +49,16 @@ public class EventAggregator : IEventAggregator, IDisposable
     private readonly Timer _cleanupTimer;
     private bool _disposed = false;
     private readonly ILogger<EventAggregator>? _logger;
+    private long _initialMemoryUsage;
+    private int _cleanupCount = 0;
 
     public EventAggregator(ILogger<EventAggregator>? logger = null)
     {
         _logger = logger;
+        // Get initial memory usage for monitoring
+        _initialMemoryUsage = GC.GetTotalMemory(false);
+        _logger?.LogInformation($"EventAggregator initialized with initial memory usage: {_initialMemoryUsage} bytes");
+        
         // Clean up dead references every 30 seconds
         _cleanupTimer = new Timer(CleanupDeadReferences, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -82,7 +88,7 @@ public class EventAggregator : IEventAggregator, IDisposable
                     return existingHandlers;
                 });
 
-            subscription = new Subscription(() => UnsubscribeHandler(eventType, handler, null));
+            subscription = new Subscription(() => UnsubscribeHandler(eventType, handler, null!));
             _subscriptions.TryAdd(subscription, (eventType, handler, null!, true));
         }
         else
@@ -97,7 +103,7 @@ public class EventAggregator : IEventAggregator, IDisposable
                     return existingHandlers;
                 });
 
-            subscription = new Subscription(() => UnsubscribeHandler(eventType, null, handlerRef));
+            subscription = new Subscription(() => UnsubscribeHandler(eventType, null!, handlerRef));
             _subscriptions.TryAdd(subscription, (eventType, handler, handlerRef, false));
         }
 
@@ -180,11 +186,11 @@ public class EventAggregator : IEventAggregator, IDisposable
         {
             if (subscriptionInfo.IsStrong)
             {
-                UnsubscribeHandler(subscriptionInfo.EventType, subscriptionInfo.Handler, null);
+                UnsubscribeHandler(subscriptionInfo.EventType, subscriptionInfo.Handler, null!);
             }
             else
             {
-                UnsubscribeHandler(subscriptionInfo.EventType, null, subscriptionInfo.WeakHandlerRef);
+                UnsubscribeHandler(subscriptionInfo.EventType, null!, subscriptionInfo.WeakHandlerRef);
             }
         }
     }
@@ -226,6 +232,17 @@ public class EventAggregator : IEventAggregator, IDisposable
     {
         if (_disposed) return;
 
+        _cleanupCount++;
+        var currentMemoryUsage = GC.GetTotalMemory(false);
+        var memoryDelta = currentMemoryUsage - _initialMemoryUsage;
+        
+        _logger?.LogDebug($"EventAggregator cleanup #{_cleanupCount}: Memory usage = {currentMemoryUsage} bytes, Delta = {memoryDelta:+#;-#} bytes, " +
+                          $"Strong handlers = {_strongHandlers.Values.Sum(h => h.Count)}, " +
+                          $"Weak handlers = {_weakHandlers.Values.Sum(h => h.Count)}, " +
+                          $"Subscriptions = {_subscriptions.Count}");
+
+        var deadReferencesRemoved = 0;
+
         foreach (var eventType in _weakHandlers.Keys.ToList())
         {
             if (_weakHandlers.TryGetValue(eventType, out var handlers))
@@ -236,6 +253,10 @@ public class EventAggregator : IEventAggregator, IDisposable
                     if (handlerRef.IsAlive)
                     {
                         liveHandlers.Add(handlerRef);
+                    }
+                    else
+                    {
+                        deadReferencesRemoved++;
                     }
                 }
 
@@ -249,9 +270,15 @@ public class EventAggregator : IEventAggregator, IDisposable
         // Also clean up dead subscriptions
         var deadSubscriptions = _subscriptions.Where(kv => 
             !kv.Value.IsStrong && !kv.Value.WeakHandlerRef.IsAlive).ToList();
+        deadReferencesRemoved += deadSubscriptions.Count;
         foreach (var deadSubscription in deadSubscriptions)
         {
             _subscriptions.TryRemove(deadSubscription.Key, out _);
+        }
+
+        if (deadReferencesRemoved > 0)
+        {
+            _logger?.LogInformation($"EventAggregator cleanup completed: Removed {deadReferencesRemoved} dead references");
         }
     }
 
@@ -265,10 +292,19 @@ public class EventAggregator : IEventAggregator, IDisposable
             _disposed = true;
             _cleanupTimer?.Dispose();
             
+            var strongHandlerCount = _strongHandlers.Values.Sum(h => h.Count);
+            var weakHandlerCount = _weakHandlers.Values.Sum(h => h.Count);
+            var subscriptionCount = _subscriptions.Count;
+            
+            _logger?.LogInformation($"EventAggregator disposing: Clearing {strongHandlerCount} strong handlers, " +
+                              $"{weakHandlerCount} weak handlers, {subscriptionCount} subscriptions");
+            
             // Clear all handlers and subscriptions
             _strongHandlers.Clear();
             _weakHandlers.Clear();
             _subscriptions.Clear();
+            
+            _logger?.LogInformation("EventAggregator disposed successfully");
         }
     }
 
