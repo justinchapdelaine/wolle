@@ -398,32 +398,13 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            // Cancel any ongoing processing
-            if (!_disposed)
-            {
-                _cancellationTokenSource.Cancel();
-                _logger?.LogInformation("Cancellation token cancelled");
-            }
-
-            // Unsubscribe from events
-            _serviceFacade.StatusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
-
-            // Stop and dispose status update timer
-            if (_serviceFacade.StatusManagementService is StatusManagementService statusService)
-            {
-                statusService.Dispose();
-            }
-
-            // Dispose services - this will handle OllamaService cleanup
-            if (!_disposed)
-            {
-                _serviceFacade.DisposeServices();
-                _logger?.LogInformation("Services disposed successfully");
-            }
+            // WindowManagementService handles cancellation and cleanup
+            // No need to duplicate those operations here
+            _logger?.LogInformation("Window closed - cleanup handled by WindowManagementService");
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error during window cleanup: {ex.Message}");
+            _logger?.LogError($"Error during window closed: {ex.Message}");
         }
         finally
         {
@@ -446,7 +427,7 @@ public partial class MainWindow : Window, IDisposable
                 // Dispose managed resources
                 _cancellationTokenSource?.Cancel();
                 _cancellationTokenSource?.Dispose();
-                _serviceFacade?.Dispose();
+                // Note: _serviceFacade is disposed by WindowManagementService during window closing
             }
             _disposed = true;
         }

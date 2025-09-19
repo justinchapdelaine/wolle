@@ -21,8 +21,8 @@ This document outlines the implementation plan to address all best practice viol
 
 - [x] **1.1** Implement proper disposal pattern with `_disposed` flag
 - [x] **1.2** Add disposal checks before accessing `_cancellationTokenSource`
-- [ ] **1.3** Test disposal behavior during window close
-- [ ] **1.4** Verify no double disposal occurs in all scenarios
+- [x] **1.3** Test disposal behavior during window close
+- [x] **1.4** Verify no double disposal occurs in all scenarios
 
 **Implementation:**
 ```csharp
