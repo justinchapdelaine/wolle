@@ -41,6 +41,9 @@ public partial class MainWindow : Window, IDisposable
             // Set DataContext to ViewModel
             DataContext = _viewModel;
 
+            // Pass cancellation token to ViewModel
+            _viewModel.SetCancellationTokenSource(_cancellationTokenSource);
+
             // Initialize coordinator with UI control
             (_serviceFacade.ResponseDisplayCoordinator as ResponseDisplayCoordinator)?.Initialize(ResponseScrollViewer);
 
@@ -386,62 +389,46 @@ public partial class MainWindow : Window, IDisposable
     protected override void OnClosed(EventArgs e)
     {
         _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
+        
         lock (_stateLock)
         {
+            if (_isClosing) return; // Prevent multiple calls
             _isClosing = true;
         }
 
-        // Don't dispose OllamaService immediately if processing is not complete
-        // Let it continue in the background
-        if (!_isProcessingComplete)
-        {
-            _logger?.LogInformation("Window closing but processing not complete - disposing OllamaService anyway to prevent memory leaks");
-        }
-        else
-        {
-            _logger?.LogInformation("Processing complete - disposing OllamaService");
-        }
-
-        // Cancel any ongoing processing
-        if (!_disposed)
-        {
-            _cancellationTokenSource.Cancel();
-        }
-
-        // Dispose cancellation token source (only if not already disposed)
-        if (!_disposed)
-        {
-            _cancellationTokenSource.Dispose();
-        }
-
-        // Unsubscribe from status timer events
-        _serviceFacade.StatusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
-
-        // Stop and dispose status update timer
-        if (_serviceFacade.StatusManagementService is StatusManagementService statusService)
-        {
-            statusService.Dispose();
-        }
-
-        // Always dispose OllamaService to prevent memory leaks
         try
         {
-            // Cancel any ongoing processing first
+            // Cancel any ongoing processing
             if (!_disposed)
             {
                 _cancellationTokenSource.Cancel();
+                _logger?.LogInformation("Cancellation token cancelled");
             }
 
-            // Now dispose the service
-            _serviceFacade.DisposeServices();
-            _logger?.LogInformation("Services disposed successfully");
+            // Unsubscribe from events
+            _serviceFacade.StatusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
+
+            // Stop and dispose status update timer
+            if (_serviceFacade.StatusManagementService is StatusManagementService statusService)
+            {
+                statusService.Dispose();
+            }
+
+            // Dispose services - this will handle OllamaService cleanup
+            if (!_disposed)
+            {
+                _serviceFacade.DisposeServices();
+                _logger?.LogInformation("Services disposed successfully");
+            }
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error disposing services: {ex.Message}");
+            _logger?.LogError($"Error during window cleanup: {ex.Message}");
         }
-
-        base.OnClosed(e);
+        finally
+        {
+            base.OnClosed(e);
+        }
     }
 
     public void Dispose()
@@ -457,11 +444,8 @@ public partial class MainWindow : Window, IDisposable
             if (disposing)
             {
                 // Dispose managed resources
-                if (!_disposed)
-                {
-                    _cancellationTokenSource?.Cancel();
-                    _cancellationTokenSource?.Dispose();
-                }
+                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource?.Dispose();
                 _serviceFacade?.Dispose();
             }
             _disposed = true;

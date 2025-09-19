@@ -55,6 +55,15 @@ public class MainWindowViewModel : INotifyPropertyChanged
         SubscribeToEvents();
     }
 
+    /// <summary>
+    /// Sets the cancellation token source to be used for operations
+    /// </summary>
+    /// <param name="cancellationTokenSource">The cancellation token source</param>
+    public void SetCancellationTokenSource(CancellationTokenSource cancellationTokenSource)
+    {
+        _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
+    }
+
     public string Title
     {
         get => _title;
