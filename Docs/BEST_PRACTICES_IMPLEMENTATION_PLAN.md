@@ -474,9 +474,10 @@ catch (Exception ex)
 
 ### ✅ High Priority Complete
 - [x] Memory usage stable over time
-- [ ] Service lifetimes properly configured
-- [ ] Error messages sanitized and secure
+- [x] Service lifetimes properly configured
+- [x] Error messages sanitized and secure
 - [x] Event aggregator memory leak free
+- [x] Window closing race condition fixed
 
 ### ✅ Medium Priority Complete
 - [ ] Code duplication eliminated
