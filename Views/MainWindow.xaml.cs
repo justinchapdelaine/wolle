@@ -94,16 +94,16 @@ public partial class MainWindow : Window, IDisposable
     {
         var eventAggregatorInstance = eventAggregator ?? throw new ArgumentNullException(nameof(eventAggregator));
 
-        // Subscribe to window-related events only (ViewModel handles UI events)
-        eventAggregatorInstance.Subscribe<ShowWindowEvent>(OnShowWindow);
-        eventAggregatorInstance.Subscribe<HideWindowEvent>(OnHideWindow);
-        eventAggregatorInstance.Subscribe<CloseWindowEvent>(OnCloseWindow);
-        eventAggregatorInstance.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition);
-        eventAggregatorInstance.Subscribe<RequestFocusEvent>(OnRequestFocus);
+        // Subscribe to window-related events (UI components - use strong references)
+        eventAggregatorInstance.Subscribe<ShowWindowEvent>(OnShowWindow, isUiComponent: true);
+        eventAggregatorInstance.Subscribe<HideWindowEvent>(OnHideWindow, isUiComponent: true);
+        eventAggregatorInstance.Subscribe<CloseWindowEvent>(OnCloseWindow, isUiComponent: true);
+        eventAggregatorInstance.Subscribe<SetWindowPositionEvent>(OnSetWindowPosition, isUiComponent: true);
+        eventAggregatorInstance.Subscribe<RequestFocusEvent>(OnRequestFocus, isUiComponent: true);
 
-        // Subscribe to response events (MainWindow handles response display)
-        eventAggregatorInstance.Subscribe<UpdateResponseEvent>(OnUpdateResponse);
-        eventAggregatorInstance.Subscribe<ClearResponseEvent>(OnClearResponse);
+        // Subscribe to response events (UI components - use strong references)
+        eventAggregatorInstance.Subscribe<UpdateResponseEvent>(OnUpdateResponse, isUiComponent: true);
+        eventAggregatorInstance.Subscribe<ClearResponseEvent>(OnClearResponse, isUiComponent: true);
     }
 
     /// <summary>
