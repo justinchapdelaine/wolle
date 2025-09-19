@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace wolle.Services;
 /// <summary>
@@ -108,6 +111,25 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
 
         startInfo.ArgumentList.Add("serve");
 
+        // Validate and sanitize process arguments
+        var sanitizedArguments = SanitizeProcessArguments(new[] { "serve" });
+        if (sanitizedArguments == null || sanitizedArguments.Length == 0)
+        {
+            var ex = new ArgumentException("Invalid process arguments", nameof(ollamaPath));
+            _logger?.LogError("Process argument validation failed");
+            _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+                "Invalid process arguments detected. Security validation failed.", ExceptionSeverity.Error);
+            onError?.Invoke("Invalid process arguments. Security validation failed.");
+            return Task.FromResult(false);
+        }
+
+        // Clear existing arguments and add sanitized ones
+        startInfo.ArgumentList.Clear();
+        foreach (var arg in sanitizedArguments)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
         var process = new Process { StartInfo = startInfo };
         process.OutputDataReceived += (sender, e) =>
         {
@@ -182,7 +204,13 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             try
             {
-                process.Start();
+                // Use enhanced security validation for process startup
+                if (!StartProcessWithSecurityValidation(process, "Ollama server"))
+                {
+                    onError?.Invoke("Process security validation failed. Cannot start Ollama server.");
+                    return Task.FromResult(false);
+                }
+
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
                 _ollamaServerProcess = process;
@@ -358,11 +386,12 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             }
 
             var lowerDir = fullPath.ToLowerInvariant();
+            
+            // Only flag truly suspicious directories, not common system directories
             var suspiciousDirs = new[]
             {
-                    "temp", "tmp", "windows\\system32", "windows\\syswow64",
-                    "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
-                };
+                "temp", "tmp", "appdata\\local\\temp", "appdata\\local\\microsoft\\windows\\inetcache"
+            };
 
             foreach (var suspiciousDir in suspiciousDirs)
             {
@@ -370,6 +399,19 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                 {
                     _logger?.LogWarning($"Directory path is potentially suspicious: {fullPath}");
                 }
+            }
+
+            // Allow common system directories that are typically in PATH
+            var allowedSystemDirs = new[]
+            {
+                "windows\\system32", "windows\\syswow64", "windows\\system32\\wbem",
+                "windows\\system32\\windowspowershell\\v1.0", "windows\\system32\\openssh"
+            };
+
+            var isAllowedSystemDir = Array.Exists(allowedSystemDirs, dir => lowerDir.Contains(dir));
+            if (isAllowedSystemDir)
+            {
+                _logger?.LogInformation($"Directory is allowed system directory: {fullPath}");
             }
 
             if (!Directory.Exists(fullPath))
@@ -431,5 +473,322 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         }
 
         _logger?.LogInformation("OllamaProcessService Dispose completed");
+    }
+
+    /// <summary>
+    /// Sanitizes process arguments to prevent command injection attacks.
+    /// </summary>
+    /// <param name="arguments">The arguments to sanitize.</param>
+    /// <returns>Sanitized arguments array, or null if validation fails.</returns>
+    private string[]? SanitizeProcessArguments(string[] arguments)
+    {
+        if (arguments == null || arguments.Length == 0)
+        {
+            _logger?.LogWarning("No arguments provided for sanitization");
+            return arguments;
+        }
+
+        try
+        {
+            var sanitizedArgs = new List<string>();
+            
+            foreach (var arg in arguments)
+            {
+                if (string.IsNullOrEmpty(arg))
+                {
+                    _logger?.LogWarning("Empty argument detected and skipped");
+                    continue;
+                }
+
+                // Check for dangerous patterns
+                if (ContainsDangerousArgumentPatterns(arg))
+                {
+                    _logger?.LogError($"Dangerous argument pattern detected: {arg}");
+                    LogSecurityEvent("DangerousArgument", arg);
+                    return null; // Reject all arguments if any dangerous pattern is found
+                }
+
+                // Sanitize the argument
+                string sanitizedArg = SanitizeSingleArgument(arg);
+                if (!string.IsNullOrEmpty(sanitizedArg))
+                {
+                    sanitizedArgs.Add(sanitizedArg);
+                }
+            }
+
+            _logger?.LogInformation($"Sanitized {arguments.Length} arguments to {sanitizedArgs.Count} safe arguments");
+            return sanitizedArgs.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error sanitizing process arguments: {ex.Message}");
+            LogSecurityEvent("ArgumentSanitizationError", ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Checks if an argument contains dangerous patterns that could indicate injection attacks.
+    /// </summary>
+    /// <param name="argument">The argument to check.</param>
+    /// <returns>True if dangerous patterns are found, false otherwise.</returns>
+    private bool ContainsDangerousArgumentPatterns(string argument)
+    {
+        if (string.IsNullOrEmpty(argument))
+            return false;
+
+        // Command injection patterns
+        var injectionPatterns = new[]
+        {
+            "&", "|", ";", "<", ">", "`", "$", "(", ")",
+            "&&", "||", ">>", "<<", "\"", "'", "\\",
+            "@", "#", "^", "~", "*", "?", "[", "]", "!", "{", "}"
+        };
+
+        foreach (var pattern in injectionPatterns)
+        {
+            if (argument.Contains(pattern))
+            {
+                _logger?.LogWarning($"Injection pattern '{pattern}' found in argument: {argument}");
+                return true;
+            }
+        }
+
+        // Check for encoded injection attempts
+        if (argument.Contains("%") && argument.Length > 2)
+        {
+            var hexPattern = new Regex(@"%[0-9a-fA-F]{2}");
+            if (hexPattern.IsMatch(argument))
+            {
+                _logger?.LogWarning($"Potential URL-encoded injection attempt: {argument}");
+                return true;
+            }
+        }
+
+        // Check for environment variable access attempts
+        if (argument.Contains("%") && (argument.Contains("env") || argument.Contains("ENV")))
+        {
+            _logger?.LogWarning($"Potential environment variable access attempt: {argument}");
+            return true;
+        }
+
+        // Check for file system redirection attempts
+        var redirectionPatterns = new[] { ">", ">>", "<", "<<" };
+        foreach (var pattern in redirectionPatterns)
+        {
+            if (argument.Contains(pattern))
+            {
+                _logger?.LogWarning($"File redirection pattern '{pattern}' found in argument: {argument}");
+                return true;
+            }
+        }
+
+        // Check for script execution attempts
+        var scriptPatterns = new[] { ".bat", ".cmd", ".ps1", ".vbs", ".js", ".sh" };
+        foreach (var pattern in scriptPatterns)
+        {
+            if (argument.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.LogWarning($"Script execution pattern '{pattern}' found in argument: {argument}");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Sanitizes a single argument by removing or escaping dangerous characters.
+    /// </summary>
+    /// <param name="argument">The argument to sanitize.</param>
+    /// <returns>Sanitized argument, or empty string if argument is too dangerous.</returns>
+    private string SanitizeSingleArgument(string argument)
+    {
+        if (string.IsNullOrEmpty(argument))
+            return string.Empty;
+
+        // Allow only safe characters: alphanumeric, spaces, hyphens, underscores, and periods
+        var safeChars = new Regex(@"[^a-zA-Z0-9\s\-_.]");
+        string sanitized = safeChars.Replace(argument, "_");
+
+        // Remove consecutive underscores that might indicate obfuscation
+        sanitized = Regex.Replace(sanitized, @"_+", "_");
+
+        // Remove leading/trailing underscores
+        sanitized = sanitized.Trim('_');
+
+        // Validate length
+        if (sanitized.Length > 1000) // Reasonable argument length limit
+        {
+            _logger?.LogWarning($"Argument too long after sanitization: {sanitized.Length} characters");
+            return string.Empty;
+        }
+
+        // Ensure the sanitized argument is not empty
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            _logger?.LogWarning($"Argument became empty after sanitization: {argument}");
+            return string.Empty;
+        }
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Validates process start information with enhanced security checks.
+    /// </summary>
+    /// <param name="startInfo">The process start info to validate.</param>
+    /// <returns>True if start info is safe, false otherwise.</returns>
+    private bool ValidateProcessStartInfo(ProcessStartInfo startInfo)
+    {
+        try
+        {
+            // Validate file name
+            if (string.IsNullOrEmpty(startInfo.FileName))
+            {
+                _logger?.LogError("Process start info has empty file name");
+                return false;
+            }
+
+            // Validate that we're not using shell execute (security risk)
+            if (startInfo.UseShellExecute)
+            {
+                _logger?.LogError("Process start info uses shell execute - security risk");
+                return false;
+            }
+            
+            // Validate working directory if specified
+            if (!string.IsNullOrEmpty(startInfo.WorkingDirectory))
+            {
+                if (!IsSafeDirectoryPath(startInfo.WorkingDirectory))
+                {
+                    _logger?.LogError($"Unsafe working directory: {startInfo.WorkingDirectory}");
+                    return false;
+                }
+            }
+
+            // Validate environment variables if any
+            if (startInfo.EnvironmentVariables != null && startInfo.EnvironmentVariables.Count > 0)
+            {
+                foreach (string key in startInfo.EnvironmentVariables.Keys)
+                {
+                    if (IsSuspiciousEnvironmentVariable(key))
+                    {
+                        _logger?.LogError($"Suspicious environment variable detected: {key}");
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error validating process start info: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if an environment variable name is suspicious.
+    /// </summary>
+    /// <param name="variableName">The environment variable name to check.</param>
+    /// <returns>True if variable is suspicious, false otherwise.</returns>
+    private bool IsSuspiciousEnvironmentVariable(string variableName)
+    {
+        if (string.IsNullOrEmpty(variableName))
+            return true;
+
+        var upperVar = variableName.ToUpperInvariant();
+        
+        // Only flag truly dangerous system variables that could be used for attacks
+        // Note: PATH and PATHEXT are allowed as they are normal Windows environment variables
+        var dangerousSystemVars = new string[] { }; // No common Windows environment variables are truly dangerous
+
+        // Check for dangerous system environment variables
+        if (Array.Exists(dangerousSystemVars, v => v == upperVar))
+        {
+            _logger?.LogWarning($"Potentially dangerous system environment variable: {variableName}");
+            return true;
+        }
+
+        // Check for clearly suspicious variable patterns that indicate malicious intent
+        if (upperVar.Contains("PASSWORD") || upperVar.Contains("SECRET") ||
+            upperVar.Contains("KEY") || upperVar.Contains("TOKEN") ||
+            upperVar.Contains("CREDENTIAL") || upperVar.Contains("AUTH") ||
+            upperVar.Contains("INJECT") || upperVar.Contains("EXPLOIT") ||
+            upperVar.Contains("ATTACK") || upperVar.Contains("MALWARE"))
+        {
+            _logger?.LogWarning($"Potentially malicious environment variable: {variableName}");
+            return true;
+        }
+
+        // Allow normal Windows environment variables like ComSpec, LOCALAPPDATA, APPDATA, PROGRAMFILES, etc.
+        // These are inherited normally and don't pose security risks
+        return false;
+    }
+
+    /// <summary>
+    /// Logs security events for process execution monitoring.
+    /// </summary>
+    /// <param name="eventType">The type of security event.</param>
+    /// <param name="details">Details about the event.</param>
+    private void LogSecurityEvent(string eventType, string details)
+    {
+        try
+        {
+            _logger?.LogWarning($"Process Security Event: {eventType} - {details}");
+            
+            // Additional security logging could be added here
+            // For example, writing to a security log file or sending to a monitoring service
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Failed to log process security event: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Enhanced process startup with security validation and logging.
+    /// </summary>
+    /// <param name="process">The process to start.</param>
+    /// <param name="processName">The name of the process for logging.</param>
+    /// <returns>True if process started successfully, false otherwise.</returns>
+    private bool StartProcessWithSecurityValidation(Process process, string processName)
+    {
+        try
+        {
+            // Validate process start info
+            if (!ValidateProcessStartInfo(process.StartInfo))
+            {
+                _logger?.LogError($"Process start info validation failed for {processName}");
+                LogSecurityEvent("ProcessStartInfoValidationFailed", processName);
+                return false;
+            }
+
+            // Log process startup attempt
+            _logger?.LogInformation($"Starting {processName} with enhanced security validation");
+            LogSecurityEvent("ProcessStartAttempt", $"{processName}: {process.StartInfo.FileName}");
+
+            // Start the process
+            if (!process.Start())
+            {
+                _logger?.LogError($"Failed to start {processName}");
+                LogSecurityEvent("ProcessStartFailed", processName);
+                return false;
+            }
+
+            // Log successful startup
+            _logger?.LogInformation($"{processName} started successfully with PID: {process.Id}");
+            LogSecurityEvent("ProcessStartSuccess", $"{processName}: PID {process.Id}");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error starting {processName}: {ex.Message}");
+            LogSecurityEvent("ProcessStartError", $"{processName}: {ex.Message}");
+            return false;
+        }
     }
 }

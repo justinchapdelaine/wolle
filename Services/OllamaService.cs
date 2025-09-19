@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text.RegularExpressions;
 
 namespace wolle.Services;
 /// <summary>
@@ -130,12 +132,21 @@ public class OllamaService : IDisposable
 
         try
         {
-            // Validate and sanitize file path
-            if (!_ollamaFileService.ValidateFilePath(filePath))
+            // Validate and sanitize file path with enhanced security checks
+            if (!ValidateAndSanitizeFilePath(filePath))
             {
-                _logger?.LogError($"Invalid file path: {filePath}");
-                OnErrorReceived?.Invoke("Cannot access file. Please check:\n1. The file exists\n2. You have permission to read it\n3. The path is not too long\n4. The file is not locked by another program");
+                _logger?.LogError($"Invalid or potentially malicious file path: {filePath}");
+                OnErrorReceived?.Invoke("Invalid file path. Please select a valid file.");
                 errorMessage = "Invalid file path";
+                return;
+            }
+
+            // Additional security validation
+            if (!PerformSecurityValidation(filePath))
+            {
+                _logger?.LogError($"Security validation failed for file path: {filePath}");
+                OnErrorReceived?.Invoke("Security validation failed. Please select a different file.");
+                errorMessage = "Security validation failed";
                 return;
             }
 
@@ -294,5 +305,294 @@ public class OllamaService : IDisposable
         }
 
         _logger?.LogInformation("OllamaService Dispose completed");
+    }
+
+    /// <summary>
+    /// Validates and sanitizes file path with enhanced security checks.
+    /// </summary>
+    /// <param name="filePath">The file path to validate.</param>
+    /// <returns>True if path is valid and safe, false otherwise.</returns>
+    private bool ValidateAndSanitizeFilePath(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            _logger?.LogError("File path is null or empty");
+            return false;
+        }
+
+        // Check for path traversal attacks
+        if (ContainsPathTraversal(filePath))
+        {
+            _logger?.LogError($"Path traversal attack detected: {filePath}");
+            LogSecurityEvent("PathTraversalAttempt", filePath);
+            return false;
+        }
+
+        // Check for suspicious characters
+        if (ContainsSuspiciousCharacters(filePath))
+        {
+            _logger?.LogError($"Suspicious characters detected in file path: {filePath}");
+            LogSecurityEvent("SuspiciousCharacters", filePath);
+            return false;
+        }
+
+        // Get canonical path to resolve relative paths and symbolic links
+        string canonicalPath;
+        try
+        {
+            canonicalPath = Path.GetFullPath(filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Failed to get canonical path for {filePath}: {ex.Message}");
+            return false;
+        }
+
+        // Validate file extension
+        if (!ValidateFileExtension(canonicalPath))
+        {
+            _logger?.LogError($"Invalid file extension: {Path.GetExtension(canonicalPath)}");
+            LogSecurityEvent("InvalidFileExtension", canonicalPath);
+            return false;
+        }
+
+        // Use existing validation from OllamaFileService
+        if (!_ollamaFileService.ValidateFilePath(canonicalPath))
+        {
+            _logger?.LogError($"File path validation failed: {canonicalPath}");
+            return false;
+        }
+
+        _logger?.LogInformation($"File path validation successful: {canonicalPath}");
+        return true;
+    }
+
+    /// <summary>
+    /// Performs additional security validation on the file path.
+    /// </summary>
+    /// <param name="filePath">The file path to validate.</param>
+    /// <returns>True if path passes security validation, false otherwise.</returns>
+    private bool PerformSecurityValidation(string filePath)
+    {
+        try
+        {
+            // Check if file is in a sensitive system location
+            if (IsInSensitiveSystemLocation(filePath))
+            {
+                _logger?.LogError($"File is in sensitive system location: {filePath}");
+                LogSecurityEvent("SensitiveSystemLocation", filePath);
+                return false;
+            }
+
+            // Check for file extension spoofing
+            if (HasExtensionSpoofing(filePath))
+            {
+                _logger?.LogError($"File extension spoofing detected: {filePath}");
+                LogSecurityEvent("ExtensionSpoofing", filePath);
+                return false;
+            }
+
+            // Check file size against security limits
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length > 100 * 1024 * 1024) // 100MB hard limit
+            {
+                _logger?.LogError($"File exceeds security size limit: {fileInfo.Length} bytes");
+                LogSecurityEvent("FileSizeExceeded", filePath);
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Security validation failed for {filePath}: {ex.Message}");
+            LogSecurityEvent("SecurityValidationError", filePath);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a path contains path traversal sequences.
+    /// </summary>
+    /// <param name="path">The path to check.</param>
+    /// <returns>True if path traversal is detected, false otherwise.</returns>
+    private bool ContainsPathTraversal(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return true;
+
+        // Check for obvious path traversal patterns
+        var traversalPatterns = new[] { "..\\", "../", "..\t", "..\n", "..\r" };
+        
+        foreach (var pattern in traversalPatterns)
+        {
+            if (path.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        // Check for encoded path traversal
+        if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
+            path.Contains("%2f", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check for multiple consecutive dots that could be obfuscated traversal
+        if (Regex.IsMatch(path, @"\.\.{2,}"))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if a path contains suspicious characters.
+    /// </summary>
+    /// <param name="path">The path to check.</param>
+    /// <returns>True if suspicious characters are found, false otherwise.</returns>
+    private bool ContainsSuspiciousCharacters(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return true;
+
+        // Characters that could indicate command injection or other attacks
+        var suspiciousChars = new[] { '|', '&', ';', '<', '>', '"', '\'', '`', '$', '(', ')', '{', '}', '[', ']', '!', '@', '#', '^', '~', '*' };
+        
+        foreach (var charToCheck in suspiciousChars)
+        {
+            if (path.Contains(charToCheck))
+                return true;
+        }
+
+        // Check for null bytes
+        if (path.Contains('\0'))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Validates file extension against allowed extensions.
+    /// </summary>
+    /// <param name="filePath">The file path to validate.</param>
+    /// <returns>True if extension is allowed, false otherwise.</returns>
+    private bool ValidateFileExtension(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return false;
+
+        string extension = Path.GetExtension(filePath).ToLowerInvariant();
+        
+        // Allowed extensions based on project requirements
+        var allowedExtensions = new[] { ".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py" };
+        
+        return Array.Exists(allowedExtensions, ext => ext == extension);
+    }
+
+    /// <summary>
+    /// Checks if a file is in a sensitive system location.
+    /// </summary>
+    /// <param name="filePath">The file path to check.</param>
+    /// <returns>True if file is in sensitive location, false otherwise.</returns>
+    private bool IsInSensitiveSystemLocation(string filePath)
+    {
+        try
+        {
+            string fullPath = Path.GetFullPath(filePath);
+            
+            // Sensitive system directories
+            var sensitiveDirs = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft")
+            };
+
+            foreach (var sensitiveDir in sensitiveDirs)
+            {
+                if (!string.IsNullOrEmpty(sensitiveDir) && 
+                    fullPath.StartsWith(sensitiveDir, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            // If we can't determine the path, err on the side of caution
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Checks for file extension spoofing (e.g., file.txt.exe).
+    /// </summary>
+    /// <param name="filePath">The file path to check.</param>
+    /// <returns>True if extension spoofing is detected, false otherwise.</returns>
+    private bool HasExtensionSpoofing(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return false;
+
+        string fileName = Path.GetFileName(filePath);
+        
+        // Check for multiple extensions (potential spoofing)
+        int extensionCount = fileName.Count(c => c == '.');
+        
+        if (extensionCount > 1)
+        {
+            // Check if the last extension is executable
+            string lastExtension = Path.GetExtension(fileName).ToLowerInvariant();
+            var executableExtensions = new[] { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".com", ".pif" };
+            
+            if (Array.Exists(executableExtensions, ext => ext == lastExtension))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Logs security events for monitoring and analysis.
+    /// </summary>
+    /// <param name="eventType">The type of security event.</param>
+    /// <param name="details">Details about the event.</param>
+    private void LogSecurityEvent(string eventType, string details)
+    {
+        try
+        {
+            _logger?.LogWarning($"Security Event: {eventType} - {details}");
+            
+            // Publish security event through event aggregator for monitoring
+            if (_eventAggregator != null)
+            {
+                var securityEvent = new SecurityEvent
+                {
+                    EventType = eventType,
+                    Details = details,
+                    Timestamp = DateTime.UtcNow,
+                    User = Environment.UserName,
+                    Machine = Environment.MachineName
+                };
+                
+                _eventAggregator.Publish(securityEvent);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Failed to log security event: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Security event data structure for logging and monitoring.
+    /// </summary>
+    private class SecurityEvent
+    {
+        public string EventType { get; set; } = string.Empty;
+        public string Details { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+        public string User { get; set; } = string.Empty;
+        public string Machine { get; set; } = string.Empty;
     }
 }

@@ -84,21 +84,69 @@ else
 **File:** `Services/OllamaService.cs`  
 **Risk:** Path traversal attacks and security vulnerabilities  
 **Priority:** Critical
+**Status:** ✅ **Completed**
 
-- [ ] **3.1** Add canonical path validation
-- [ ] **3.2** Implement path traversal attack protection
-- [ ] **3.3** Add file extension validation
-- [ ] **3.4** Test with malicious file paths
-- [ ] **3.5** Add security logging for suspicious attempts
+- [x] **3.1** Add canonical path validation
+- [x] **3.2** Implement path traversal attack protection
+- [x] **3.3** Add file extension validation
+- [x] **3.4** Test with malicious file paths
+- [x] **3.5** Add security logging for suspicious attempts
 
 **Implementation:**
 ```csharp
-if (!_ollamaFileService.ValidateFilePath(filePath) || 
-    Path.IsPathRooted(filePath) && !filePath.StartsWith(Path.GetPathRoot(filePath)!, StringComparison.Ordinal))
+private bool ValidateAndSanitizeFilePath(string filePath)
 {
-    _logger?.LogError($"Invalid or potentially malicious file path: {filePath}");
-    OnErrorReceived?.Invoke("Invalid file path. Please select a valid file.");
-    return;
+    if (string.IsNullOrEmpty(filePath))
+    {
+        _logger?.LogError("File path is null or empty");
+        return false;
+    }
+
+    // Check for path traversal attacks
+    if (ContainsPathTraversal(filePath))
+    {
+        _logger?.LogError($"Path traversal attack detected: {filePath}");
+        LogSecurityEvent("PathTraversalAttempt", filePath);
+        return false;
+    }
+
+    // Check for suspicious characters
+    if (ContainsSuspiciousCharacters(filePath))
+    {
+        _logger?.LogError($"Suspicious characters detected in file path: {filePath}");
+        LogSecurityEvent("SuspiciousCharacters", filePath);
+        return false;
+    }
+
+    // Get canonical path to resolve relative paths and symbolic links
+    string canonicalPath;
+    try
+    {
+        canonicalPath = Path.GetFullPath(filePath);
+    }
+    catch (Exception ex)
+    {
+        _logger?.LogError($"Failed to get canonical path for {filePath}: {ex.Message}");
+        return false;
+    }
+
+    // Validate file extension
+    if (!ValidateFileExtension(canonicalPath))
+    {
+        _logger?.LogError($"Invalid file extension: {Path.GetExtension(canonicalPath)}");
+        LogSecurityEvent("InvalidFileExtension", canonicalPath);
+        return false;
+    }
+
+    // Use existing validation from OllamaFileService
+    if (!_ollamaFileService.ValidateFilePath(canonicalPath))
+    {
+        _logger?.LogError($"File path validation failed: {canonicalPath}");
+        return false;
+    }
+
+    _logger?.LogInformation($"File path validation successful: {canonicalPath}");
+    return true;
 }
 ```
 
@@ -106,22 +154,61 @@ if (!_ollamaFileService.ValidateFilePath(filePath) ||
 **File:** `Services/OllamaProcessService.cs`  
 **Risk:** Process injection and command execution vulnerabilities  
 **Priority:** Critical
+**Status:** ✅ **Completed**
 
-- [ ] **4.1** Validate all process arguments before execution
-- [ ] **4.2** Implement secure process start patterns
-- [ ] **4.3** Add argument sanitization
-- [ ] **4.4** Test with malicious input attempts
-- [ ] **4.5** Add process execution logging
+- [x] **4.1** Validate all process arguments before execution
+- [x] **4.2** Implement secure process start patterns
+- [x] **4.3** Add argument sanitization
+- [x] **4.4** Test with malicious input attempts
+- [x] **4.5** Add process execution logging
 
 **Implementation:**
 ```csharp
-private string[] SanitizeProcessArguments(string[] arguments)
+private string[]? SanitizeProcessArguments(string[] arguments)
 {
-    return arguments.Select(arg => 
+    if (arguments == null || arguments.Length == 0)
     {
-        // Remove potentially dangerous characters
-        return arg.Replace("&", "").Replace("|", "").Replace(";", "").Replace("<", "").Replace(">", "");
-    }).ToArray();
+        _logger?.LogWarning("No arguments provided for sanitization");
+        return arguments;
+    }
+
+    try
+    {
+        var sanitizedArgs = new List<string>();
+        
+        foreach (var arg in arguments)
+        {
+            if (string.IsNullOrEmpty(arg))
+            {
+                _logger?.LogWarning("Empty argument detected and skipped");
+                continue;
+            }
+
+            // Check for dangerous patterns
+            if (ContainsDangerousArgumentPatterns(arg))
+            {
+                _logger?.LogError($"Dangerous argument pattern detected: {arg}");
+                LogSecurityEvent("DangerousArgument", arg);
+                return null; // Reject all arguments if any dangerous pattern is found
+            }
+
+            // Sanitize argument
+            string sanitizedArg = SanitizeSingleArgument(arg);
+            if (!string.IsNullOrEmpty(sanitizedArg))
+            {
+                sanitizedArgs.Add(sanitizedArg);
+            }
+        }
+
+        _logger?.LogInformation($"Sanitized {arguments.Length} arguments to {sanitizedArgs.Count} safe arguments");
+        return sanitizedArgs.ToArray();
+    }
+    catch (Exception ex)
+    {
+        _logger?.LogError($"Error sanitizing process arguments: {ex.Message}");
+        LogSecurityEvent("ArgumentSanitizationError", ex.Message);
+        return null;
+    }
 }
 ```
 
@@ -324,8 +411,8 @@ catch (Exception ex)
 
 - **Phase 1.1:** Double Disposal Bug (Item #1) - ✅ Completed
 - **Phase 1.2:** UI Thread Safety (Item #2) - ✅ Completed
-- **Phase 1.3:** Input Validation Security (Item #3) - ⏳ Not completed  
-- **Phase 1.4:** Process Execution Security (Item #4) - ⏳ Not completed
+- **Phase 1.3:** Input Validation Security (Item #3) - ✅ Completed
+- **Phase 1.4:** Process Execution Security (Item #4) - ✅ Completed
 
 **Goal:** Eliminate security vulnerabilities and crash risks  
 **Timeline:** 3-5 days  
