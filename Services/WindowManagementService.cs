@@ -56,7 +56,7 @@ namespace wolle.Services
 
             lock (_stateLock)
             {
-                // Check if window is already closing
+                // Check if window is already in the process of closing
                 if (_isWindowClosing)
                 {
                     _logger?.LogInformation("Window already closing - preventing duplicate close");
@@ -70,7 +70,7 @@ namespace wolle.Services
                     _logger?.LogInformation("Processing not complete - allowing close with cancellation");
                 }
 
-                // Mark that we're attempting to close
+                // Mark that we're attempting to close only after all checks pass
                 _isWindowClosing = true;
             }
 
