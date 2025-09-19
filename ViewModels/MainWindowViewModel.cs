@@ -225,7 +225,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void ShowError(string message, int durationMs = 0)
     {
-        InfoMessage = message;
+        var sanitizedMessage = SanitizeMessage(message);
+        InfoMessage = sanitizedMessage;
         IsInfoMessageError = true;
         IsInfoMessageVisible = true;
 
@@ -247,7 +248,8 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void ShowSuccess(string message, int durationMs = 0)
     {
-        InfoMessage = message;
+        var sanitizedMessage = SanitizeMessage(message);
+        InfoMessage = sanitizedMessage;
         IsInfoMessageError = false;
         IsInfoMessageVisible = true;
 
@@ -407,6 +409,58 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private void ExecuteCancelSettings()
     {
         _serviceFacade.SettingsManagementService.CancelSettings();
+    }
+
+    /// <summary>
+    /// Sanitizes a message to remove sensitive information before displaying to users.
+    /// </summary>
+    /// <param name="message">The message to sanitize.</param>
+    /// <returns>A sanitized message safe for user display.</returns>
+    private string SanitizeMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return message;
+        }
+
+        try
+        {
+            var sanitized = message;
+
+            // Remove system drive paths (e.g., "C:\", "D:\")
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\", "[DRIVE]");
+
+            // Remove UNC paths (e.g., "\\server\share")
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\\\\[^\s]+", "[NETWORK_PATH]");
+
+            // Remove user names from messages
+            if (!string.IsNullOrEmpty(Environment.UserName))
+            {
+                sanitized = sanitized.Replace(Environment.UserName, "[USER]");
+            }
+
+            // Remove machine names from messages
+            if (!string.IsNullOrEmpty(Environment.MachineName))
+            {
+                sanitized = sanitized.Replace(Environment.MachineName, "[MACHINE]");
+            }
+
+            // Remove full file paths that might contain sensitive information
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+", "[FILE_PATH]");
+
+            // Remove IP addresses
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[IP_ADDRESS]");
+
+            // Remove port numbers from URLs
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @":\d{1,5}(?=/|$)", ":[PORT]");
+
+            return sanitized;
+        }
+        catch
+        {
+            // If sanitization fails, return a generic message
+            return "An error occurred. Please contact support if issue persists.";
+        }
     }
 
 

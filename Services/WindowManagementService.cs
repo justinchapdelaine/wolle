@@ -162,7 +162,6 @@ namespace wolle.Services
         {
             lock (_stateLock)
             {
-                _isWindowClosing = true;
                 _isProcessingComplete = true;
                 _logger?.LogInformation("Window closing allowed");
             }
