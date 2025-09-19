@@ -255,11 +255,34 @@ public partial class MainWindow : Window, IDisposable
                 _logger?.LogInformation($"Progress: {progress.percent}% - {progress.status}");
             }
 
-            Dispatcher.Invoke(() =>
+            if (Dispatcher.CheckAccess())
             {
-                // Use progress management service to handle all progress display logic
+                // Direct call if already on UI thread
                 _serviceFacade.ProgressManagementService.UpdateProgress(progress);
-            });
+            }
+            else
+            {
+                try
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (!_isClosing)
+                        {
+                            _serviceFacade.ProgressManagementService.UpdateProgress(progress);
+                        }
+                    }, DispatcherPriority.Normal);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Dispatcher was shut down
+                    _logger?.LogWarning("Dispatcher shut down during progress update");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Dispatcher might be in an invalid state
+                    _logger?.LogWarning(ex, "Dispatcher in invalid state during progress update");
+                }
+            }
         }
     }
 
@@ -301,16 +324,43 @@ public partial class MainWindow : Window, IDisposable
     {
         if (!_isClosing && _serviceFacade.OllamaService != null)
         {
-            // Use Dispatcher to update UI from background thread
-            Dispatcher.Invoke(() =>
+            if (Dispatcher.CheckAccess())
             {
-                // Hide progress section when first output is received
+                // Direct call if already on UI thread
                 if (ProgressSection.Visibility == Visibility.Visible)
                 {
                     ProgressSection.Visibility = Visibility.Collapsed;
                 }
                 AppendResponseText(output);
-            });
+            }
+            else
+            {
+                try
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (!_isClosing)
+                        {
+                            // Hide progress section when first output is received
+                            if (ProgressSection.Visibility == Visibility.Visible)
+                            {
+                                ProgressSection.Visibility = Visibility.Collapsed;
+                            }
+                            AppendResponseText(output);
+                        }
+                    }, DispatcherPriority.Normal);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Dispatcher was shut down
+                    _logger?.LogWarning("Dispatcher shut down during output received");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Dispatcher might be in an invalid state
+                    _logger?.LogWarning(ex, "Dispatcher in invalid state during output received");
+                }
+            }
         }
     }
 
@@ -345,9 +395,9 @@ public partial class MainWindow : Window, IDisposable
             _serviceFacade.StatusManagementService.StopStatusTimer();
             _logger?.LogInformation("Status update timer stopped");
 
-            // Use Dispatcher to update UI from background thread
-            Dispatcher.Invoke(() =>
+            if (Dispatcher.CheckAccess())
             {
+                // Direct call if already on UI thread
                 // Ensure progress section is hidden
                 ProgressSection.Visibility = Visibility.Collapsed;
 
@@ -356,7 +406,37 @@ public partial class MainWindow : Window, IDisposable
                 {
                     ApplyPendingSettings();
                 }
-            });
+            }
+            else
+            {
+                try
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (!_isClosing)
+                        {
+                            // Ensure progress section is hidden
+                            ProgressSection.Visibility = Visibility.Collapsed;
+
+                            // Apply any pending settings changes, but don't dispose service if still processing UI
+                            if (!_isClosing)
+                            {
+                                ApplyPendingSettings();
+                            }
+                        }
+                    }, DispatcherPriority.Normal);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Dispatcher was shut down
+                    _logger?.LogWarning("Dispatcher shut down during process complete");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Dispatcher might be in an invalid state
+                    _logger?.LogWarning(ex, "Dispatcher in invalid state during process complete");
+                }
+            }
         }
     }
 
@@ -389,7 +469,7 @@ public partial class MainWindow : Window, IDisposable
     protected override void OnClosed(EventArgs e)
     {
         _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isClosing={_isClosing}");
-        
+
         lock (_stateLock)
         {
             if (_isClosing) return; // Prevent multiple calls
