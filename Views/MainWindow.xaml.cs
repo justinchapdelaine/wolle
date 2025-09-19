@@ -403,7 +403,10 @@ public partial class MainWindow : Window, IDisposable
         }
 
         // Cancel any ongoing processing
-        _cancellationTokenSource.Cancel();
+        if (!_disposed)
+        {
+            _cancellationTokenSource.Cancel();
+        }
 
         // Dispose cancellation token source (only if not already disposed)
         if (!_disposed)
@@ -454,8 +457,11 @@ public partial class MainWindow : Window, IDisposable
             if (disposing)
             {
                 // Dispose managed resources
-                _cancellationTokenSource?.Cancel();
-                _cancellationTokenSource?.Dispose();
+                if (!_disposed)
+                {
+                    _cancellationTokenSource?.Cancel();
+                    _cancellationTokenSource?.Dispose();
+                }
                 _serviceFacade?.Dispose();
             }
             _disposed = true;
