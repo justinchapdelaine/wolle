@@ -23,6 +23,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly object _stateLock = new object();
     private CancellationTokenSource _cancellationTokenSource = new();
     private readonly MainWindowViewModel _viewModel;
+    private bool _disposed = false;
 
     public MainWindow(IMainWindowServiceFacade serviceFacade, IServiceProvider serviceProvider, MainWindowViewModel viewModel, ILogger<MainWindow> logger)
     {
@@ -404,8 +405,11 @@ public partial class MainWindow : Window, IDisposable
         // Cancel any ongoing processing
         _cancellationTokenSource.Cancel();
 
-        // Dispose cancellation token source
-        _cancellationTokenSource.Dispose();
+        // Dispose cancellation token source (only if not already disposed)
+        if (!_disposed)
+        {
+            _cancellationTokenSource.Dispose();
+        }
 
         // Unsubscribe from status timer events
         _serviceFacade.StatusManagementService.OnStatusTimerTick -= OnStatusUpdateTimerTick;
@@ -420,7 +424,10 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             // Cancel any ongoing processing first
-            _cancellationTokenSource.Cancel();
+            if (!_disposed)
+            {
+                _cancellationTokenSource.Cancel();
+            }
 
             // Now dispose the service
             _serviceFacade.DisposeServices();
@@ -442,11 +449,16 @@ public partial class MainWindow : Window, IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-        if (disposing)
+        if (!_disposed)
         {
-            // Dispose managed resources
-            _cancellationTokenSource?.Dispose();
-            _serviceFacade?.Dispose();
+            if (disposing)
+            {
+                // Dispose managed resources
+                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource?.Dispose();
+                _serviceFacade?.Dispose();
+            }
+            _disposed = true;
         }
     }
 }
