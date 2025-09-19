@@ -52,14 +52,11 @@ namespace wolle.Services
         /// <param name="e">The cancel event arguments</param>
         public void OnWindowClosing(CancelEventArgs e)
         {
-            _logger?.LogInformation($"Window closing event triggered. Cancel={e.Cancel}, _isProcessingComplete={_isProcessingComplete}, _isWindowClosing={_isWindowClosing}");
-
             lock (_stateLock)
             {
-                // Check if window is already closing
+                // Check if window is already in the process of closing
                 if (_isWindowClosing)
                 {
-                    _logger?.LogInformation("Window already closing - preventing duplicate close");
                     e.Cancel = true;
                     return;
                 }
@@ -67,14 +64,12 @@ namespace wolle.Services
                 // Check if processing is complete or user wants to force close
                 if (!_isProcessingComplete)
                 {
-                    _logger?.LogInformation("Processing not complete - allowing close with cancellation");
+                    // Allow close but log that processing wasn't complete
                 }
 
-                // Mark that we're attempting to close
+                // Mark that we're attempting to close only after all checks pass
                 _isWindowClosing = true;
             }
-
-            _logger?.LogInformation("Window closing allowed");
         }
 
         /// <summary>
