@@ -290,24 +290,81 @@ private ServiceLifetime DetermineServiceLifetime(Type serviceType)
 **Note:** Simplified approach chosen over complex ServiceLifetimeManager to maintain window closing functionality while providing enhanced memory leak prevention.
 
 ### 7. Error Message Security
-**File:** `Services/ExceptionHandlingService.cs`  
+**File:** `ViewModels/MainWindowViewModel.cs`  
 **Risk:** Information disclosure and security vulnerabilities  
 **Priority:** High
+**Status:** ✅ **Completed**
 
-- [ ] **7.1** Implement error message sanitization
-- [ ] **7.2** Remove system paths from error messages
-- [ ] **7.3** Remove user and machine names from error messages
-- [ ] **7.4** Test with various exception types
-- [ ] **7.5** Add security logging for detailed errors
+- [x] **7.1** Implement error message sanitization
+- [x] **7.2** Remove system paths from error messages
+- [x] **7.3** Remove user and machine names from error messages
+- [x] **7.4** Test with various exception types
+- [x] **7.5** Add security logging for detailed errors
+
+**Additional Fix - Window Closing Race Condition:**
+```csharp
+// BEFORE (broken):
+public void AllowWindowClosing()
+{
+    _isWindowClosing = true; // ← This caused race condition
+    _isProcessingComplete = true;
+}
+
+// AFTER (fixed):
+public void AllowWindowClosing()
+{
+    _isProcessingComplete = true; // ← Only set completion flag
+    // OnWindowClosing() now properly sets _isWindowClosing = true
+}
+```
 
 **Implementation:**
 ```csharp
-private string SanitizeErrorMessage(string message)
+private string SanitizeMessage(string message)
 {
-    return message
-        .Replace(Path.GetPathRoot(Environment.CurrentDirectory)!, "[DRIVE]")
-        .Replace(Environment.UserName, "[USER]")
-        .Replace(Environment.MachineName, "[MACHINE]");
+    if (string.IsNullOrEmpty(message))
+    {
+        return message;
+    }
+
+    try
+    {
+        var sanitized = message;
+
+        // Remove system drive paths (e.g., "C:\", "D:\")
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\", "[DRIVE]");
+
+        // Remove UNC paths (e.g., "\\server\share")
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\\\\[^\s]+", "[NETWORK_PATH]");
+
+        // Remove user names from messages
+        if (!string.IsNullOrEmpty(Environment.UserName))
+        {
+            sanitized = sanitized.Replace(Environment.UserName, "[USER]");
+        }
+
+        // Remove machine names from messages
+        if (!string.IsNullOrEmpty(Environment.MachineName))
+        {
+            sanitized = sanitized.Replace(Environment.MachineName, "[MACHINE]");
+        }
+
+        // Remove full file paths that might contain sensitive information
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+", "[FILE_PATH]");
+
+        // Remove IP addresses
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[IP_ADDRESS]");
+
+        // Remove port numbers from URLs
+        sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @":\d{1,5}(?=/|$)", ":[PORT]");
+
+        return sanitized;
+    }
+    catch
+    {
+        // If sanitization fails, return a generic message
+        return "An error occurred. Please contact support if issue persists.";
+    }
 }
 ```
 
@@ -435,7 +492,7 @@ catch (Exception ex)
 
 - **Phase 2.1:** Memory Leaks in Event Aggregator (Item #5) - ✅ **Completed**
 - **Phase 2.2:** Service Lifetime Management (Item #6) - ✅ **Completed**
-- **Phase 2.3:** Error Message Security (Item #7) - ⏳ Not completed
+- **Phase 2.3:** Error Message Security (Item #7) - ✅ **Completed**
 
 **Goal:** Improve architecture and prevent memory leaks  
 **Timeline:** 3-5 days  
