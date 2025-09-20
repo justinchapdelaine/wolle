@@ -245,15 +245,20 @@ public class EventAggregator : IEventAggregator, IDisposable
             if (_weakHandlers.TryGetValue(eventType, out var handlers))
             {
                 var liveHandlers = new ConcurrentBag<WeakReference>();
-                foreach (var handlerRef in handlers)
+                
+                // Use Chunk() to process handlers in batches of 10
+                foreach (var handlerBatch in handlers.Chunk(10))
                 {
-                    if (handlerRef.IsAlive)
+                    foreach (var handlerRef in handlerBatch)
                     {
-                        liveHandlers.Add(handlerRef);
-                    }
-                    else
-                    {
-                        deadReferencesRemoved++;
+                        if (handlerRef.IsAlive)
+                        {
+                            liveHandlers.Add(handlerRef);
+                        }
+                        else
+                        {
+                            deadReferencesRemoved++;
+                        }
                     }
                 }
 

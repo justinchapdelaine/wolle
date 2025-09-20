@@ -20,6 +20,7 @@ namespace wolle;
 public partial class App : Application
 {
     private IServiceProvider? _serviceProvider;
+    private ILogger<App>? _logger;
 
     [SupportedOSPlatform("windows")]
     protected override void OnStartup(StartupEventArgs e)
@@ -37,6 +38,9 @@ public partial class App : Application
             var services = new ServiceCollection();
             ConfigureServices(services);
             _serviceProvider = services.BuildServiceProvider();
+            
+            // Get logger for debug output
+            _logger = _serviceProvider.GetService<ILogger<App>>();
 
             // Check if a file path was passed as argument
             if (e.Args.Length > 0)
@@ -230,21 +234,28 @@ public partial class App : Application
             .Where(t => t.Namespace?.StartsWith("wolle.Services") == true)
             .ToList();
 
+        // Use CountBy to analyze service type distribution
+        var serviceCounts = serviceTypes
+            .Select(t => t.Name.ToLower())
+            .CountBy(name => name.Contains("service") ? "Service" : "Other");
+
+        _logger?.LogDebug("Service registration analysis: {ServiceCounts}", 
+            string.Join(", ", serviceCounts.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+
         // Register interface implementations with appropriate lifetimes
-        foreach (var serviceType in serviceTypes)
+        foreach (var (index, serviceType) in serviceTypes.Index())
         {
+            _logger?.LogDebug("Processing service {Index}: {ServiceName}", index + 1, serviceType.Name);
             // Skip interfaces and abstract classes
             if (serviceType.IsInterface || serviceType.IsAbstract)
                 continue;
 
             // Skip special cases that need manual registration
-            if (serviceType.Name == "SettingsService" ||
-                serviceType.Name == "OllamaService" ||
-                serviceType.Name == "MainWindow" ||
-                serviceType.Name == "ContextMenuService" ||
-                serviceType.Name == "OllamaHttpService" ||
-                serviceType.Name == "OllamaProcessService" ||
-                serviceType.Name == "MainWindowViewModel")
+            var specialCases = new[] { "SettingsService", "OllamaService", "MainWindow", 
+                                   "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
+                                   "MainWindowViewModel" };
+            
+            if (specialCases.Contains(serviceType.Name))
                 continue;
 
             // Find the corresponding interface

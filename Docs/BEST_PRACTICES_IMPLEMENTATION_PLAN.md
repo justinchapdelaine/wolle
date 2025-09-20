@@ -561,11 +561,11 @@ sanitized = DrivePathRegex().Replace(sanitized, "[DRIVE]");
 **Files:** `App.xaml.cs`, `Services/EventAggregator.cs`  
 **Benefits:** Cleaner code with modern LINQ operators
 
-- [ ] **12.3.1** Replace manual counting with CountBy in service registration
-- [ ] **12.3.2** Use DistinctBy for service type filtering
-- [ ] **12.3.3** Implement Chunk() for batch processing in EventAggregator
-- [ ] **12.3.4** Add Index() for enumeration with position tracking
-- [ ] **12.3.5** Test LINQ improvements maintain functionality
+- [x] **12.3.1** Replace manual counting with CountBy in service registration
+- [x] **12.3.2** Use DistinctBy for service type filtering
+- [x] **12.3.3** Implement Chunk() for batch processing in EventAggregator
+- [x] **12.3.4** Add Index() for enumeration with position tracking
+- [x] **12.3.5** Test LINQ improvements maintain functionality
 
 **Implementation Example:**
 ```csharp
