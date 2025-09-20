@@ -44,14 +44,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
-
+        
         // Initialize commands
-        CloseCommand = new RelayCommand(ExecuteClose);
-        SettingsCommand = new RelayCommand(ExecuteSettings);
-        SaveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
-        CancelSettingsCommand = new RelayCommand(ExecuteCancelSettings);
+        _closeCommand = new RelayCommand(ExecuteClose);
+        _settingsCommand = new RelayCommand(ExecuteSettings);
+        _saveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
+        _cancelSettingsCommand = new RelayCommand(ExecuteCancelSettings);
 
-        // Subscribe to events
         SubscribeToEvents();
     }
 
@@ -190,10 +189,15 @@ public class MainWindowViewModel : INotifyPropertyChanged
         set => SetProperty(ref _isProcessing, value);
     }
 
-    public ICommand CloseCommand { get; }
-    public ICommand SettingsCommand { get; }
-    public ICommand SaveSettingsCommand { get; }
-    public ICommand CancelSettingsCommand { get; }
+    private readonly ICommand _closeCommand;
+    private readonly ICommand _settingsCommand;
+    private readonly ICommand _saveSettingsCommand;
+    private readonly ICommand _cancelSettingsCommand;
+
+    public ICommand CloseCommand => _closeCommand;
+    public ICommand SettingsCommand => _settingsCommand;
+    public ICommand SaveSettingsCommand => _saveSettingsCommand;
+    public ICommand CancelSettingsCommand => _cancelSettingsCommand;
 
     private void SubscribeToEvents()
     {

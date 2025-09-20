@@ -9,30 +9,21 @@ namespace wolle.Services
     /// <summary>
     /// Service for managing file processing operations
     /// </summary>
-    public class FileProcessingService : IFileProcessingService
+    public class FileProcessingService(
+        OllamaService ollamaService,
+        IStatusManagementService statusManagementService,
+        ILogger<FileProcessingService> logger) : IFileProcessingService
     {
-        private readonly OllamaService _ollamaService;
-        private readonly ILogger<FileProcessingService> _logger;
-        private IStatusManagementService _statusManagementService;
-        private readonly object _processingLock = new();
+        private readonly OllamaService _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
+        private readonly ILogger<FileProcessingService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private IStatusManagementService _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
         private string _currentFilePath = string.Empty;
         private bool _isProcessingActive = false;
         private bool _isProcessingComplete = false;
         private double _processingProgress = 0.0;
         private string _processingStatus = "Initializing...";
 
-        /// <summary>
-        /// Initializes file processing service
-        /// </summary>
-        /// <param name="ollamaService">The Ollama service</param>
-        /// <param name="statusManagementService">The status management service</param>
-        /// <param name="logger">The logger</param>
-        public FileProcessingService(OllamaService ollamaService, IStatusManagementService statusManagementService, ILogger<FileProcessingService> logger)
-        {
-            _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
-            _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly object _processingLock = new();
 
         /// <summary>
         /// Initializes file processing service

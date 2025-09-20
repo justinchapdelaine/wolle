@@ -489,15 +489,252 @@ await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 - **5-15%** improvement in overall application responsiveness
 - Better code maintainability with modern .NET 9 syntax
 
-### 12. Documentation and Code Quality
+### 12. Additional Modern .NET 9 Features
+**Files:** Multiple files across the codebase  
+**Risk:** Missing latest .NET 9 optimizations and syntax improvements  
+**Priority:** Low
+**Status:** 🔄 **In Progress**
+
+#### **12.1 Primary Constructors**
+**Files:** All service classes, ViewModels, RelayCommand  
+**Benefits:** Reduce boilerplate code by 20-30%
+
+- [x] **12.1.1** Convert MainWindowViewModel to primary constructor
+- [x] **12.1.2** Convert RelayCommand to primary constructor
+- [x] **12.1.3** Convert all service classes to primary constructors
+- [x] **12.1.4** Convert MainWindow to primary constructor
+- [x] **12.1.5** Test all converted constructors maintain functionality
+
+**Implementation Example:**
+```csharp
+// Current:
+public class MainWindowViewModel : INotifyPropertyChanged
+{
+    private readonly ILogger<MainWindowViewModel> _logger;
+    private readonly IMainWindowServiceFacade _serviceFacade;
+    
+    public MainWindowViewModel(ILogger<MainWindowViewModel> logger, IMainWindowServiceFacade serviceFacade)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
+    }
+}
+
+// After:
+public class MainWindowViewModel(
+    ILogger<MainWindowViewModel> logger,
+    IMainWindowServiceFacade serviceFacade) : INotifyPropertyChanged
+{
+    private readonly ILogger<MainWindowViewModel> _logger = logger;
+    private readonly IMainWindowServiceFacade _serviceFacade = serviceFacade;
+}
+```
+
+#### **12.2 Regex Source Generators**
+**File:** `ViewModels/MainWindowViewModel.cs` (SanitizeMessage method)  
+**Benefits:** 3-5x performance improvement for message sanitization
+
+- [ ] **12.2.1** Add regex source generator attributes
+- [ ] **12.2.2** Replace runtime regex compilation with generated methods
+- [ ] **12.2.3** Test regex performance improvements
+- [ ] **12.2.4** Verify sanitization still works correctly
+
+**Implementation Example:**
+```csharp
+[GeneratedRegex(@"[A-Za-z]:\\")]
+private static partial Regex DrivePathRegex();
+
+[GeneratedRegex(@"\\\\[^\s]+")]
+private static partial Regex UncPathRegex();
+
+[GeneratedRegex(@"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+")]
+private static partial Regex FilePathRegex();
+
+[GeneratedRegex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b")]
+private static partial Regex IpAddressRegex();
+
+// Replace runtime regex with generated ones
+sanitized = DrivePathRegex().Replace(sanitized, "[DRIVE]");
+```
+
+#### **12.3 New LINQ Methods**
+**Files:** `App.xaml.cs`, `Services/EventAggregator.cs`  
+**Benefits:** Cleaner code with modern LINQ operators
+
+- [ ] **12.3.1** Replace manual counting with CountBy in service registration
+- [ ] **12.3.2** Use DistinctBy for service type filtering
+- [ ] **12.3.3** Implement Chunk() for batch processing in EventAggregator
+- [ ] **12.3.4** Add Index() for enumeration with position tracking
+- [ ] **12.3.5** Test LINQ improvements maintain functionality
+
+**Implementation Example:**
+```csharp
+// In App.xaml.cs
+var serviceCounts = serviceTypes
+    .Select(t => t.Name.ToLower())
+    .CountBy(name => name.Contains("service") ? "Service" : "Other");
+
+// In EventAggregator.cs
+var deadReferences = _weakHandlers.Values
+    .SelectMany(handlers => handlers)
+    .Where(handler => !handler.IsAlive)
+    .Chunk(10) // Process in batches of 10
+    .SelectMany(chunk => chunk);
+```
+
+#### **12.4 Span<T> String Processing**
+**File:** `ViewModels/MainWindowViewModel.cs` (SanitizeMessage method)  
+**Benefits:** 15-20% memory reduction for string operations
+
+- [ ] **12.4.1** Convert SanitizeMessage to use Span<T> operations
+- [ ] **12.4.2** Implement span-based pattern matching
+- [ ] **12.4.3** Test memory improvements with profiling
+- [ ] **12.4.4** Verify string processing correctness
+
+**Implementation Example:**
+```csharp
+private string SanitizeMessage(string message)
+{
+    if (string.IsNullOrEmpty(message))
+        return message;
+
+    return string.Create(message.Length, message, (span, message) =>
+    {
+        message.AsSpan().CopyTo(span);
+        
+        // Use span-based operations for better performance
+        var drivePattern = "[A-Za-z]:\\".AsSpan();
+        var networkPattern = "\\\\".AsSpan();
+        
+        // Replace patterns using span operations
+        // ... implementation details
+    });
+}
+```
+
+#### **12.5 Collection Expressions**
+**Files:** `App.xaml.cs`, various initialization code  
+**Benefits:** More concise array initialization syntax
+
+- [ ] **12.5.1** Replace array initializations with collection expressions
+- [ ] **12.5.2** Update special cases array in App.xaml.cs
+- [ ] **12.5.3** Convert list initializations where appropriate
+- [ ] **12.5.4** Test collection expressions work correctly
+
+**Implementation Example:**
+```csharp
+// Current:
+var specialCases = new[] { "SettingsService", "OllamaService", "MainWindow", 
+                          "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
+                          "MainWindowViewModel" };
+
+// After:
+var specialCases = ["SettingsService", "OllamaService", "MainWindow", 
+                    "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
+                    "MainWindowViewModel"];
+```
+
+#### **12.6 Task Parallelism Improvements**
+**File:** `Services/FileProcessingService.cs`  
+**Benefits:** Better async performance with modern task parallelism
+
+- [ ] **12.6.1** Implement Parallel.ForEachAsync for multiple file processing
+- [ ] **12.6.2** Use Task.WhenEach for processing completion tracking
+- [ ] **12.6.3** Add CancellationTokenSource.CreateLinkedTokenSource
+- [ ] **12.6.4** Test parallel processing improvements
+- [ ] **12.6.5** Verify cancellation handling works correctly
+
+**Implementation Example:**
+```csharp
+public async Task ProcessMultipleFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken)
+{
+    var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+    
+    await Parallel.ForEachAsync(filePaths, linkedTokenSource.Token, async (filePath, ct) =>
+    {
+        await ProcessFileAsync(filePath, ct);
+    });
+    
+    // Use Task.WhenEach for processing completion
+    await foreach (var task in Task.WhenEach(processingTasks))
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error processing file");
+        }
+    }
+}
+```
+
+#### **12.7 Required Members Usage**
+**Files:** ViewModels, service classes  
+**Benefits:** Cleaner dependency injection patterns
+
+- [ ] **12.7.1** Add required properties to MainWindowViewModel
+- [ ] **12.7.2** Convert MainWindow to use required members
+- [ ] **12.7.3** Update service classes with required dependencies
+- [ ] **12.7.4** Test required members work with DI container
+- [ ] **12.7.5** Verify all required dependencies are properly injected
+
+**Implementation Example:**
+```csharp
+public class MainWindowViewModel : INotifyPropertyChanged
+{
+    public required ILogger<MainWindowViewModel> Logger { get; init; }
+    public required IMainWindowServiceFacade ServiceFacade { get; init; }
+    
+    // Constructor can be simplified or removed if using primary constructor
+}
+```
+
+#### **12.8 Pattern Matching Enhancements**
+**File:** `App.xaml.cs` (DetermineServiceLifetime method)  
+**Benefits:** More concise and readable pattern matching
+
+- [ ] **12.8.1** Convert DetermineServiceLifetime to use enhanced pattern matching
+- [ ] **12.8.2** Add list patterns for complex matching scenarios
+- [ ] **12.8.3** Test pattern matching improvements
+- [ ] **12.8.4** Verify all service types are correctly categorized
+
+**Implementation Example:**
+```csharp
+private ServiceLifetime DetermineServiceLifetime(Type serviceType)
+{
+    var typeName = serviceType.Name.ToLower();
+    
+    return typeName switch
+    {
+        var name when name.Contains("state") || 
+                     name.Contains("management") || 
+                     name.Contains("coordinator") || 
+                     name.Contains("aggregator") => ServiceLifetime.Singleton,
+        
+        var name when name.Contains("ui") || 
+                     name.Contains("interaction") || 
+                     name.Contains("display") => ServiceLifetime.Scoped,
+        
+        var name when name.Contains("conversion") || 
+                     name.Contains("debounce") || 
+                     name.Contains("validation") => ServiceLifetime.Transient,
+        
+        _ => ServiceLifetime.Singleton
+    };
+}
+```
+
+### 13. Documentation and Code Quality
 **Files:** Multiple files  
 **Risk:** Reduced maintainability  
 **Priority:** Low
 
-- [ ] **12.1** Add comprehensive XML documentation
-- [ ] **12.2** Standardize naming conventions
-- [ ] **12.3** Improve code organization
-- [ ] **12.4** Add inline comments for complex logic
+- [ ] **13.1** Add comprehensive XML documentation
+- [ ] **13.2** Standardize naming conventions
+- [ ] **13.3** Improve code organization
+- [ ] **13.4** Add inline comments for complex logic
 
 ---
 
@@ -541,10 +778,11 @@ await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 **Focus:** All Low Priority issues
 
 - **Phase 4.1:** Modern .NET Features (Item #11) - ✅ **Completed**
-- **Phase 4.2:** Documentation and Code Quality (Item #12) - ⏳ Not completed
+- **Phase 4.2:** Additional Modern .NET 9 Features (Item #12) - ⏳ **Planned**
+- **Phase 4.3:** Documentation and Code Quality (Item #13) - ⏳ **Planned**
 
 **Goal:** Final polish and documentation  
-**Timeline:** 1-2 days  
+**Timeline:** 2-3 days  
 **Testing:** Final validation and documentation review
 
 ---
@@ -572,6 +810,7 @@ await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
 ### ✅ Low Priority Complete
 - [x] Modern .NET features implemented
+- [ ] Additional modern .NET 9 features implemented
 - [ ] Documentation comprehensive
 - [ ] Naming conventions standardized
 - [ ] Code organization optimized
@@ -629,9 +868,52 @@ await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
 ---
 
+## Additional Modern .NET 9 Features Implementation Plan
+
+### Phase 4.2: Modern .NET 9 Features (Item #12)
+
+#### **Implementation Strategy:**
+1. **High Impact First:** Start with primary constructors and regex source generators for immediate benefits
+2. **Incremental Changes:** Implement one feature at a time with testing
+3. **Performance Focus:** Prioritize features with measurable performance improvements
+4. **Maintainability:** Focus on features that improve code readability and maintenance
+
+#### **Timeline:** 1-2 days
+#### **Priority Order:**
+1. **Primary Constructors** - All service classes and ViewModels (highest impact)
+2. **Regex Source Generators** - Message sanitization performance (critical path)
+3. **New LINQ Methods** - Service registration and event handling (code clarity)
+4. **Span<T> String Processing** - Memory optimization (medium impact)
+5. **Collection Expressions** - Syntax improvement (low impact)
+6. **Task Parallelism Improvements** - File processing (future enhancement)
+7. **Required Members Usage** - Dependency injection (modernization)
+8. **Pattern Matching Enhancements** - Service lifetime logic (code clarity)
+
+#### **Testing Requirements:**
+- **Unit Tests:** Verify all converted constructors work correctly
+- **Performance Tests:** Benchmark regex and span-based operations
+- **Integration Tests:** Ensure DI container compatibility with required members
+- **Memory Profiling:** Verify memory improvements from span-based operations
+- **Functional Tests:** Confirm all features maintain existing functionality
+
+#### **Risk Assessment:**
+- **Low Risk:** Primary constructors, collection expressions, pattern matching
+- **Medium Risk:** Regex source generators, required members, new LINQ methods
+- **Higher Risk:** Span<T> operations, task parallelism improvements
+
+#### **Rollback Plan:**
+- Each feature will be implemented in separate commits
+- All changes will be tested individually before combining
+- Maintain ability to revert specific features if issues arise
+
+---
+
 ## Notes
 
 - All changes should follow the existing commit message format
 - Each change should be committed separately with clear descriptions
 - Backward compatibility should be maintained where possible
 - Performance benchmarks should be established before optimization work begins
+- Modern .NET 9 features should be implemented incrementally with testing
+- Focus on features that provide immediate performance and maintainability benefits
+- Verify compatibility with existing WPF and dependency injection patterns

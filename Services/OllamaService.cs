@@ -31,16 +31,6 @@ public class OllamaService : IDisposable
     public event Action<OllamaProgress>? OnProgressUpdate;
     public event Action? OnProcessComplete;
 
-    /// <summary>
-    /// Initializes a new instance of OllamaService class.
-    /// </summary>
-    /// <param name="settings">The application settings configuration.</param>
-    /// <param name="logger">Logger service for logging operations.</param>
-    /// <param name="ollamaHttpService">HTTP service for Ollama API communication.</param>
-    /// <param name="ollamaProcessService">Process service for Ollama process management.</param>
-    /// <param name="ollamaPerformanceService">Performance service for metrics and statistics.</param>
-    /// <param name="ollamaFileService">File service for file operations and validation.</param>
-    /// <param name="eventAggregator">Event aggregator for communication.</param>
     public OllamaService(
         IOptions<AppSettings> settings,
         ILogger<OllamaService> logger,
