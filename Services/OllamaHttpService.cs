@@ -68,7 +68,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OllamaHttpService> _logger;
     private readonly IExceptionHandlingService _exceptionHandlingService;
-    private readonly SemaphoreSlim _apiLock = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim _apiLock = new(1, 1);
     private HttpClient _httpClient;
     private bool _isDisposed = false;
 
@@ -94,7 +94,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     /// <returns>True if model exists, false otherwise.</returns>
     public async Task<bool> ModelExistsAsync(string modelName, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation($"Checking if model exists: {modelName}");
+        _logger?.LogInformation("Checking if model exists: {ModelName}", modelName);
 
         try
         {
@@ -104,7 +104,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 return false;
             }
 
-            await _apiLock.WaitAsync(cancellationToken);
+            await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (_isDisposed)
@@ -365,7 +365,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 return;
             }
 
-            await _apiLock.WaitAsync(cancellationToken);
+            await _apiLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (_isDisposed)

@@ -60,7 +60,7 @@ public class OllamaService : IDisposable
 
         var appSettings = _settings.Value;
         _modelName = appSettings.ModelName;
-        _logger.LogInformation($"OllamaService created with timeout: {appSettings.ApiTimeoutSeconds} seconds");
+        _logger.LogInformation("OllamaService created with timeout: {Timeout} seconds", appSettings.ApiTimeoutSeconds);
     }
 
     /// <summary>
@@ -72,7 +72,7 @@ public class OllamaService : IDisposable
         _logger?.LogInformation("EnsureOllamaReadyAsync started");
         string? ollamaPath = _ollamaFileService.GetOllamaPath();
 
-        _logger?.LogInformation($"Ollama path: {ollamaPath ?? "null"}");
+        _logger?.LogInformation("Ollama path: {Path}", ollamaPath ?? "null");
 
         if (string.IsNullOrEmpty(ollamaPath))
         {
@@ -97,11 +97,11 @@ public class OllamaService : IDisposable
 
         // Step 2: Check if model already exists
         OnStatusUpdate?.Invoke($"Checking {_modelName} model availability...");
-        _logger?.LogInformation($"Checking if {_modelName} model exists");
+        _logger?.LogInformation("Checking if {ModelName} model exists", _modelName);
         if (await _ollamaHttpService.ModelExistsAsync(_modelName))
         {
             OnStatusUpdate?.Invoke($"{_modelName} model ready");
-            _logger?.LogInformation($"{_modelName} model already exists");
+            _logger?.LogInformation("{ModelName} model already exists", _modelName);
             return true;
         }
 
@@ -421,8 +421,8 @@ public class OllamaService : IDisposable
         if (string.IsNullOrEmpty(path))
             return true;
 
-        // Check for obvious path traversal patterns
-        var traversalPatterns = new[] { "..\\", "../", "..\t", "..\n", "..\r" };
+        // Check for obvious path traversal patterns using modern .NET 9 span-based operations
+        ReadOnlySpan<string> traversalPatterns = ["..\\", "../", "..\t", "..\n", "..\r"];
         
         foreach (var pattern in traversalPatterns)
         {
@@ -436,8 +436,22 @@ public class OllamaService : IDisposable
             return true;
 
         // Check for multiple consecutive dots that could be obfuscated traversal
-        if (Regex.IsMatch(path, @"\.\.{2,}"))
-            return true;
+        // Use span-based pattern matching instead of Regex for better performance
+        var pathSpan = path.AsSpan();
+        int consecutiveDots = 0;
+        for (int i = 0; i < pathSpan.Length; i++)
+        {
+            if (pathSpan[i] == '.')
+            {
+                consecutiveDots++;
+                if (consecutiveDots >= 2)
+                    return true;
+            }
+            else
+            {
+                consecutiveDots = 0;
+            }
+        }
 
         return false;
     }
@@ -452,20 +466,9 @@ public class OllamaService : IDisposable
         if (string.IsNullOrEmpty(path))
             return true;
 
-        // Characters that could indicate command injection or other attacks
-        var suspiciousChars = new[] { '|', '&', ';', '<', '>', '"', '\'', '`', '$', '(', ')', '{', '}', '[', ']', '!', '@', '#', '^', '~', '*' };
-        
-        foreach (var charToCheck in suspiciousChars)
-        {
-            if (path.Contains(charToCheck))
-                return true;
-        }
-
-        // Check for null bytes
-        if (path.Contains('\0'))
-            return true;
-
-        return false;
+        // Characters that could indicate command injection or other attacks - use span-based operations
+        ReadOnlySpan<char> suspiciousChars = "|&;<>'`$(){}[]!@#^~*";
+        return path.AsSpan().IndexOfAny(suspiciousChars) >= 0;
     }
 
     /// <summary>
@@ -480,10 +483,15 @@ public class OllamaService : IDisposable
 
         string extension = Path.GetExtension(filePath).ToLowerInvariant();
         
-        // Allowed extensions based on project requirements
-        var allowedExtensions = new[] { ".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py" };
+        // Allowed extensions based on project requirements - use modern .NET 9 span
+        ReadOnlySpan<string> allowedExtensions = [".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py"];
         
-        return Array.Exists(allowedExtensions, ext => ext == extension);
+        for (int i = 0; i < allowedExtensions.Length; i++)
+        {
+            if (string.Equals(allowedExtensions[i], extension, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>

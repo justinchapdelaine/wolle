@@ -65,7 +65,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     private Process? _ollamaServerProcess;
     private Process? _ollamaProcess;
     private bool _isDisposed = false;
-    private readonly object _processLock = new object();
+    private readonly object _processLock = new();
 
     /// <summary>
     /// Initializes a new instance of OllamaProcessService class.

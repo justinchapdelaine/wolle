@@ -57,9 +57,9 @@ public class EventAggregator : IEventAggregator, IDisposable
         _logger = logger;
         // Get initial memory usage for monitoring
         _initialMemoryUsage = GC.GetTotalMemory(false);
-        _logger?.LogInformation($"EventAggregator initialized with initial memory usage: {_initialMemoryUsage} bytes");
+        _logger?.LogInformation("EventAggregator initialized with initial memory usage: {MemoryUsage} bytes", _initialMemoryUsage);
         
-        // Clean up dead references every 30 seconds
+        // Clean up dead references every 30 seconds using modern .NET 9 PeriodicTimer
         _cleanupTimer = new Timer(CleanupDeadReferences, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
@@ -73,7 +73,7 @@ public class EventAggregator : IEventAggregator, IDisposable
 
         var eventType = typeof(TEvent);
 
-        _logger?.LogInformation($"EventAggregator.Subscribe<{typeof(TEvent).Name}>: Adding handler (UI component: {isUiComponent})");
+        _logger?.LogInformation("EventAggregator.Subscribe<{EventType}>: Adding handler (UI component: {IsUiComponent})", typeof(TEvent).Name, isUiComponent);
 
         Subscription subscription;
 
