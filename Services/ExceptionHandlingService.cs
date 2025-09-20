@@ -108,11 +108,22 @@ namespace wolle.Services
             {
                 try
                 {
-                    await Task.Run(() => _errorManagementService.ShowError(userFriendlyMessage));
+                    await Task.Run(() => 
+                    {
+                        try
+                        {
+                            _errorManagementService.ShowError(userFriendlyMessage);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to display error message in Task.Run");
+                            throw;
+                        }
+                    });
                 }
                 catch (Exception displayEx)
                 {
-                    _logger.LogError(displayEx, "Failed to display error message to user");
+                    _logger.LogError(displayEx, "Failed to display error message asynchronously");
                 }
             }
 

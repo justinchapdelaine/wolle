@@ -213,61 +213,40 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     private void OnShowMessage(ShowMessageEvent @event)
     {
-        if (@event.IsError)
-        {
-            ShowError(@event.Message, @event.Duration);
-        }
-        else
-        {
-            ShowSuccess(@event.Message, @event.Duration);
-        }
+        ShowMessage(@event.Message, @event.IsError, @event.Duration);
     }
 
-    private void ShowError(string message, int durationMs = 0)
+    private void ShowMessage(string message, bool isError, int durationMs = 0)
     {
         var sanitizedMessage = SanitizeMessage(message);
         InfoMessage = sanitizedMessage;
-        IsInfoMessageError = true;
+        IsInfoMessageError = isError;
         IsInfoMessageVisible = true;
 
         if (durationMs > 0)
         {
-            // Use dispatcher to hide message after delay
-            var timer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(durationMs)
-            };
-            timer.Tick += (s, e) =>
-            {
-                IsInfoMessageVisible = false;
-                timer.Stop();
-            };
-            timer.Start();
+            SetupMessageTimer(durationMs);
         }
     }
 
-    private void ShowSuccess(string message, int durationMs = 0)
+    private void SetupMessageTimer(int durationMs)
     {
-        var sanitizedMessage = SanitizeMessage(message);
-        InfoMessage = sanitizedMessage;
-        IsInfoMessageError = false;
-        IsInfoMessageVisible = true;
-
-        if (durationMs > 0)
+        // Use dispatcher to hide message after delay
+        var timer = new System.Windows.Threading.DispatcherTimer
         {
-            // Use dispatcher to hide message after delay
-            var timer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(durationMs)
-            };
-            timer.Tick += (s, e) =>
-            {
-                IsInfoMessageVisible = false;
-                timer.Stop();
-            };
-            timer.Start();
-        }
+            Interval = TimeSpan.FromMilliseconds(durationMs)
+        };
+        timer.Tick += (s, e) =>
+        {
+            IsInfoMessageVisible = false;
+            timer.Stop();
+        };
+        timer.Start();
     }
+
+    private void ShowError(string message, int durationMs = 0) => ShowMessage(message, true, durationMs);
+
+    private void ShowSuccess(string message, int durationMs = 0) => ShowMessage(message, false, durationMs);
 
     private void OnUpdateStatus(UpdateStatusEvent @event)
     {

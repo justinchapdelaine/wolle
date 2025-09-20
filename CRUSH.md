@@ -84,6 +84,7 @@ The application uses **Microsoft.Extensions.Logging with Serilog** for enterpris
 - Check for newer framework features and recommended patterns
 - Cross-reference multiple sources for complex implementations
 - Note that model training data may be outdated - verify current practices
+- **Root Cause Analysis**: When features are breaking, look for underlying design flaws rather than just fixing symptoms
 
 ## Project Requirements
 ### Core Functionality

@@ -123,14 +123,12 @@ public class EventAggregator : IEventAggregator, IDisposable
         // Handle strong reference handlers (UI components)
         if (_strongHandlers.TryGetValue(eventType, out var strongHandlers))
         {
-            Delegate[] handlersCopy = strongHandlers.ToArray();
-            handlersCalled += handlersCopy.Length;
-
-            foreach (var handler in handlersCopy)
+            foreach (var handler in strongHandlers)
             {
                 try
                 {
                     ((Action<TEvent>)handler)(@event);
+                    handlersCalled++;
                 }
                 catch (Exception ex)
                 {
@@ -142,10 +140,9 @@ public class EventAggregator : IEventAggregator, IDisposable
         // Handle weak reference handlers (non-UI components)
         if (_weakHandlers.TryGetValue(eventType, out var weakHandlers))
         {
-            WeakReference[] handlersCopy = weakHandlers.ToArray();
             var liveWeakHandlers = new List<WeakReference>();
 
-            foreach (var handlerRef in handlersCopy)
+            foreach (var handlerRef in weakHandlers)
             {
                 try
                 {
@@ -163,7 +160,7 @@ public class EventAggregator : IEventAggregator, IDisposable
             }
 
             // Update weak handlers list if any were collected
-            if (liveWeakHandlers.Count != handlersCopy.Length)
+            if (liveWeakHandlers.Count != weakHandlers.Count)
             {
                 var newWeakHandlers = new ConcurrentBag<WeakReference>();
                 foreach (var liveHandler in liveWeakHandlers)
