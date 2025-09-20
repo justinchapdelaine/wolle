@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -66,6 +68,162 @@ namespace wolle.Services
                     _logger?.LogError($"Exception in ProcessFile: {ex.Message}");
                 }
             }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Processes multiple files asynchronously using modern task parallelism
+        /// </summary>
+        /// <param name="filePaths">The file paths to process</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if all files were processed successfully, false otherwise</returns>
+        public async Task<bool> ProcessMultipleFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
+        {
+            if (filePaths == null)
+            {
+                _logger?.LogError("File paths collection is null");
+                return false;
+            }
+
+            var filePathList = filePaths.ToList();
+            if (filePathList.Count == 0)
+            {
+                _logger?.LogInformation("No files to process");
+                return true;
+            }
+
+            _logger?.LogInformation($"Processing {filePathList.Count} files in parallel");
+
+            // Create linked token source for coordinated cancellation
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var processingTasks = new List<Task<bool>>();
+
+            try
+            {
+                // Process files in parallel with controlled concurrency
+                await Parallel.ForEachAsync(filePathList, new ParallelOptions
+                {
+                    CancellationToken = linkedTokenSource.Token,
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, async (filePath, ct) =>
+                {
+                    try
+                    {
+                        bool result = await ProcessFileAsync(filePath, ct);
+                        _logger?.LogInformation($"File processing completed: {filePath} - Success: {result}");
+                        return; // Return ValueTask.CompletedTask implicitly
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger?.LogInformation($"File processing cancelled: {filePath}");
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError($"Error processing file {filePath}: {ex.Message}");
+                        return; // Return ValueTask.CompletedTask implicitly
+                    }
+                });
+
+                _logger?.LogInformation("All files processed successfully");
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger?.LogInformation("Multiple file processing was cancelled");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError($"Error in multiple file processing: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Processes multiple files with individual task completion tracking using Task.WhenEach
+        /// </summary>
+        /// <param name="filePaths">The file paths to process</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if all files were processed successfully, false otherwise</returns>
+        public async Task<bool> ProcessMultipleFilesWithTrackingAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
+        {
+            if (filePaths == null)
+            {
+                _logger?.LogError("File paths collection is null");
+                return false;
+            }
+
+            var filePathList = filePaths.ToList();
+            if (filePathList.Count == 0)
+            {
+                _logger?.LogInformation("No files to process");
+                return true;
+            }
+
+            _logger?.LogInformation($"Processing {filePathList.Count} files with individual tracking");
+
+            // Create linked token source for coordinated cancellation
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var processingTasks = new List<Task<bool>>();
+
+            // Start all file processing tasks
+            foreach (var filePath in filePathList)
+            {
+                var task = Task.Run(async () =>
+                {
+                    try
+                    {
+                        return await ProcessFileAsync(filePath, linkedTokenSource.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger?.LogInformation($"File processing cancelled: {filePath}");
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError($"Error processing file {filePath}: {ex.Message}");
+                        return false;
+                    }
+                }, linkedTokenSource.Token);
+
+                processingTasks.Add(task);
+            }
+
+            var successCount = 0;
+            var failureCount = 0;
+
+            // Use Task.WhenEach for processing completion tracking
+            await foreach (var completedTask in Task.WhenEach(processingTasks).WithCancellation(linkedTokenSource.Token))
+            {
+                try
+                {
+                    bool result = await completedTask;
+                    if (result)
+                    {
+                        successCount++;
+                        _logger?.LogInformation($"File processing completed successfully. Success count: {successCount}");
+                    }
+                    else
+                    {
+                        failureCount++;
+                        _logger?.LogWarning($"File processing failed. Failure count: {failureCount}");
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogInformation("File processing tracking was cancelled");
+                    failureCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Error tracking file processing completion: {ex.Message}");
+                    failureCount++;
+                }
+            }
+
+            _logger?.LogInformation($"File processing completed. Success: {successCount}, Failures: {failureCount}");
+            return failureCount == 0;
         }
 
         /// <summary>

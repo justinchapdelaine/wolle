@@ -1,5 +1,6 @@
-using System.Threading;
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace wolle.Services
@@ -14,6 +15,22 @@ namespace wolle.Services
         /// </summary>
         /// <param name="statusManagementService">The status management service</param>
         void Initialize(IStatusManagementService statusManagementService);
+
+        /// <summary>
+        /// Processes multiple files asynchronously using modern task parallelism
+        /// </summary>
+        /// <param name="filePaths">The file paths to process</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if all files were processed successfully, false otherwise</returns>
+        Task<bool> ProcessMultipleFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Processes multiple files with individual task completion tracking using Task.WhenEach
+        /// </summary>
+        /// <param name="filePaths">The file paths to process</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if all files were processed successfully, false otherwise</returns>
+        Task<bool> ProcessMultipleFilesWithTrackingAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Processes a file asynchronously
