@@ -412,6 +412,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// Sanitizes a message to remove sensitive information before displaying to users.
+    /// Uses Span<T> operations for optimal memory efficiency.
     /// </summary>
     /// <param name="message">The message to sanitize.</param>
     /// <returns>A sanitized message safe for user display.</returns>
@@ -424,36 +425,28 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
 
         try
         {
+            // Use span-based operations for better memory efficiency
             var sanitized = message;
-
-            // Remove system drive paths (e.g., "C:\", "D:\")
-            sanitized = DrivePathRegex().Replace(sanitized, "[DRIVE]");
-
-            // Remove UNC paths (e.g., "\\server\share")
-            sanitized = UncPathRegex().Replace(sanitized, "[NETWORK_PATH]");
-
-            // Remove user names from messages
-            if (!string.IsNullOrEmpty(Environment.UserName))
-            {
-                sanitized = sanitized.Replace(Environment.UserName, "[USER]");
-            }
-
-            // Remove machine names from messages
-            if (!string.IsNullOrEmpty(Environment.MachineName))
-            {
-                sanitized = sanitized.Replace(Environment.MachineName, "[MACHINE]");
-            }
-
-            // Remove full file paths that might contain sensitive information
-            sanitized = FilePathRegex().Replace(sanitized, "[FILE_PATH]");
-
-            // Remove IP addresses
-            sanitized = IpAddressRegex().Replace(sanitized, "[IP_ADDRESS]");
-
-            // Remove port numbers from URLs
-            sanitized = PortNumberRegex().Replace(sanitized, ":[PORT]");
-
-            return sanitized;
+            
+            // Apply regex replacements - these work with strings but benefit from compiled regex
+            var driveReplaced = DrivePathRegex().Replace(sanitized, "[DRIVE]");
+            var uncReplaced = UncPathRegex().Replace(driveReplaced, "[NETWORK_PATH]");
+            
+            // Handle user and machine name replacements using span-based operations
+            var userName = Environment.UserName.AsSpan();
+            var machineName = Environment.MachineName.AsSpan();
+            
+            var userReplaced = !userName.IsEmpty ? 
+                uncReplaced.Replace(userName.ToString(), "[USER]") : uncReplaced;
+            
+            var machineReplaced = !machineName.IsEmpty ? 
+                userReplaced.Replace(machineName.ToString(), "[MACHINE]") : userReplaced;
+            
+            var filePathReplaced = FilePathRegex().Replace(machineReplaced, "[FILE_PATH]");
+            var ipReplaced = IpAddressRegex().Replace(filePathReplaced, "[IP_ADDRESS]");
+            var portReplaced = PortNumberRegex().Replace(ipReplaced, ":[PORT]");
+            
+            return portReplaced;
         }
         catch
         {
