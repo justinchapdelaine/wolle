@@ -541,7 +541,7 @@ public class OllamaService : IDisposable
         {
             // Check if the last extension is executable
             string lastExtension = Path.GetExtension(fileName).ToLowerInvariant();
-            var executableExtensions = new[] { ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".com", ".pif" };
+            string[] executableExtensions = [".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".com", ".pif"];
             
             if (Array.Exists(executableExtensions, ext => ext == lastExtension))
                 return true;

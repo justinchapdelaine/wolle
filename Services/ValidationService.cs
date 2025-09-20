@@ -13,8 +13,8 @@ namespace wolle.Services
     public static class ValidationService
     {
         private static readonly string[] _allowedBaseDirectories = Array.Empty<string>();
-        private static readonly string[] _suspiciousFilePatterns = new[] { "..", "|", "<", ">", "\"", "'", "*", "?", "\0" };
-        private static readonly string[] _allowedExtensions = new[] { ".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py" };
+        private static readonly string[] _suspiciousFilePatterns = ["..", "|", "<", ">", "\"", "'", "*", "?", "\0"];
+        private static readonly string[] _allowedExtensions = [".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py"];
         private static readonly Regex ConsecutiveDotsRegex = new(@"\.\.{2,}", RegexOptions.Compiled);
 
         /// <summary>

@@ -112,7 +112,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         startInfo.ArgumentList.Add("serve");
 
         // Validate and sanitize process arguments
-        var sanitizedArguments = SanitizeProcessArguments(new[] { "serve" });
+        var sanitizedArguments = SanitizeProcessArguments(["serve"]);
         if (sanitizedArguments == null || sanitizedArguments.Length == 0)
         {
             var ex = new ArgumentException("Invalid process arguments", nameof(ollamaPath));

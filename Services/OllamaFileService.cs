@@ -110,7 +110,7 @@ public class OllamaFileService : IOllamaFileService
             return false;
 
         string extension = Path.GetExtension(filePath).ToLowerInvariant();
-        var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp" };
+        string[] imageExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp"];
 
         return Array.Exists(imageExtensions, ext => ext == extension);
     }

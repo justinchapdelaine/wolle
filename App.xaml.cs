@@ -251,9 +251,9 @@ public partial class App : Application
                 continue;
 
             // Skip special cases that need manual registration
-            var specialCases = new[] { "SettingsService", "OllamaService", "MainWindow", 
+            string[] specialCases = ["SettingsService", "OllamaService", "MainWindow", 
                                    "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
-                                   "MainWindowViewModel" };
+                                   "MainWindowViewModel"];
             
             if (specialCases.Contains(serviceType.Name))
                 continue;

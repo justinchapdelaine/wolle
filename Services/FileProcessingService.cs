@@ -188,7 +188,7 @@ namespace wolle.Services
 
             // Check file extension
             string extension = Path.GetExtension(sanitizedPath).ToLowerInvariant();
-            string[] supportedExtensions = { ".txt", ".md", ".markdown", ".json", ".xml", ".csv" };
+            string[] supportedExtensions = [".txt", ".md", ".markdown", ".json", ".xml", ".csv"];
 
             if (!Array.Exists(supportedExtensions, ext => ext == extension))
             {

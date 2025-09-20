@@ -632,13 +632,13 @@ private string SanitizeMessage(string message)
 ```
 
 #### **12.5 Collection Expressions**
-**Files:** `App.xaml.cs`, various initialization code  
-**Benefits:** More concise array initialization syntax
+**Files:** `App.xaml.cs`, `Services/OllamaService.cs`, `Services/OllamaFileService.cs`, `Services/FileProcessingService.cs`, `Services/OllamaProcessService.cs`, `Services/ValidationService.cs`, `Services/ProgressManagementService.cs`  
+**Benefits:** Modern syntax for collection initialization (low impact but improves code readability)
 
-- [ ] **12.5.1** Replace array initializations with collection expressions
-- [ ] **12.5.2** Update special cases array in App.xaml.cs
-- [ ] **12.5.3** Convert list initializations where appropriate
-- [ ] **12.5.4** Test collection expressions work correctly
+- [x] **12.5.1** Replace array initializations with collection expressions
+- [x] **12.5.2** Update string array declarations
+- [x] **12.5.3** Convert extension arrays to modern syntax
+- [x] **12.5.4** Test collection expressions work correctly
 
 **Implementation Example:**
 ```csharp
@@ -648,10 +648,19 @@ var specialCases = new[] { "SettingsService", "OllamaService", "MainWindow",
                           "MainWindowViewModel" };
 
 // After:
-var specialCases = ["SettingsService", "OllamaService", "MainWindow", 
-                    "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
-                    "MainWindowViewModel"];
+string[] specialCases = ["SettingsService", "OllamaService", "MainWindow", 
+                        "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
+                        "MainWindowViewModel"];
 ```
+
+**Files Modified:**
+- `App.xaml.cs` - Service registration special cases array
+- `Services/OllamaService.cs` - Executable extensions array
+- `Services/OllamaFileService.cs` - Image extensions array
+- `Services/FileProcessingService.cs` - Supported extensions array
+- `Services/OllamaProcessService.cs` - Process arguments array
+- `Services/ValidationService.cs` - Security validation arrays
+- `Services/ProgressManagementService.cs` - File size units array
 
 #### **12.6 Task Parallelism Improvements**
 **File:** `Services/FileProcessingService.cs`  
@@ -797,7 +806,7 @@ private ServiceLifetime DetermineServiceLifetime(Type serviceType)
 **Focus:** All Low Priority issues
 
 - **Phase 4.1:** Modern .NET Features (Item #11) - ✅ **Completed**
-- **Phase 4.2:** Additional Modern .NET 9 Features (Item #12) - ⏳ **Planned**
+- **Phase 4.2:** Additional Modern .NET 9 Features (Item #12) - 🔄 **In Progress (5/8 completed)**
 - **Phase 4.3:** Documentation and Code Quality (Item #13) - ⏳ **Planned**
 
 **Goal:** Final polish and documentation  

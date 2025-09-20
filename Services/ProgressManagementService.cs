@@ -149,7 +149,7 @@ namespace wolle.Services
         /// <returns>Formatted string</returns>
         private string FormatBytes(long bytes)
         {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            string[] sizes = ["B", "KB", "MB", "GB", "TB"];
             double len = bytes;
             int order = 0;
 
