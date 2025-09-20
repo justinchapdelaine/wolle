@@ -39,22 +39,6 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public MainWindowViewModel(
-        ILogger<MainWindowViewModel> logger,
-        IMainWindowServiceFacade serviceFacade)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
-        
-        // Initialize commands
-        _closeCommand = new RelayCommand(ExecuteClose);
-        _settingsCommand = new RelayCommand(ExecuteSettings);
-        _saveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
-        _cancelSettingsCommand = new RelayCommand(ExecuteCancelSettings);
-
-        SubscribeToEvents();
-    }
-
     /// <summary>
     /// Sets the cancellation token source to be used for operations
     /// </summary>
@@ -190,6 +174,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         set => SetProperty(ref _isProcessing, value);
     }
 
+    // Initialize commands in constructor
     private readonly ICommand _closeCommand;
     private readonly ICommand _settingsCommand;
     private readonly ICommand _saveSettingsCommand;
@@ -199,6 +184,22 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
     public ICommand SettingsCommand => _settingsCommand;
     public ICommand SaveSettingsCommand => _saveSettingsCommand;
     public ICommand CancelSettingsCommand => _cancelSettingsCommand;
+
+    public MainWindowViewModel(
+        ILogger<MainWindowViewModel> logger,
+        IMainWindowServiceFacade serviceFacade)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
+        
+        // Initialize commands
+        _closeCommand = new RelayCommand(ExecuteClose);
+        _settingsCommand = new RelayCommand(ExecuteSettings);
+        _saveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
+        _cancelSettingsCommand = new RelayCommand(ExecuteCancelSettings);
+
+        SubscribeToEvents();
+    }
 
     private void SubscribeToEvents()
     {
@@ -256,6 +257,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
     private void OnUpdateStatus(UpdateStatusEvent @event)
     {
         ProgressDetails = @event.Status;
+        _logger.LogInformation($"ProgressDetails updated to: {@event.Status}");
     }
 
     private void OnUpdateProgress(UpdateProgressEvent @event)
@@ -269,6 +271,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         if (@event.Message != null)
         {
             ProgressDetails = @event.Message;
+            _logger.LogInformation($"ProgressDetails updated to: {@event.Message}");
         }
     }
 
@@ -356,6 +359,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         IsProgressDeterminate = false;
         ProgressValue = 0;
         ProgressDetails = "This may take a few minutes on first run...";
+        _logger.LogInformation($"ProgressDetails updated to: This may take a few minutes on first run...");
         _logger.LogInformation("ShowLoading completed - progress should be visible");
     }
 

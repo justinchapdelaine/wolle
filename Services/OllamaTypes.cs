@@ -23,16 +23,16 @@ public record PerformanceMetric
 /// </summary>
 public class PerformanceStats
 {
-    public TimeSpan ServiceUptime { get; set; }
-    public int TotalFilesProcessed { get; set; }
-    public int SuccessfulOperations { get; set; }
-    public int FailedOperations { get; set; }
-    public double SuccessRate { get; set; }
-    public long TotalBytesProcessed { get; set; }
-    public long AverageFileSizeBytes { get; set; }
-    public double AverageProcessingTimeMs { get; set; }
-    public double ThroughputBytesPerSecond { get; set; }
-    public List<PerformanceMetric> RecentMetrics { get; set; } = new();
+    public required TimeSpan ServiceUptime { get; set; }
+    public required int TotalFilesProcessed { get; set; }
+    public required int SuccessfulOperations { get; set; }
+    public required int FailedOperations { get; set; }
+    public required double SuccessRate { get; set; }
+    public required long TotalBytesProcessed { get; set; }
+    public required long AverageFileSizeBytes { get; set; }
+    public required double AverageProcessingTimeMs { get; set; }
+    public required double ThroughputBytesPerSecond { get; set; }
+    public required List<PerformanceMetric> RecentMetrics { get; set; } = new();
 }
 
 /// <summary>
