@@ -13,6 +13,13 @@ using wolle.Services.Events;
 
 namespace wolle.ViewModels;
 
+/// <summary>
+/// Main view model for the Wolle application window
+/// </summary>
+/// <remarks>
+/// This view model manages the UI state, commands, and business logic for the main application window.
+/// It handles file processing, progress tracking, error handling, and user interactions.
+/// </remarks>
 public partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<MainWindowViewModel> _logger;
@@ -37,6 +44,9 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
     private int _selectedContextWindowSizeIndex = 2;
     private bool _isProcessing;
 
+    /// <summary>
+    /// Occurs when a property value changes
+    /// </summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>
@@ -48,12 +58,18 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
     }
 
+    /// <summary>
+    /// Gets or sets the title of the application window
+    /// </summary>
     public string Title
     {
         get => _title;
         set => SetProperty(ref _title, value);
     }
 
+    /// <summary>
+    /// Gets or sets the detailed progress message displayed to the user
+    /// </summary>
     public string ProgressDetails
     {
         get => _progressDetails;
@@ -66,12 +82,18 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gets or sets the current progress value (0.0 to 1.0)
+    /// </summary>
     public double ProgressValue
     {
         get => _progressValue;
         set => SetProperty(ref _progressValue, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the progress bar is visible
+    /// </summary>
     public bool IsProgressVisible
     {
         get => _isProgressVisible;
@@ -84,12 +106,18 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the progress indicator is in indeterminate mode
+    /// </summary>
     public bool IsProgressIndeterminate
     {
         get => _isProgressIndeterminate;
         set => SetProperty(ref _isProgressIndeterminate, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the progress ring is visible
+    /// </summary>
     public bool IsProgressRingVisible
     {
         get => _isProgressRingVisible;
@@ -102,6 +130,9 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the progress bar is in determinate mode
+    /// </summary>
     public bool IsProgressDeterminate
     {
         get => _isProgressDeterminate;
@@ -114,60 +145,90 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the response content is visible
+    /// </summary>
     public bool IsResponseVisible
     {
         get => _isResponseVisible;
         set => SetProperty(ref _isResponseVisible, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the error panel is visible
+    /// </summary>
     public bool IsErrorVisible
     {
         get => _isErrorVisible;
         set => SetProperty(ref _isErrorVisible, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the info message is visible
+    /// </summary>
     public bool IsInfoMessageVisible
     {
         get => _isInfoMessageVisible;
         set => SetProperty(ref _isInfoMessageVisible, value);
     }
 
+    /// <summary>
+    /// Gets or sets the error message to display to the user
+    /// </summary>
     public string ErrorMessage
     {
         get => _errorMessage;
         set => SetProperty(ref _errorMessage, value);
     }
 
+    /// <summary>
+    /// Gets or sets the informational message to display to the user
+    /// </summary>
     public string InfoMessage
     {
         get => _infoMessage;
         set => SetProperty(ref _infoMessage, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the info message should be displayed as an error
+    /// </summary>
     public bool IsInfoMessageError
     {
         get => _isInfoMessageError;
         set => SetProperty(ref _isInfoMessageError, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the settings panel is visible
+    /// </summary>
     public bool IsSettingsVisible
     {
         get => _isSettingsVisible;
         set => SetProperty(ref _isSettingsVisible, value);
     }
 
+    /// <summary>
+    /// Gets or sets the API timeout value in seconds
+    /// </summary>
     public string ApiTimeout
     {
         get => _apiTimeout;
         set => SetProperty(ref _apiTimeout, value);
     }
 
+    /// <summary>
+    /// Gets or sets the selected context window size index
+    /// </summary>
     public int SelectedContextWindowSizeIndex
     {
         get => _selectedContextWindowSizeIndex;
         set => SetProperty(ref _selectedContextWindowSizeIndex, value);
     }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the application is currently processing a file
+    /// </summary>
     public bool IsProcessing
     {
         get => _isProcessing;
@@ -180,11 +241,28 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
     private readonly ICommand _saveSettingsCommand;
     private readonly ICommand _cancelSettingsCommand;
 
+    /// <summary>
+    /// Gets the command to close the application window
+    /// </summary>
     public ICommand CloseCommand => _closeCommand;
+    /// <summary>
+    /// Gets the command to show the settings panel
+    /// </summary>
     public ICommand SettingsCommand => _settingsCommand;
+    /// <summary>
+    /// Gets the command to save settings changes
+    /// </summary>
     public ICommand SaveSettingsCommand => _saveSettingsCommand;
+    /// <summary>
+    /// Gets the command to cancel settings changes
+    /// </summary>
     public ICommand CancelSettingsCommand => _cancelSettingsCommand;
 
+    /// <summary>
+    /// Initializes a new instance of the MainWindowViewModel class
+    /// </summary>
+    /// <param name="logger">The logger instance for diagnostic logging</param>
+    /// <param name="serviceFacade">The service facade providing access to application services</param>
     public MainWindowViewModel(
         ILogger<MainWindowViewModel> logger,
         IMainWindowServiceFacade serviceFacade)
@@ -330,6 +408,18 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         ShowSuccess("Processing completed successfully", 3000);
     }
 
+    /// <summary>
+    /// Processes the specified file using the configured services
+    /// </summary>
+    /// <param name="filePath">The path to the file to process</param>
+    /// <remarks>
+    /// This method initiates file processing by:
+    /// 1. Setting the processing state
+    /// 2. Canceling any existing operations
+    /// 3. Creating a new cancellation token source
+    /// 4. Notifying relevant services of the processing state
+    /// 5. Starting the file processing operation
+    /// </remarks>
     public void ProcessFile(string filePath)
     {
         _logger.LogInformation($"ProcessFile called with: {filePath}");
@@ -399,18 +489,38 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         _serviceFacade.SettingsManagementService.CancelSettings();
     }
 
+    /// <summary>
+    /// Generates a regex pattern for matching drive paths (e.g., "C:\")
+    /// </summary>
+    /// <returns>A compiled regex pattern for drive path detection</returns>
     [GeneratedRegex(@"[A-Za-z]:\\")]
     private static partial Regex DrivePathRegex();
 
+    /// <summary>
+    /// Generates a regex pattern for matching UNC paths (e.g., "\\server\share")
+    /// </summary>
+    /// <returns>A compiled regex pattern for UNC path detection</returns>
     [GeneratedRegex(@"\\\\[^\s]+")]
     private static partial Regex UncPathRegex();
 
+    /// <summary>
+    /// Generates a regex pattern for matching full file paths
+    /// </summary>
+    /// <returns>A compiled regex pattern for file path detection</returns>
     [GeneratedRegex(@"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+")]
     private static partial Regex FilePathRegex();
 
+    /// <summary>
+    /// Generates a regex pattern for matching IP addresses
+    /// </summary>
+    /// <returns>A compiled regex pattern for IP address detection</returns>
     [GeneratedRegex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b")]
     private static partial Regex IpAddressRegex();
 
+    /// <summary>
+    /// Generates a regex pattern for matching port numbers in URLs
+    /// </summary>
+    /// <returns>A compiled regex pattern for port number detection</returns>
     [GeneratedRegex(@":\d{1,5}(?=/|$)")]
     private static partial Regex PortNumberRegex();
 
@@ -461,11 +571,23 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
 
 
 
+    /// <summary>
+    /// Raises the PropertyChanged event for the specified property
+    /// </summary>
+    /// <param name="propertyName">The name of the property that changed</param>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    /// <summary>
+    /// Sets the property value and raises the PropertyChanged event if the value changed
+    /// </summary>
+    /// <typeparam name="T">The type of the property</typeparam>
+    /// <param name="field">A reference to the backing field</param>
+    /// <param name="value">The new value to set</param>
+    /// <param name="propertyName">The name of the property (automatically populated)</param>
+    /// <returns>True if the value changed, false otherwise</returns>
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;

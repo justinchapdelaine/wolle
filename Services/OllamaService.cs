@@ -25,12 +25,37 @@ public class OllamaService : IDisposable
     private bool _isDisposed = false;
     private readonly string _modelName = "gemma3:4b";
 
+    /// <summary>
+    /// Occurs when status updates are available
+    /// </summary>
     public event Action<string>? OnStatusUpdate;
+    /// <summary>
+    /// Occurs when output data is received from Ollama
+    /// </summary>
     public event Action<string>? OnOutputReceived;
+    /// <summary>
+    /// Occurs when errors are encountered during Ollama operations
+    /// </summary>
     public event Action<string>? OnErrorReceived;
+    /// <summary>
+    /// Occurs when progress updates are available
+    /// </summary>
     public event Action<OllamaProgress>? OnProgressUpdate;
+    /// <summary>
+    /// Occurs when Ollama processing is complete
+    /// </summary>
     public event Action? OnProcessComplete;
 
+    /// <summary>
+    /// Initializes a new instance of the OllamaService class
+    /// </summary>
+    /// <param name="settings">The application settings</param>
+    /// <param name="logger">The logger instance</param>
+    /// <param name="ollamaHttpService">The HTTP service for Ollama API calls</param>
+    /// <param name="ollamaProcessService">The process service for Ollama server management</param>
+    /// <param name="ollamaPerformanceService">The performance monitoring service</param>
+    /// <param name="ollamaFileService">The file service for Ollama file operations</param>
+    /// <param name="eventAggregator">The event aggregator for event-based communication</param>
     public OllamaService(
         IOptions<AppSettings> settings,
         ILogger<OllamaService> logger,

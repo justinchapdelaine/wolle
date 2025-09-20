@@ -13,6 +13,14 @@ using wolle.Services.Events;
 using wolle.ViewModels;
 
 namespace wolle;
+/// <summary>
+/// Main application window that handles file processing, UI interactions, and service coordination
+/// </summary>
+/// <remarks>
+/// This window serves as the primary user interface for the Wolle application,
+/// coordinating between various services and managing the application lifecycle.
+/// It implements IDisposable to ensure proper cleanup of resources.
+/// </remarks>
 public partial class MainWindow : Window, IDisposable
 {
     private readonly IMainWindowServiceFacade _serviceFacade;
@@ -25,6 +33,13 @@ public partial class MainWindow : Window, IDisposable
     private readonly MainWindowViewModel _viewModel;
     private bool _disposed = false;
 
+    /// <summary>
+    /// Initializes a new instance of the MainWindow class
+    /// </summary>
+    /// <param name="serviceFacade">The service facade providing access to application services</param>
+    /// <param name="serviceProvider">The service provider for dependency injection</param>
+    /// <param name="viewModel">The main window view model</param>
+    /// <param name="logger">The logger instance for diagnostic logging</param>
     public MainWindow(IMainWindowServiceFacade serviceFacade, IServiceProvider serviceProvider, MainWindowViewModel viewModel, ILogger<MainWindow> logger)
     {
         _serviceFacade = ValidationUtilities.ValidateNotNull(serviceFacade, nameof(serviceFacade));
@@ -222,6 +237,10 @@ public partial class MainWindow : Window, IDisposable
 
 
 
+    /// <summary>
+    /// Processes the specified file by delegating to the view model
+    /// </summary>
+    /// <param name="filePath">The path to the file to process</param>
     public void ProcessFile(string filePath)
     {
         _logger?.LogInformation($"ProcessFile called with: {filePath}");
@@ -501,12 +520,19 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    /// <summary>
+    /// Releases all resources used by the MainWindow
+    /// </summary>
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Releases the unmanaged resources used by the MainWindow and optionally releases the managed resources
+    /// </summary>
+    /// <param name="disposing">True to release both managed and unmanaged resources; false to release only unmanaged resources</param>
     protected virtual void Dispose(bool disposing)
     {
         if (!_disposed)
