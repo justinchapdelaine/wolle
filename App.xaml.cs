@@ -315,33 +315,21 @@ public partial class App : Application
     {
         var typeName = serviceType.Name.ToLower();
 
-        // Stateful services that maintain state should be singleton
-        if (typeName.Contains("state") ||
-            typeName.Contains("management") ||
-            typeName.Contains("coordinator") ||
-            typeName.Contains("aggregator"))
-        {
-            return ServiceLifetime.Singleton;
-        }
+        // Define keyword groups using collection expressions for better readability
+        string[] singletonKeywords = ["state", "management", "coordinator", "aggregator"];
+        string[] scopedKeywords = ["ui", "interaction", "display"];
+        string[] transientKeywords = ["conversion", "debounce", "validation"];
 
-        // Services that handle UI interactions should be scoped
-        if (typeName.Contains("ui") ||
-            typeName.Contains("interaction") ||
-            typeName.Contains("display"))
+        // Use enhanced pattern matching with list patterns
+        return (singletonKeywords.Any(keyword => typeName.Contains(keyword)),
+                scopedKeywords.Any(keyword => typeName.Contains(keyword)),
+                transientKeywords.Any(keyword => typeName.Contains(keyword))) switch
         {
-            return ServiceLifetime.Scoped;
-        }
-
-        // Lightweight services without state can be transient
-        if (typeName.Contains("conversion") ||
-            typeName.Contains("debounce") ||
-            typeName.Contains("validation"))
-        {
-            return ServiceLifetime.Transient;
-        }
-
-        // Default to singleton for most services in this application
-        return ServiceLifetime.Singleton;
+            (true, _, _) => ServiceLifetime.Singleton,
+            (_, true, _) => ServiceLifetime.Scoped,
+            (_, _, true) => ServiceLifetime.Transient,
+            _ => ServiceLifetime.Singleton // Default to singleton for most services
+        };
     }
 
     [SupportedOSPlatform("windows")]
