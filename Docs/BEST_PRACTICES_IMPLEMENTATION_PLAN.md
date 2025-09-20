@@ -534,10 +534,10 @@ public class MainWindowViewModel(
 **File:** `ViewModels/MainWindowViewModel.cs` (SanitizeMessage method)  
 **Benefits:** 3-5x performance improvement for message sanitization
 
-- [ ] **12.2.1** Add regex source generator attributes
-- [ ] **12.2.2** Replace runtime regex compilation with generated methods
-- [ ] **12.2.3** Test regex performance improvements
-- [ ] **12.2.4** Verify sanitization still works correctly
+- [x] **12.2.1** Add regex source generator attributes
+- [x] **12.2.2** Replace runtime regex compilation with generated methods
+- [x] **12.2.3** Test regex performance improvements
+- [x] **12.2.4** Verify sanitization still works correctly
 
 **Implementation Example:**
 ```csharp

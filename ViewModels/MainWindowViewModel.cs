@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using System.Windows.Input;
@@ -12,7 +13,7 @@ using wolle.Services.Events;
 
 namespace wolle.ViewModels;
 
-public class MainWindowViewModel : INotifyPropertyChanged
+public partial class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IMainWindowServiceFacade _serviceFacade;
@@ -394,6 +395,21 @@ public class MainWindowViewModel : INotifyPropertyChanged
         _serviceFacade.SettingsManagementService.CancelSettings();
     }
 
+    [GeneratedRegex(@"[A-Za-z]:\\")]
+    private static partial Regex DrivePathRegex();
+
+    [GeneratedRegex(@"\\\\[^\s]+")]
+    private static partial Regex UncPathRegex();
+
+    [GeneratedRegex(@"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+")]
+    private static partial Regex FilePathRegex();
+
+    [GeneratedRegex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b")]
+    private static partial Regex IpAddressRegex();
+
+    [GeneratedRegex(@":\d{1,5}(?=/|$)")]
+    private static partial Regex PortNumberRegex();
+
     /// <summary>
     /// Sanitizes a message to remove sensitive information before displaying to users.
     /// </summary>
@@ -411,10 +427,10 @@ public class MainWindowViewModel : INotifyPropertyChanged
             var sanitized = message;
 
             // Remove system drive paths (e.g., "C:\", "D:\")
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\", "[DRIVE]");
+            sanitized = DrivePathRegex().Replace(sanitized, "[DRIVE]");
 
             // Remove UNC paths (e.g., "\\server\share")
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\\\\[^\s]+", "[NETWORK_PATH]");
+            sanitized = UncPathRegex().Replace(sanitized, "[NETWORK_PATH]");
 
             // Remove user names from messages
             if (!string.IsNullOrEmpty(Environment.UserName))
@@ -429,13 +445,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
             }
 
             // Remove full file paths that might contain sensitive information
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[A-Za-z]:\\[^\s""']+|\\\\[^\s""']+", "[FILE_PATH]");
+            sanitized = FilePathRegex().Replace(sanitized, "[FILE_PATH]");
 
             // Remove IP addresses
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[IP_ADDRESS]");
+            sanitized = IpAddressRegex().Replace(sanitized, "[IP_ADDRESS]");
 
             // Remove port numbers from URLs
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @":\d{1,5}(?=/|$)", ":[PORT]");
+            sanitized = PortNumberRegex().Replace(sanitized, ":[PORT]");
 
             return sanitized;
         }
