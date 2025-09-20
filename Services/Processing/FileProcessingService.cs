@@ -5,8 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Processing
 {
     /// <summary>
     /// Service for managing file processing operations

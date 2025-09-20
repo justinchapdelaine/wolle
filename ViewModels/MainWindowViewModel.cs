@@ -8,7 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
-using wolle.Services;
+using wolle.Services.Interfaces;
 using wolle.Services.Events;
 
 namespace wolle.ViewModels;

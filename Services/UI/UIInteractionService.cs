@@ -2,7 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 
-namespace wolle.Services
+namespace wolle.Services.UI
 {
     /// <summary>
     /// Service for managing UI interactions and window operations

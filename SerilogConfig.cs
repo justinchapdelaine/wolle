@@ -1,7 +1,7 @@
 using System;
 using Serilog;
 using Serilog.Events;
-using wolle.Services;
+using wolle.Services.Core;
 
 namespace wolle;
 /// <summary>

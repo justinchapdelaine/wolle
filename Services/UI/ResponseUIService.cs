@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 
-namespace wolle.Services
+namespace wolle.Services.UI
 {
     /// <summary>
     /// Service for managing response UI elements

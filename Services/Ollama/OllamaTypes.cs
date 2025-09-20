@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace wolle.Services;
+namespace wolle.Services.Ollama;
 /// <summary>
 /// Represents a performance metric for monitoring.
 /// </summary>

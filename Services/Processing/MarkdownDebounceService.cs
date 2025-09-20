@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Threading;
 
-namespace wolle.Services
+namespace wolle.Services.Processing
 {
     /// <summary>
     /// Service for managing markdown conversion debouncing to improve performance

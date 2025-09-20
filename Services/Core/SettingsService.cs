@@ -11,7 +11,7 @@ using System.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Manages application settings and configuration with advanced features.

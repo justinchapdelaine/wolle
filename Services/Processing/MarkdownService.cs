@@ -5,7 +5,7 @@ using System.Windows.Media;
 using Markdig;
 using Neo.Markdig.Xaml;
 
-namespace wolle.Services
+namespace wolle.Services.Processing
 {
     /// <summary>
     /// Service for rendering Markdown to WPF FlowDocument using Neo.Markdig.Xaml

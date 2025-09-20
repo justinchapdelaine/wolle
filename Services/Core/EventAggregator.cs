@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-namespace wolle.Services;
+namespace wolle.Services.Core;
 
 /// <summary>
 /// Event aggregator for implementing event-based communication between components

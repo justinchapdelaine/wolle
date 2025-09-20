@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Threading;
 
-namespace wolle.Services
+namespace wolle.Services.UI
 {
     /// <summary>
     /// Service for managing status display and updates

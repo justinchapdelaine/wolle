@@ -5,7 +5,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace wolle.Services
+namespace wolle.Services.Processing
 {
     /// <summary>
     /// Provides centralized validation utilities for file paths and settings.

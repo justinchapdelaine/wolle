@@ -5,9 +5,9 @@ using System.Runtime.Versioning;
 
 using System.Windows;
 using Microsoft.Win32;
-using wolle.Services;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Manages Windows Explorer context menu registration for wol application.

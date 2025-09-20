@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Manages loading and execution of file processor plugins.

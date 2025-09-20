@@ -8,7 +8,9 @@ using System.Windows.Threading;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using wolle.Services;
+using wolle.Services.Interfaces;
+using wolle.Services.Ollama;
+using wolle.Services.Events;
 using wolle.Services.Events;
 using wolle.ViewModels;
 

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.Logging;
 
-namespace wolle.Services
+namespace wolle.Services.UI
 {
     /// <summary>
     /// Service for managing window operations and lifecycle

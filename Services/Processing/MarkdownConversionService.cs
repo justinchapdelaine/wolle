@@ -3,7 +3,7 @@ using System.Windows.Documents;
 using Markdig;
 using Neo.Markdig.Xaml;
 
-namespace wolle.Services
+namespace wolle.Services.Processing
 {
     /// <summary>
     /// Service for markdown conversion operations

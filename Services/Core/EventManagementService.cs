@@ -1,7 +1,9 @@
 using System;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Service for managing event subscriptions and forwarding

@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using wolle.Services.Events;
 
-namespace wolle.Services
+namespace wolle.Services.UI
 {
     /// <summary>
     /// Service for displaying messages to the user using event-based communication

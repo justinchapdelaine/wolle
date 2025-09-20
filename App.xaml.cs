@@ -12,7 +12,12 @@ using System.Windows.Resources;
 using System.Threading;
 using System.Windows.Threading;
 using System.Threading.Tasks;
-using wolle.Services;
+using wolle.Services.Core;
+using wolle.Services.Ollama;
+using wolle.Services.UI;
+using wolle.Services.Processing;
+using wolle.Services.Interfaces;
+using wolle.Services.Events;
 using wolle.ViewModels;
 
 namespace wolle;
@@ -481,4 +486,5 @@ public partial class App : Application
         Shutdown();
     }
 }
+
 

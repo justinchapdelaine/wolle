@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
-namespace wolle.Services;
+namespace wolle.Services.Processing;
 
 /// <summary>
 /// Centralized validation utilities for common validation patterns.
