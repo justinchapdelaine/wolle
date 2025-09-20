@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.UI
 {

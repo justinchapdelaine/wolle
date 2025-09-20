@@ -2,6 +2,7 @@ using System;
 using System.Windows.Documents;
 using Markdig;
 using Neo.Markdig.Xaml;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.Processing
 {

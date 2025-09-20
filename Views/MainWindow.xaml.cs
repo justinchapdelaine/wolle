@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 using wolle.Services.Interfaces;
 using wolle.Services.Ollama;
 using wolle.Services.Events;
-using wolle.Services.Events;
+using wolle.Services.Core;
+using wolle.Services.Processing;
 using wolle.ViewModels;
 
 namespace wolle;
@@ -44,10 +45,10 @@ public partial class MainWindow : Window, IDisposable
     /// <param name="logger">The logger instance for diagnostic logging</param>
     public MainWindow(IMainWindowServiceFacade serviceFacade, IServiceProvider serviceProvider, MainWindowViewModel viewModel, ILogger<MainWindow> logger)
     {
-        _serviceFacade = ValidationUtilities.ValidateNotNull(serviceFacade, nameof(serviceFacade));
-        _serviceProvider = ValidationUtilities.ValidateNotNull(serviceProvider, nameof(serviceProvider));
-        _viewModel = ValidationUtilities.ValidateNotNull(viewModel, nameof(viewModel));
-        _logger = ValidationUtilities.ValidateNotNull(logger, nameof(logger));
+        _serviceFacade = wolle.Services.Processing.ValidationUtilities.ValidateNotNull(serviceFacade, nameof(serviceFacade));
+        _serviceProvider = wolle.Services.Processing.ValidationUtilities.ValidateNotNull(serviceProvider, nameof(serviceProvider));
+        _viewModel = wolle.Services.Processing.ValidationUtilities.ValidateNotNull(viewModel, nameof(viewModel));
+        _logger = wolle.Services.Processing.ValidationUtilities.ValidateNotNull(logger, nameof(logger));
 
         try
         {
@@ -62,19 +63,19 @@ public partial class MainWindow : Window, IDisposable
             _viewModel.SetCancellationTokenSource(_cancellationTokenSource);
 
             // Initialize coordinator with UI control
-            (_serviceFacade.ResponseDisplayCoordinator as ResponseDisplayCoordinator)?.Initialize(ResponseScrollViewer);
+            (_serviceFacade.ResponseDisplayCoordinator as wolle.Services.Core.ResponseDisplayCoordinator)?.Initialize(ResponseScrollViewer);
 
             // Initialize progress management service with UI controls
-            (_serviceFacade.ProgressManagementService as ProgressManagementService)?.Initialize(ProgressBar, ProgressRing, ProgressDetails);
+            (_serviceFacade.ProgressManagementService as wolle.Services.UI.ProgressManagementService)?.Initialize(ProgressBar, ProgressRing, ProgressDetails);
 
             // Initialize status management service
-            (_serviceFacade.StatusManagementService as StatusManagementService)?.Initialize();
+            (_serviceFacade.StatusManagementService as wolle.Services.UI.StatusManagementService)?.Initialize();
 
             // Initialize settings management service with UI controls
             // Initialize UI interaction service
-            (_serviceFacade.UIInteractionService as UIInteractionService)?.Initialize(this);
+            (_serviceFacade.UIInteractionService as wolle.Services.UI.UIInteractionService)?.Initialize(this);
 
-            (_serviceFacade.FileProcessingService as FileProcessingService)?.Initialize(_serviceFacade.StatusManagementService);
+            (_serviceFacade.FileProcessingService as wolle.Services.Processing.FileProcessingService)?.Initialize(_serviceFacade.StatusManagementService);
 
             // Subscribe to all events using event management service
             _serviceFacade.EventManagementService.SubscribeToOllamaEvents(_serviceFacade.OllamaService);

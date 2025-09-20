@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Threading;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.UI
 {

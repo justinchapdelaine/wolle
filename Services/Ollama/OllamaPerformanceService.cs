@@ -6,8 +6,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Ollama;
 
-namespace wolle.Services;
+namespace wolle.Services.Ollama;
 /// <summary>
 /// Provides performance monitoring and statistics for Ollama operations.
 /// </summary>

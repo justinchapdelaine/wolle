@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
+using wolle.Services.Core;
 
 namespace wolle.Services.Ollama;
 /// <summary>

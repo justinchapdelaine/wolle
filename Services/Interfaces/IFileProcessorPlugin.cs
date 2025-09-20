@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Defines the interface for file processor plugins.

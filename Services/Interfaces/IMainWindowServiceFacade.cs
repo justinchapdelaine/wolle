@@ -4,8 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using wolle.Services.Core;
+using wolle.Services.Ollama;
+using wolle.Services.Processing;
 
-namespace wolle.Services;
+namespace wolle.Services.Interfaces;
 
 /// <summary>
 /// Facade service that provides a simplified interface to multiple related services.

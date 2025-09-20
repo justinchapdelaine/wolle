@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for settings management service

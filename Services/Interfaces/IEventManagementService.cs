@@ -1,6 +1,7 @@
 using System;
+using wolle.Services.Ollama;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Service for managing event subscriptions and forwarding

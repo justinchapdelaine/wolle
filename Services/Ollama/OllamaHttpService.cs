@@ -9,8 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services;
+namespace wolle.Services.Ollama;
 /// <summary>
 /// Provides HTTP communication with Ollama API.
 /// </summary>

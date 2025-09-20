@@ -7,8 +7,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using System.Linq;
+using wolle.Services.Interfaces;
+using wolle.Services.Processing;
 
-namespace wolle.Services;
+namespace wolle.Services.Ollama;
 /// <summary>
 /// Provides Ollama process management services.
 /// </summary>
@@ -90,7 +92,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     {
         _logger?.LogInformation("StartOllamaServerAsync started");
 
-        if (!ValidationService.ValidateExecutablePath(ollamaPath))
+        if (!wolle.Services.Processing.ValidationService.ValidateExecutablePath(ollamaPath))
         {
             var ex = new ArgumentException("Invalid Ollama executable path provided", nameof(ollamaPath));
             _logger?.LogError("Invalid Ollama path: {Path}", ollamaPath);

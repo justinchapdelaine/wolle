@@ -1,7 +1,8 @@
 using System.Windows;
 using System.Windows.Media;
+using wolle.Services.Ollama;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for progress management service

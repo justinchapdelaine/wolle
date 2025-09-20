@@ -64,7 +64,7 @@ public partial class App : Application
                 string filePath = e.Args[0];
 
                 // Validate file path before processing
-                if (!Services.ValidationService.ValidateFilePath(filePath, out var sanitizedPath))
+                if (!wolle.Services.Processing.ValidationService.ValidateFilePath(filePath, out var sanitizedPath))
                 {
                     MessageBox.Show("Invalid file path provided.",
                         "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Error);

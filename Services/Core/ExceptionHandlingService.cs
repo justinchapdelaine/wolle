@@ -8,8 +8,9 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Implements centralized exception handling with logging and user-friendly error messages.

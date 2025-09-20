@@ -4,8 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using wolle.Services.Core;
+using wolle.Services.Ollama;
+using wolle.Services.Processing;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services;
+namespace wolle.Services.Core;
 
 /// <summary>
 /// Implementation of the MainWindow service facade that provides simplified access to multiple services.

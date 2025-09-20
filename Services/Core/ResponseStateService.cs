@@ -1,7 +1,8 @@
 using System;
 using System.Windows;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Service for managing response state (accumulation and visibility)

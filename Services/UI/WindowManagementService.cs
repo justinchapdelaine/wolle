@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.UI
 {

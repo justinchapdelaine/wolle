@@ -1,6 +1,6 @@
 using System;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for status management service

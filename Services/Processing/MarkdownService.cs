@@ -4,6 +4,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using Markdig;
 using Neo.Markdig.Xaml;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.Processing
 {

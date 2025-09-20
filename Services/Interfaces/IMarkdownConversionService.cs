@@ -1,6 +1,6 @@
 using System.Windows.Documents;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for markdown conversion service

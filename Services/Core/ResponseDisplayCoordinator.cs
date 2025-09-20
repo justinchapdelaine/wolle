@@ -1,7 +1,10 @@
 using System;
 using System.Windows.Controls;
+using wolle.Services.Processing;
+using wolle.Services.Interfaces;
+using wolle.Services.UI;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Coordinator for managing response display services
@@ -36,7 +39,7 @@ namespace wolle.Services
         {
             // Initialize UI services with UI control
             (_stateService as ResponseStateService)?.Initialize(responseScrollViewer);
-            (_uiService as ResponseUIService)?.Initialize(responseScrollViewer);
+            (_uiService as wolle.Services.UI.ResponseUIService)?.Initialize(responseScrollViewer);
         }
 
         /// <summary>

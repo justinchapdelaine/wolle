@@ -1,4 +1,4 @@
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for response display coordinator

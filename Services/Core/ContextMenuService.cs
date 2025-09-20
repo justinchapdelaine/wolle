@@ -6,6 +6,7 @@ using System.Runtime.Versioning;
 using System.Windows;
 using Microsoft.Win32;
 using wolle.Services.Interfaces;
+using wolle.Services.Processing;
 
 namespace wolle.Services.Core
 {
@@ -129,7 +130,7 @@ namespace wolle.Services.Core
         /// <returns>True if path is valid, false otherwise.</returns>
         private bool IsValidExecutablePath(string path)
         {
-            return ValidationService.ValidateExecutablePath(path);
+            return wolle.Services.Processing.ValidationService.ValidateExecutablePath(path);
         }
 
         /// <summary>

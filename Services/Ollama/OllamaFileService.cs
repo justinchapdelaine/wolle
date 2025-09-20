@@ -4,8 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using wolle.Services.Core;
+using wolle.Services.Interfaces;
+using wolle.Services.Processing;
 
-namespace wolle.Services;
+namespace wolle.Services.Ollama;
 /// <summary>
 /// Provides file operations and validation for Ollama processing.
 /// </summary>
@@ -96,7 +99,7 @@ public class OllamaFileService : IOllamaFileService
     /// <returns>True if path is valid, false otherwise.</returns>
     public bool ValidateFilePath(string filePath)
     {
-        return ValidationService.ValidateFilePath(filePath, out _);
+        return wolle.Services.Processing.ValidationService.ValidateFilePath(filePath, out _);
     }
 
     /// <summary>
@@ -231,7 +234,7 @@ public class OllamaFileService : IOllamaFileService
         // Check configured path first with enhanced validation
         if (!string.IsNullOrEmpty(settings.OllamaPath))
         {
-            if (ValidationService.ValidateExecutablePath(settings.OllamaPath) &&
+            if (wolle.Services.Processing.ValidationService.ValidateExecutablePath(settings.OllamaPath) &&
                 IsSafeExecutablePath(settings.OllamaPath))
             {
                 _logger?.LogInformation($"Found configured Ollama path: {settings.OllamaPath}");
@@ -260,7 +263,7 @@ public class OllamaFileService : IOllamaFileService
 
                 var ollamaPath = Path.Combine(dir, "ollama.exe");
                 if (File.Exists(ollamaPath) &&
-                    ValidationService.ValidateExecutablePath(ollamaPath) &&
+                    wolle.Services.Processing.ValidationService.ValidateExecutablePath(ollamaPath) &&
                     IsSafeExecutablePath(ollamaPath))
                 {
                     _logger?.LogInformation($"Found Ollama in PATH: {ollamaPath}");
@@ -287,7 +290,7 @@ public class OllamaFileService : IOllamaFileService
             try
             {
                 if (File.Exists(commonPath) &&
-                    ValidationService.ValidateExecutablePath(commonPath) &&
+                    wolle.Services.Processing.ValidationService.ValidateExecutablePath(commonPath) &&
                     IsSafeExecutablePath(commonPath))
                 {
                     _logger?.LogInformation($"Found Ollama in common path: {commonPath}");

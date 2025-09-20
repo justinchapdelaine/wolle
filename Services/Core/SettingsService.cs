@@ -5,6 +5,8 @@ using System.Windows;
 using Microsoft.Win32;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Interfaces;
+using wolle.Services.Processing;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Threading;
@@ -64,7 +66,7 @@ namespace wolle.Services.Core
                     // Validate Ollama path if configured
                     if (!string.IsNullOrEmpty(settings.OllamaPath))
                     {
-                        if (!ValidationService.ValidateExecutablePath(settings.OllamaPath))
+                        if (!wolle.Services.Processing.ValidationService.ValidateExecutablePath(settings.OllamaPath))
                         {
                             System.Diagnostics.Debug.WriteLine("Invalid Ollama path in settings, resetting to default");
                             settings.OllamaPath = "";
@@ -74,7 +76,7 @@ namespace wolle.Services.Core
                     // Validate Ollama endpoint
                     if (!string.IsNullOrEmpty(settings.OllamaEndpoint))
                     {
-                        if (!ValidationService.ValidateOllamaEndpoint(settings.OllamaEndpoint))
+                        if (!wolle.Services.Processing.ValidationService.ValidateOllamaEndpoint(settings.OllamaEndpoint))
                         {
                             System.Diagnostics.Debug.WriteLine("Invalid Ollama endpoint in settings, resetting to default");
                             settings.OllamaEndpoint = "http://127.0.0.1:11434";
@@ -82,21 +84,21 @@ namespace wolle.Services.Core
                     }
 
                     // Validate max file size
-                    if (!ValidationService.ValidateFileSize(settings.MaxFileSize))
+                    if (!wolle.Services.Processing.ValidationService.ValidateFileSize(settings.MaxFileSize))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid max file size in settings, resetting to default");
                         settings.MaxFileSize = 10 * 1024 * 1024; // 10MB
                     }
 
                     // Validate API timeout
-                    if (!ValidationService.ValidateApiTimeout(settings.ApiTimeoutSeconds))
+                    if (!wolle.Services.Processing.ValidationService.ValidateApiTimeout(settings.ApiTimeoutSeconds))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid API timeout in settings, resetting to default");
                         settings.ApiTimeoutSeconds = 600; // 10 minutes
                     }
 
                     // Validate model name
-                    if (string.IsNullOrWhiteSpace(settings.ModelName) || !ValidationService.ValidateModelName(settings.ModelName))
+                    if (string.IsNullOrWhiteSpace(settings.ModelName) || !wolle.Services.Processing.ValidationService.ValidateModelName(settings.ModelName))
                     {
                         System.Diagnostics.Debug.WriteLine("Invalid or empty model name in settings, resetting to default");
                         settings.ModelName = "gemma3:4b";

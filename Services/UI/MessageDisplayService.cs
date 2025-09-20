@@ -6,6 +6,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using wolle.Services.Events;
+using wolle.Services.Core;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.UI
 {

@@ -3,8 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Service for managing error display and handling

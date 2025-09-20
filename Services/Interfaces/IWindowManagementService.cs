@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Windows;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for window management service

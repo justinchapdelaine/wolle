@@ -1,6 +1,8 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
 namespace wolle.Services.UI
 {

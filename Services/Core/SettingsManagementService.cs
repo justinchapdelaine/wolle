@@ -5,8 +5,11 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using wolle.Services.Events;
+using wolle.Services.Core;
+using wolle.Services.Ollama;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Service for managing settings UI and validation

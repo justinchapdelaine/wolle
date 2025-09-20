@@ -2,8 +2,9 @@ using System;
 using System.Windows;
 using System.Windows.Media;
 using Microsoft.Extensions.Logging;
+using wolle.Services.Interfaces;
 
-namespace wolle.Services
+namespace wolle.Services.Core
 {
     /// <summary>
     /// Service for managing application resources

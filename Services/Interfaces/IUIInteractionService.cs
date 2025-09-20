@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Interface for UI interaction service

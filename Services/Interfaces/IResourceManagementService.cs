@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 
-namespace wolle.Services
+namespace wolle.Services.Interfaces
 {
     /// <summary>
     /// Service for managing application resources
