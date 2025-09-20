@@ -70,9 +70,9 @@ public record OllamaOptions
 /// </summary>
 public class OllamaProgress
 {
-    public string status { get; set; } = string.Empty;
-    public string? digest { get; set; }
-    public long total { get; set; }
-    public long completed { get; set; }
-    public int percent { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? Digest { get; set; }
+    public long Total { get; set; }
+    public long Completed { get; set; }
+    public int Percent { get; set; }
 }

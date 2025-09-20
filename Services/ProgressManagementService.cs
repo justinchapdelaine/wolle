@@ -35,17 +35,17 @@ namespace wolle.Services
             if (_progressBar == null || _progressRing == null || _progressDetails == null)
                 return;
 
-            if (progress.status.Contains("pulling"))
+            if (progress.Status.Contains("pulling"))
             {
                 // Show determinate progress bar, hide indeterminate ring
                 ShowProgressBar();
-                SetProgressValue(progress.percent);
+                SetProgressValue(progress.Percent);
 
                 // Update progress text with percentage
-                if (progress.total > 0 && progress.completed > 0)
+                if (progress.Total > 0 && progress.Completed > 0)
                 {
-                    string completed = FormatBytes(progress.completed);
-                    string total = FormatBytes(progress.total);
+                    string completed = FormatBytes(progress.Completed);
+                    string total = FormatBytes(progress.Total);
                     UpdateProgressText("Downloading model...");
                 }
                 else
@@ -54,7 +54,7 @@ namespace wolle.Services
                     UpdateProgressText("");
                 }
             }
-            else if (progress.status.Contains("manifest"))
+            else if (progress.Status.Contains("manifest"))
             {
                 // Show indeterminate progress ring, hide determinate bar
                 ShowProgressRing();

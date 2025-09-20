@@ -272,12 +272,12 @@ public partial class MainWindow : Window, IDisposable
         if (!_isClosing && _serviceFacade.OllamaService != null)
         {
             // Only log progress at major milestones to drastically reduce log spam
-            if (progress.percent == 0 || progress.percent == 50 || progress.percent == 100 ||
-                (progress.status.Contains("error") || progress.status.Contains("failed") ||
-                 progress.status.Contains("success") || progress.status.Contains("manifest") ||
-                 progress.status.Contains("verifying")))
+            if (progress.Percent == 0 || progress.Percent == 50 || progress.Percent == 100 ||
+                (progress.Status.Contains("error") || progress.Status.Contains("failed") ||
+                 progress.Status.Contains("success") || progress.Status.Contains("manifest") ||
+                 progress.Status.Contains("verifying")))
             {
-                _logger?.LogInformation($"Progress: {progress.percent}% - {progress.status}");
+                _logger?.LogInformation($"Progress: {progress.Percent}% - {progress.Status}");
             }
 
             if (Dispatcher.CheckAccess())

@@ -558,31 +558,31 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
 
             if (json.TryGetProperty("status", out var statusElement))
             {
-                progress.status = statusElement.GetString() ?? "";
+                progress.Status = statusElement.GetString() ?? "";
             }
 
             if (json.TryGetProperty("digest", out var digestElement))
             {
-                progress.digest = digestElement.GetString();
+                progress.Digest = digestElement.GetString();
             }
 
             if (json.TryGetProperty("total", out var totalElement) &&
                 json.TryGetProperty("completed", out var completedElement))
             {
-                progress.total = totalElement.GetInt64();
-                progress.completed = completedElement.GetInt64();
+                progress.Total = totalElement.GetInt64();
+                progress.Completed = completedElement.GetInt64();
 
-                if (progress.total > 0)
+                if (progress.Total > 0)
                 {
-                    double rawPercentage = (progress.completed * 100.0) / progress.total;
-                    progress.percent = (int)Math.Round(rawPercentage);
+                    double rawPercentage = (progress.Completed * 100.0) / progress.Total;
+                    progress.Percent = (int)Math.Round(rawPercentage);
 
-                    if (progress.percent == 0 || progress.percent == 50 || progress.percent == 100 ||
-                        (progress.status.Contains("error") || progress.status.Contains("failed") ||
-                         progress.status.Contains("success") || progress.status.Contains("manifest") ||
-                         progress.status.Contains("verifying")))
+                    if (progress.Percent == 0 || progress.Percent == 50 || progress.Percent == 100 ||
+                        (progress.Status.Contains("error") || progress.Status.Contains("failed") ||
+                         progress.Status.Contains("success") || progress.Status.Contains("manifest") ||
+                         progress.Status.Contains("verifying")))
                     {
-                        _logger?.LogInformation($"Progress: {progress.percent}% - {progress.status}");
+                        _logger?.LogInformation($"Progress: {progress.Percent}% - {progress.Status}");
                     }
                 }
                 else
@@ -591,23 +591,23 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 }
             }
 
-            if (progress.total == 0)
+            if (progress.Total == 0)
             {
-                if (progress.status.Contains("pulling") || progress.status.Contains("downloading"))
+                if (progress.Status.Contains("pulling") || progress.Status.Contains("downloading"))
                 {
-                    progress.percent = 0;
+                    progress.Percent = 0;
                 }
-                else if (progress.status.Contains("verifying") || progress.status.Contains("checking"))
+                else if (progress.Status.Contains("verifying") || progress.Status.Contains("checking"))
                 {
-                    progress.percent = 90;
+                    progress.Percent = 90;
                 }
-                else if (progress.status.Contains("writing") || progress.status.Contains("creating"))
+                else if (progress.Status.Contains("writing") || progress.Status.Contains("creating"))
                 {
-                    progress.percent = 95;
+                    progress.Percent = 95;
                 }
-                else if (progress.status.Contains("success"))
+                else if (progress.Status.Contains("success"))
                 {
-                    progress.percent = 100;
+                    progress.Percent = 100;
                 }
             }
 
