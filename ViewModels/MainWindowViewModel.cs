@@ -269,7 +269,7 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceFacade = serviceFacade ?? throw new ArgumentNullException(nameof(serviceFacade));
-        
+
         // Initialize commands
         _closeCommand = new RelayCommand(ExecuteClose);
         _settingsCommand = new RelayCommand(ExecuteSettings);
@@ -541,25 +541,25 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         {
             // Use span-based operations for better memory efficiency
             var sanitized = message;
-            
+
             // Apply regex replacements - these work with strings but benefit from compiled regex
             var driveReplaced = DrivePathRegex().Replace(sanitized, "[DRIVE]");
             var uncReplaced = UncPathRegex().Replace(driveReplaced, "[NETWORK_PATH]");
-            
+
             // Handle user and machine name replacements using span-based operations
             var userName = Environment.UserName.AsSpan();
             var machineName = Environment.MachineName.AsSpan();
-            
-            var userReplaced = !userName.IsEmpty ? 
+
+            var userReplaced = !userName.IsEmpty ?
                 uncReplaced.Replace(userName.ToString(), "[USER]") : uncReplaced;
-            
-            var machineReplaced = !machineName.IsEmpty ? 
+
+            var machineReplaced = !machineName.IsEmpty ?
                 userReplaced.Replace(machineName.ToString(), "[MACHINE]") : userReplaced;
-            
+
             var filePathReplaced = FilePathRegex().Replace(machineReplaced, "[FILE_PATH]");
             var ipReplaced = IpAddressRegex().Replace(filePathReplaced, "[IP_ADDRESS]");
             var portReplaced = PortNumberRegex().Replace(ipReplaced, ":[PORT]");
-            
+
             return portReplaced;
         }
         catch

@@ -58,7 +58,7 @@ public class EventAggregator : IEventAggregator, IDisposable
         // Get initial memory usage for monitoring
         _initialMemoryUsage = GC.GetTotalMemory(false);
         _logger?.LogInformation("EventAggregator initialized with initial memory usage: {MemoryUsage} bytes", _initialMemoryUsage);
-        
+
         // Clean up dead references every 30 seconds using modern .NET 9 PeriodicTimer
         _cleanupTimer = new Timer(CleanupDeadReferences, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -232,7 +232,7 @@ public class EventAggregator : IEventAggregator, IDisposable
         _cleanupCount++;
         var currentMemoryUsage = GC.GetTotalMemory(false);
         var memoryDelta = currentMemoryUsage - _initialMemoryUsage;
-        
+
         _logger?.LogDebug($"EventAggregator cleanup #{_cleanupCount}: Memory usage = {currentMemoryUsage} bytes, Delta = {memoryDelta:+#;-#} bytes, " +
                           $"Strong handlers = {_strongHandlers.Values.Sum(h => h.Count)}, " +
                           $"Weak handlers = {_weakHandlers.Values.Sum(h => h.Count)}, " +
@@ -245,7 +245,7 @@ public class EventAggregator : IEventAggregator, IDisposable
             if (_weakHandlers.TryGetValue(eventType, out var handlers))
             {
                 var liveHandlers = new ConcurrentBag<WeakReference>();
-                
+
                 // Use Chunk() to process handlers in batches of 10
                 foreach (var handlerBatch in handlers.Chunk(10))
                 {
@@ -270,7 +270,7 @@ public class EventAggregator : IEventAggregator, IDisposable
         }
 
         // Also clean up dead subscriptions
-        var deadSubscriptions = _subscriptions.Where(kv => 
+        var deadSubscriptions = _subscriptions.Where(kv =>
             !kv.Value.IsStrong && !kv.Value.WeakHandlerRef.IsAlive).ToList();
         deadReferencesRemoved += deadSubscriptions.Count;
         foreach (var deadSubscription in deadSubscriptions)
@@ -293,19 +293,19 @@ public class EventAggregator : IEventAggregator, IDisposable
         {
             _disposed = true;
             _cleanupTimer?.Dispose();
-            
+
             var strongHandlerCount = _strongHandlers.Values.Sum(h => h.Count);
             var weakHandlerCount = _weakHandlers.Values.Sum(h => h.Count);
             var subscriptionCount = _subscriptions.Count;
-            
+
             _logger?.LogInformation($"EventAggregator disposing: Clearing {strongHandlerCount} strong handlers, " +
                               $"{weakHandlerCount} weak handlers, {subscriptionCount} subscriptions");
-            
+
             // Clear all handlers and subscriptions
             _strongHandlers.Clear();
             _weakHandlers.Clear();
             _subscriptions.Clear();
-            
+
             _logger?.LogInformation("EventAggregator disposed successfully");
         }
     }

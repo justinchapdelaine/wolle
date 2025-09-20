@@ -43,7 +43,7 @@ public partial class App : Application
             var services = new ServiceCollection();
             ConfigureServices(services);
             _serviceProvider = services.BuildServiceProvider();
-            
+
             // Get logger for debug output
             _logger = _serviceProvider.GetService<ILogger<App>>();
 
@@ -244,7 +244,7 @@ public partial class App : Application
             .Select(t => t.Name.ToLower())
             .CountBy(name => name.Contains("service") ? "Service" : "Other");
 
-        _logger?.LogDebug("Service registration analysis: {ServiceCounts}", 
+        _logger?.LogDebug("Service registration analysis: {ServiceCounts}",
             string.Join(", ", serviceCounts.Select(kvp => $"{kvp.Key}={kvp.Value}")));
 
         // Register interface implementations with appropriate lifetimes
@@ -256,10 +256,10 @@ public partial class App : Application
                 continue;
 
             // Skip special cases that need manual registration
-            string[] specialCases = ["SettingsService", "OllamaService", "MainWindow", 
-                                   "ContextMenuService", "OllamaHttpService", "OllamaProcessService", 
+            string[] specialCases = ["SettingsService", "OllamaService", "MainWindow",
+                                   "ContextMenuService", "OllamaHttpService", "OllamaProcessService",
                                    "MainWindowViewModel"];
-            
+
             if (specialCases.Contains(serviceType.Name))
                 continue;
 

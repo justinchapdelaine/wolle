@@ -133,10 +133,10 @@ public partial class MainWindow : Window, IDisposable
         {
             Owner = @event.Owner;
         }
-        
+
         // Reset window closing state to allow future closes
         _serviceFacade.WindowManagementService.CancelWindowClosing();
-        
+
         Show();
         Activate();
     }
@@ -517,7 +517,7 @@ public partial class MainWindow : Window, IDisposable
         finally
         {
             base.OnClosed(e);
-            
+
             // Shutdown the application after window closes
             Application.Current.Shutdown();
         }

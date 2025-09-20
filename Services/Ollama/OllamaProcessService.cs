@@ -388,7 +388,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             }
 
             var lowerDir = fullPath.ToLowerInvariant();
-            
+
             // Only flag truly suspicious directories, not common system directories
             var suspiciousDirs = new[]
             {
@@ -493,7 +493,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         try
         {
             var sanitizedArgs = new List<string>();
-            
+
             foreach (var arg in arguments)
             {
                 if (string.IsNullOrEmpty(arg))
@@ -658,7 +658,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                 _logger?.LogError("Process start info uses shell execute - security risk");
                 return false;
             }
-            
+
             // Validate working directory if specified
             if (!string.IsNullOrEmpty(startInfo.WorkingDirectory))
             {
@@ -702,7 +702,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             return true;
 
         var upperVar = variableName.ToUpperInvariant();
-        
+
         // Only flag truly dangerous system variables that could be used for attacks
         // Note: PATH and PATHEXT are allowed as they are normal Windows environment variables
         var dangerousSystemVars = new string[] { }; // No common Windows environment variables are truly dangerous
@@ -740,7 +740,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         try
         {
             _logger?.LogWarning($"Process Security Event: {eventType} - {details}");
-            
+
             // Additional security logging could be added here
             // For example, writing to a security log file or sending to a monitoring service
         }

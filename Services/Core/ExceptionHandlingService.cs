@@ -109,7 +109,7 @@ namespace wolle.Services.Core
             {
                 try
                 {
-                    await Task.Run(() => 
+                    await Task.Run(() =>
                     {
                         try
                         {

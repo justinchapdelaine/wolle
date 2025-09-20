@@ -439,7 +439,7 @@ public class OllamaService : IDisposable
 
         // Check for obvious path traversal patterns using modern .NET 9 span-based operations
         ReadOnlySpan<string> traversalPatterns = ["..\\", "../", "..\t", "..\n", "..\r"];
-        
+
         foreach (var pattern in traversalPatterns)
         {
             if (path.Contains(pattern, StringComparison.OrdinalIgnoreCase))
@@ -498,10 +498,10 @@ public class OllamaService : IDisposable
             return false;
 
         string extension = Path.GetExtension(filePath).ToLowerInvariant();
-        
+
         // Allowed extensions based on project requirements - use modern .NET 9 span
         ReadOnlySpan<string> allowedExtensions = [".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py"];
-        
+
         for (int i = 0; i < allowedExtensions.Length; i++)
         {
             if (string.Equals(allowedExtensions[i], extension, StringComparison.OrdinalIgnoreCase))
@@ -520,7 +520,7 @@ public class OllamaService : IDisposable
         try
         {
             string fullPath = Path.GetFullPath(filePath);
-            
+
             // Sensitive system directories
             var sensitiveDirs = new[]
             {
@@ -534,7 +534,7 @@ public class OllamaService : IDisposable
 
             foreach (var sensitiveDir in sensitiveDirs)
             {
-                if (!string.IsNullOrEmpty(sensitiveDir) && 
+                if (!string.IsNullOrEmpty(sensitiveDir) &&
                     fullPath.StartsWith(sensitiveDir, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
@@ -559,16 +559,16 @@ public class OllamaService : IDisposable
             return false;
 
         string fileName = Path.GetFileName(filePath);
-        
+
         // Check for multiple extensions (potential spoofing)
         int extensionCount = fileName.Count(c => c == '.');
-        
+
         if (extensionCount > 1)
         {
             // Check if the last extension is executable
             string lastExtension = Path.GetExtension(fileName).ToLowerInvariant();
             string[] executableExtensions = [".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".com", ".pif"];
-            
+
             if (Array.Exists(executableExtensions, ext => ext == lastExtension))
                 return true;
         }
@@ -586,7 +586,7 @@ public class OllamaService : IDisposable
         try
         {
             _logger?.LogWarning($"Security Event: {eventType} - {details}");
-            
+
             // Publish security event through event aggregator for monitoring
             if (_eventAggregator != null)
             {
@@ -598,7 +598,7 @@ public class OllamaService : IDisposable
                     User = Environment.UserName,
                     Machine = Environment.MachineName
                 };
-                
+
                 _eventAggregator.Publish(securityEvent);
             }
         }
