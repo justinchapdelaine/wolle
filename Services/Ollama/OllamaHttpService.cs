@@ -65,28 +65,11 @@ public interface IOllamaHttpService
 /// <summary>
 /// Implements HTTP communication with Ollama API.
 /// </summary>
-public class OllamaHttpService : IOllamaHttpService, IDisposable
+public class OllamaHttpService(IHttpClientFactory httpClientFactory, ILogger<OllamaHttpService> logger, IExceptionHandlingService exceptionHandlingService) : IOllamaHttpService, IDisposable
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<OllamaHttpService> _logger;
-    private readonly IExceptionHandlingService _exceptionHandlingService;
     private readonly SemaphoreSlim _apiLock = new(1, 1);
-    private HttpClient _httpClient;
+    private HttpClient _httpClient = httpClientFactory.CreateClient("OllamaClient");
     private bool _isDisposed = false;
-
-    /// <summary>
-    /// Initializes a new instance of OllamaHttpService class.
-    /// </summary>
-    /// <param name="httpClientFactory">HTTP client factory.</param>
-    /// <param name="logger">Logger service.</param>
-    /// <param name="exceptionHandlingService">Exception handling service.</param>
-    public OllamaHttpService(IHttpClientFactory httpClientFactory, ILogger<OllamaHttpService> logger, IExceptionHandlingService exceptionHandlingService)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
-        _httpClient = _httpClientFactory.CreateClient("OllamaClient");
-    }
 
     /// <summary>
     /// Checks if specified Ollama model exists.
@@ -96,13 +79,13 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     /// <returns>True if model exists, false otherwise.</returns>
     public async Task<bool> ModelExistsAsync(string modelName, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Checking if model exists: {ModelName}", modelName);
+        logger?.LogInformation("Checking if model exists: {ModelName}", modelName);
 
         try
         {
             if (_isDisposed)
             {
-                _logger?.LogWarning("OllamaHttpService is disposed, cannot check model existence");
+                logger?.LogWarning("OllamaHttpService is disposed, cannot check model existence");
                 return false;
             }
 
@@ -111,7 +94,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
             {
                 if (_isDisposed)
                 {
-                    _logger?.LogWarning("OllamaHttpService is disposed after acquiring lock");
+                    logger?.LogWarning("OllamaHttpService is disposed after acquiring lock");
                     return false;
                 }
 
@@ -123,12 +106,12 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 {
                     try
                     {
-                        _logger?.LogInformation($"Sending list request to Ollama API (attempt {retryCount + 1})");
+                        logger?.LogInformation($"Sending list request to Ollama API (attempt {retryCount + 1})");
 
                         var response = await _httpClient.GetAsync("/api/tags", cancellationToken);
                         response.EnsureSuccessStatusCode();
 
-                        _logger?.LogInformation("List response received from Ollama API");
+                        logger?.LogInformation("List response received from Ollama API");
                         success = true;
 
                         var responseContent = await response.Content.ReadAsStringAsync();
@@ -145,21 +128,21 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                                     if (name.Equals(modelName, StringComparison.OrdinalIgnoreCase) ||
                                         name.Equals($"{modelName}:latest", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        _logger?.LogInformation($"Model {modelName} exists: {name}");
+                                        logger?.LogInformation($"Model {modelName} exists: {name}");
                                         return true;
                                     }
                                 }
                             }
                         }
 
-                        _logger?.LogInformation($"Model {modelName} not found");
+                        logger?.LogInformation($"Model {modelName} not found");
                         return false;
                     }
                     catch (HttpRequestException ex)
                     {
                         retryCount++;
-                        _logger?.LogError($"Network error (attempt {retryCount}): {ex.Message}");
-                        await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
+                        logger?.LogError($"Network error (attempt {retryCount}): {ex.Message}");
+                        await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
                             $"Network connection issue while checking model (attempt {retryCount})", ExceptionSeverity.Warning);
 
                         if (retryCount < maxRetries)
@@ -168,15 +151,15 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                         }
                         else
                         {
-                            _logger?.LogError("Max retries reached for Ollama API");
+                            logger?.LogError("Max retries reached for Ollama API");
                             return false;
                         }
                     }
                     catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
                     {
                         retryCount++;
-                        _logger?.LogError($"Request timeout (attempt {retryCount}): {ex.Message}");
-                        await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
+                        logger?.LogError($"Request timeout (attempt {retryCount}): {ex.Message}");
+                        await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
                             $"Request timeout while checking model (attempt {retryCount})", ExceptionSeverity.Warning);
 
                         if (retryCount < maxRetries)
@@ -185,20 +168,20 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                         }
                         else
                         {
-                            _logger?.LogError("Max retries reached due to timeouts");
+                            logger?.LogError("Max retries reached due to timeouts");
                             return false;
                         }
                     }
                     catch (JsonException ex)
                     {
-                        _logger?.LogError($"JSON parsing error: {ex.Message}");
-                        await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
+                        logger?.LogError($"JSON parsing error: {ex.Message}");
+                        await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
                             "Invalid response format from Ollama API", ExceptionSeverity.Error);
                         return false;
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        _logger?.LogInformation("Model existence check was cancelled");
+                        logger?.LogInformation("Model existence check was cancelled");
                         throw; // Re-throw cancellation exceptions
                     }
                 }
@@ -212,22 +195,22 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
         }
         catch (ObjectDisposedException disposedEx)
         {
-            _logger?.LogError($"Error checking model existence: Service is disposed - {disposedEx.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(disposedEx, "OllamaHttpService.ModelExistsAsync",
+            logger?.LogError($"Error checking model existence: Service is disposed - {disposedEx.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(disposedEx, "OllamaHttpService.ModelExistsAsync",
                 "Service is no longer available. Please restart the application.", ExceptionSeverity.Error);
             return false;
         }
         catch (InvalidOperationException invalidEx)
         {
-            _logger?.LogError($"Invalid operation: {invalidEx.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(invalidEx, "OllamaHttpService.ModelExistsAsync",
+            logger?.LogError($"Invalid operation: {invalidEx.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(invalidEx, "OllamaHttpService.ModelExistsAsync",
                 "Invalid operation performed. Please restart the application.", ExceptionSeverity.Error);
             return false;
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Unexpected error checking model existence: {ex.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
+            logger?.LogError($"Unexpected error checking model existence: {ex.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.ModelExistsAsync",
                 "Failed to check model availability. Please check your network connection.", ExceptionSeverity.Error);
             return false;
         }
@@ -242,7 +225,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task PullModelWithProgressApiAsync(string modelName, Action<OllamaProgress>? onProgress = null, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation($"Pulling model with progress (API): {modelName}");
+        logger?.LogInformation($"Pulling model with progress (API): {modelName}");
 
         try
         {
@@ -257,12 +240,12 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 System.Text.Encoding.UTF8,
                 "application/json");
 
-            _logger?.LogInformation("Sending pull request to Ollama API");
+            logger?.LogInformation("Sending pull request to Ollama API");
 
             var response = await _httpClient.PostAsync("/api/pull", content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            _logger?.LogInformation("Pull response received from Ollama API");
+            logger?.LogInformation("Pull response received from Ollama API");
 
             using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
             using (var reader = new StreamReader(stream))
@@ -283,7 +266,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                                     status.Contains("success") || status.Contains("manifest") ||
                                     status.Contains("verifying") || status.Contains("pulling manifest"))
                                 {
-                                    _logger?.LogInformation($"Pull status: {status}");
+                                    logger?.LogInformation($"Pull status: {status}");
                                 }
 
                                 var progress = ParseProgressFromApiResponse(json.RootElement);
@@ -296,14 +279,14 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                             if (json.RootElement.TryGetProperty("status", out var doneStatusElement) &&
                                 doneStatusElement.GetString() == "success")
                             {
-                                _logger?.LogInformation("Ollama pull completed successfully");
+                                logger?.LogInformation("Ollama pull completed successfully");
                                 break;
                             }
                         }
                         catch (JsonException ex)
                         {
-                            _logger?.LogError($"Error parsing JSON response: {ex.Message}");
-                            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
+                            logger?.LogError($"Error parsing JSON response: {ex.Message}");
+                            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
                                 "Invalid response format from Ollama API during model pull", ExceptionSeverity.Warning);
                         }
                     }
@@ -312,34 +295,34 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
         }
         catch (HttpRequestException ex)
         {
-            _logger?.LogError($"Ollama API pull HTTP error: {ex.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
+            logger?.LogError($"Ollama API pull HTTP error: {ex.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
                 "Network error occurred while pulling model. Please check your connection.", ExceptionSeverity.Error);
             throw;
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger?.LogError($"Ollama API pull timeout: {ex.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
+            logger?.LogError($"Ollama API pull timeout: {ex.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
                 "Request timed out while pulling model. Please try again.", ExceptionSeverity.Error);
             throw;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger?.LogInformation("Ollama API pull was cancelled");
+            logger?.LogInformation("Ollama API pull was cancelled");
             throw; // Re-throw cancellation exceptions
         }
         catch (IOException ex)
         {
-            _logger?.LogError($"Ollama API pull IO error: {ex.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
+            logger?.LogError($"Ollama API pull IO error: {ex.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
                 "Network or file system error occurred while pulling model.", ExceptionSeverity.Error);
             throw;
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Ollama API pull unexpected error: {ex.Message}");
-            await _exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
+            logger?.LogError($"Ollama API pull unexpected error: {ex.Message}");
+            await exceptionHandlingService.HandleExceptionAsync(ex, "OllamaHttpService.PullModelWithProgressApiAsync",
                 "An unexpected error occurred while pulling the model.", ExceptionSeverity.Error);
             throw;
         }
@@ -356,13 +339,13 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task RunOllamaApiAsync(OllamaApiRequest request, Action<string>? onOutput = null, Action? onComplete = null, Action<string>? onError = null, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation($"RunOllamaApiAsync started with prompt: {request.Prompt}");
+        logger?.LogInformation($"RunOllamaApiAsync started with prompt: {request.Prompt}");
 
         try
         {
             if (_isDisposed)
             {
-                _logger?.LogWarning("OllamaHttpService is disposed, cannot make API call");
+                logger?.LogWarning("OllamaHttpService is disposed, cannot make API call");
                 onError?.Invoke("Service is shutting down");
                 return;
             }
@@ -372,7 +355,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
             {
                 if (_isDisposed)
                 {
-                    _logger?.LogWarning("OllamaHttpService is disposed after acquiring lock");
+                    logger?.LogWarning("OllamaHttpService is disposed after acquiring lock");
                     onError?.Invoke("Service is shutting down");
                     return;
                 }
@@ -386,11 +369,11 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                     System.Text.Encoding.UTF8,
                     "application/json");
 
-                _logger?.LogInformation("Sending request to Ollama API");
+                logger?.LogInformation("Sending request to Ollama API");
 
                 if (!await IsModelReadyAsync(request.Model, cancellationToken))
                 {
-                    _logger?.LogError("Model is not ready for generation");
+                    logger?.LogError("Model is not ready for generation");
                     onError?.Invoke("Model is not ready for generation. Please try again.");
                     return;
                 }
@@ -398,7 +381,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                 var response = await _httpClient.PostAsync("/api/generate", content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
-                _logger?.LogInformation("Response received from Ollama API");
+                logger?.LogInformation("Response received from Ollama API");
 
                 using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
                 using (var reader = new StreamReader(stream))
@@ -415,7 +398,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                                 {
                                     if (_isDisposed)
                                     {
-                                        _logger?.LogWarning("OllamaHttpService is disposed, not sending output to UI");
+                                        logger?.LogWarning("OllamaHttpService is disposed, not sending output to UI");
                                         break;
                                     }
 
@@ -428,18 +411,18 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                                 {
                                     if (_isDisposed)
                                     {
-                                        _logger?.LogWarning("OllamaHttpService is disposed, not sending completion event to UI");
+                                        logger?.LogWarning("OllamaHttpService is disposed, not sending completion event to UI");
                                         break;
                                     }
 
-                                    _logger?.LogInformation("Ollama API processing completed");
+                                    logger?.LogInformation("Ollama API processing completed");
                                     onComplete?.Invoke();
                                     break;
                                 }
                             }
                             catch (JsonException ex)
                             {
-                                _logger?.LogError($"Error parsing JSON response: {ex.Message}");
+                                logger?.LogError($"Error parsing JSON response: {ex.Message}");
                             }
                         }
                     }
@@ -454,18 +437,18 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
         {
             if (ex is ObjectDisposedException disposedEx)
             {
-                _logger?.LogError($"Ollama API error: Service is disposed - {disposedEx.Message}");
+                logger?.LogError($"Ollama API error: Service is disposed - {disposedEx.Message}");
                 onError?.Invoke("Service is shutting down");
             }
             else
             {
-                _logger?.LogError($"Ollama API error: {ex.Message}");
+                logger?.LogError($"Ollama API error: {ex.Message}");
                 onError?.Invoke($"Ollama API error: {ex.Message}");
             }
             onComplete?.Invoke();
         }
 
-        _logger?.LogInformation("RunOllamaApiAsync completed");
+        logger?.LogInformation("RunOllamaApiAsync completed");
     }
 
     /// <summary>
@@ -477,17 +460,17 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     {
         try
         {
-            _logger?.LogInformation("Performing Ollama health check");
+            logger?.LogInformation("Performing Ollama health check");
 
             var response = await _httpClient.GetAsync("/api/tags", cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            _logger?.LogInformation("Ollama health check passed");
+            logger?.LogInformation("Ollama health check passed");
             return true;
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger?.LogError($"Ollama health check failed: {ex.Message}");
+            logger?.LogError($"Ollama health check failed: {ex.Message}");
             return false;
         }
     }
@@ -502,13 +485,13 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     {
         if (_isDisposed)
         {
-            _logger?.LogWarning("OllamaHttpService is disposed, cannot check model readiness");
+            logger?.LogWarning("OllamaHttpService is disposed, cannot check model readiness");
             return false;
         }
 
         try
         {
-            _logger?.LogInformation($"Checking if model {modelName} is ready...");
+            logger?.LogInformation($"Checking if model {modelName} is ready...");
 
             var listResponse = await _httpClient.GetAsync("/api/tags", cancellationToken);
             listResponse.EnsureSuccessStatusCode();
@@ -524,24 +507,24 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                     if (model.TryGetProperty("name", out var nameElement) &&
                         nameElement.GetString() == modelName)
                     {
-                        _logger?.LogInformation($"Model {modelName} found and ready");
+                        logger?.LogInformation($"Model {modelName} found and ready");
                         return true;
                     }
                 }
             }
 
-            _logger?.LogError($"Model {modelName} not found in model list");
+            logger?.LogError($"Model {modelName} not found in model list");
             return false;
         }
         catch (Exception ex)
         {
             if (ex is ObjectDisposedException disposedEx)
             {
-                _logger?.LogError($"Error checking model readiness: Service is disposed - {disposedEx.Message}");
+                logger?.LogError($"Error checking model readiness: Service is disposed - {disposedEx.Message}");
             }
             else
             {
-                _logger?.LogError($"Error checking model readiness: {ex.Message}");
+                logger?.LogError($"Error checking model readiness: {ex.Message}");
             }
             return false;
         }
@@ -584,12 +567,12 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
                          progress.Status.Contains("success") || progress.Status.Contains("manifest") ||
                          progress.Status.Contains("verifying")))
                     {
-                        _logger?.LogInformation($"Progress: {progress.Percent}% - {progress.Status}");
+                        logger?.LogInformation($"Progress: {progress.Percent}% - {progress.Status}");
                     }
                 }
                 else
                 {
-                    _logger?.LogInformation($"Progress calculation skipped - total is 0");
+                    logger?.LogInformation($"Progress calculation skipped - total is 0");
                 }
             }
 
@@ -617,7 +600,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error parsing API progress data: {ex.Message}");
+            logger?.LogError($"Error parsing API progress data: {ex.Message}");
             return null;
         }
     }
@@ -627,7 +610,7 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _logger?.LogInformation("OllamaHttpService Dispose called");
+        logger?.LogInformation("OllamaHttpService Dispose called");
 
         if (_isDisposed)
         {
@@ -644,14 +627,14 @@ public class OllamaHttpService : IOllamaHttpService, IDisposable
             }
             else if (_apiLock != null)
             {
-                _logger?.LogWarning("SemaphoreSlim not disposed - API calls may still be active");
+                logger?.LogWarning("SemaphoreSlim not disposed - API calls may still be active");
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error disposing SemaphoreSlim: {ex.Message}");
+            logger?.LogError($"Error disposing SemaphoreSlim: {ex.Message}");
         }
 
-        _logger?.LogInformation("OllamaHttpService Dispose completed");
+        logger?.LogInformation("OllamaHttpService Dispose completed");
     }
 }

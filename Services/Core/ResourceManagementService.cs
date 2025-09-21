@@ -9,18 +9,8 @@ namespace wolle.Services.Core
     /// <summary>
     /// Service for managing application resources
     /// </summary>
-    public class ResourceManagementService : IResourceManagementService
+    public class ResourceManagementService(ILogger<ResourceManagementService> logger) : IResourceManagementService
     {
-        private readonly ILogger<ResourceManagementService> _logger;
-
-        /// <summary>
-        /// Initializes resource management service
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        public ResourceManagementService(ILogger<ResourceManagementService> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
 
         /// <summary>
         /// Gets a brush from application resources with fallback
@@ -42,12 +32,12 @@ namespace wolle.Services.Core
                            Application.Current.Resources[fallbackKey] as Brush ??
                            new SolidColorBrush(Colors.Black);
 
-                _logger?.LogDebug($"Retrieved brush for resource '{resourceKey}' with fallback '{fallbackKey}'");
+                logger?.LogDebug($"Retrieved brush for resource '{resourceKey}' with fallback '{fallbackKey}'");
                 return brush;
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error getting resource brush '{resourceKey}': {ex.Message}");
+                logger?.LogError($"Error getting resource brush '{resourceKey}': {ex.Message}");
                 return new SolidColorBrush(Colors.Black);
             }
         }
@@ -71,17 +61,17 @@ namespace wolle.Services.Core
                     var resource = Application.Current.Resources[resourceKey];
                     if (resource is T typedResource)
                     {
-                        _logger?.LogDebug($"Retrieved resource '{resourceKey}' of type {typeof(T).Name}");
+                        logger?.LogDebug($"Retrieved resource '{resourceKey}' of type {typeof(T).Name}");
                         return typedResource;
                     }
                 }
 
-                _logger?.LogWarning($"Resource '{resourceKey}' not found or wrong type, using fallback");
+                logger?.LogWarning($"Resource '{resourceKey}' not found or wrong type, using fallback");
                 return fallbackValue;
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error getting resource '{resourceKey}': {ex.Message}");
+                logger?.LogError($"Error getting resource '{resourceKey}': {ex.Message}");
                 return fallbackValue;
             }
         }
@@ -99,12 +89,12 @@ namespace wolle.Services.Core
                     return false;
 
                 var exists = Application.Current.Resources.Contains(resourceKey);
-                _logger?.LogDebug($"Resource '{resourceKey}' exists: {exists}");
+                logger?.LogDebug($"Resource '{resourceKey}' exists: {exists}");
                 return exists;
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error checking if resource '{resourceKey}' exists: {ex.Message}");
+                logger?.LogError($"Error checking if resource '{resourceKey}' exists: {ex.Message}");
                 return false;
             }
         }
@@ -133,12 +123,12 @@ namespace wolle.Services.Core
                     };
                 }
 
-                _logger?.LogWarning($"Color resource '{resourceKey}' not found, using fallback");
+                logger?.LogWarning($"Color resource '{resourceKey}' not found, using fallback");
                 return fallbackColor;
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error getting color resource '{resourceKey}': {ex.Message}");
+                logger?.LogError($"Error getting color resource '{resourceKey}': {ex.Message}");
                 return fallbackColor;
             }
         }

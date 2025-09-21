@@ -8,9 +8,8 @@ namespace wolle.Services.Core
     /// <summary>
     /// Service for managing event subscriptions and forwarding
     /// </summary>
-    public class EventManagementService : IEventManagementService, IDisposable
+    public class EventManagementService(ILogger<EventManagementService> logger) : IEventManagementService, IDisposable
     {
-        private readonly ILogger<EventManagementService> _logger;
         private OllamaService? _ollamaService;
         private IFileProcessingService? _fileProcessingService;
         private IStatusManagementService? _statusManagementService;
@@ -22,15 +21,6 @@ namespace wolle.Services.Core
         public event Action? OnOllamaProcessComplete;
         public event EventHandler? OnFileProcessingComplete;
         public event EventHandler? OnStatusTimerTick;
-
-        /// <summary>
-        /// Initializes event management service
-        /// </summary>
-        /// <param name="logger">The logger</param>
-        public EventManagementService(ILogger<EventManagementService> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
 
         /// <summary>
         /// Subscribes to all Ollama service events
@@ -49,7 +39,7 @@ namespace wolle.Services.Core
             _ollamaService.OnErrorReceived += OnOllamaErrorReceivedInternal;
             _ollamaService.OnProcessComplete += OnOllamaProcessCompleteInternal;
 
-            _logger?.LogInformation("Subscribed to Ollama service events");
+            logger?.LogInformation("Subscribed to Ollama service events");
         }
 
         /// <summary>
@@ -67,7 +57,7 @@ namespace wolle.Services.Core
             ollamaService.OnErrorReceived -= OnOllamaErrorReceivedInternal;
             ollamaService.OnProcessComplete -= OnOllamaProcessCompleteInternal;
 
-            _logger?.LogInformation("Unsubscribed from Ollama service events");
+            logger?.LogInformation("Unsubscribed from Ollama service events");
         }
 
         /// <summary>
@@ -82,7 +72,7 @@ namespace wolle.Services.Core
             _fileProcessingService = fileProcessingService;
             _fileProcessingService.OnFileProcessingComplete += OnFileProcessingCompleteInternal;
 
-            _logger?.LogInformation("Subscribed to file processing service events");
+            logger?.LogInformation("Subscribed to file processing service events");
         }
 
         /// <summary>
@@ -96,7 +86,7 @@ namespace wolle.Services.Core
 
             fileProcessingService.OnFileProcessingComplete -= OnFileProcessingCompleteInternal;
 
-            _logger?.LogInformation("Unsubscribed from file processing service events");
+            logger?.LogInformation("Unsubscribed from file processing service events");
         }
 
         /// <summary>
@@ -111,7 +101,7 @@ namespace wolle.Services.Core
             _statusManagementService = statusManagementService;
             _statusManagementService.OnStatusTimerTick += OnStatusTimerTickInternal;
 
-            _logger?.LogInformation("Subscribed to status management service events");
+            logger?.LogInformation("Subscribed to status management service events");
         }
 
         /// <summary>
@@ -125,7 +115,7 @@ namespace wolle.Services.Core
 
             statusManagementService.OnStatusTimerTick -= OnStatusTimerTickInternal;
 
-            _logger?.LogInformation("Unsubscribed from status management service events");
+            logger?.LogInformation("Unsubscribed from status management service events");
         }
 
         /// <summary>
@@ -136,7 +126,7 @@ namespace wolle.Services.Core
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             System.Windows.Threading.Dispatcher.CurrentDispatcher.UnhandledException += OnDispatcherUnhandledException;
 
-            _logger?.LogInformation("Subscribed to application exception events");
+            logger?.LogInformation("Subscribed to application exception events");
         }
 
         /// <summary>
@@ -165,7 +155,7 @@ namespace wolle.Services.Core
             AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
             System.Windows.Threading.Dispatcher.CurrentDispatcher.UnhandledException -= OnDispatcherUnhandledException;
 
-            _logger?.LogInformation("Unsubscribed from all events");
+            logger?.LogInformation("Unsubscribed from all events");
         }
 
         /// <summary>
@@ -179,7 +169,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding Ollama progress update: {ex.Message}");
+                logger?.LogError($"Error forwarding Ollama progress update: {ex.Message}");
             }
         }
 
@@ -194,7 +184,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding Ollama status update: {ex.Message}");
+                logger?.LogError($"Error forwarding Ollama status update: {ex.Message}");
             }
         }
 
@@ -209,7 +199,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding Ollama output: {ex.Message}");
+                logger?.LogError($"Error forwarding Ollama output: {ex.Message}");
             }
         }
 
@@ -224,7 +214,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding Ollama error: {ex.Message}");
+                logger?.LogError($"Error forwarding Ollama error: {ex.Message}");
             }
         }
 
@@ -239,7 +229,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding Ollama process complete: {ex.Message}");
+                logger?.LogError($"Error forwarding Ollama process complete: {ex.Message}");
             }
         }
 
@@ -254,7 +244,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding file processing complete: {ex.Message}");
+                logger?.LogError($"Error forwarding file processing complete: {ex.Message}");
             }
         }
 
@@ -269,7 +259,7 @@ namespace wolle.Services.Core
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error forwarding status timer tick: {ex.Message}");
+                logger?.LogError($"Error forwarding status timer tick: {ex.Message}");
             }
         }
 
@@ -278,7 +268,7 @@ namespace wolle.Services.Core
         /// </summary>
         private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            _logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
+            logger?.LogError($"Unhandled application exception: {e.ExceptionObject}");
         }
 
         /// <summary>
@@ -286,7 +276,7 @@ namespace wolle.Services.Core
         /// </summary>
         private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
-            _logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
+            logger?.LogError($"Unhandled dispatcher exception: {e.Exception.Message}");
             e.Handled = true;
         }
 

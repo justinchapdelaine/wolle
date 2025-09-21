@@ -15,24 +15,10 @@ namespace wolle.Services.Core
     /// <summary>
     /// Implements centralized exception handling with logging and user-friendly error messages.
     /// </summary>
-    public class ExceptionHandlingService : IExceptionHandlingService
+    public class ExceptionHandlingService(ILogger<ExceptionHandlingService> logger, IErrorManagementService errorManagementService) : IExceptionHandlingService
     {
-        private readonly ILogger<ExceptionHandlingService> _logger;
-        private readonly IErrorManagementService _errorManagementService;
-        private readonly ConcurrentQueue<ExceptionRecord> _exceptionHistory;
+        private readonly ConcurrentQueue<ExceptionRecord> _exceptionHistory = new();
         private readonly int _maxHistorySize = 100;
-
-        /// <summary>
-        /// Initializes a new instance of ExceptionHandlingService class.
-        /// </summary>
-        /// <param name="logger">Logger service for logging operations.</param>
-        /// <param name="errorManagementService">Error management service for displaying errors to users.</param>
-        public ExceptionHandlingService(ILogger<ExceptionHandlingService> logger, IErrorManagementService errorManagementService)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _errorManagementService = errorManagementService ?? throw new ArgumentNullException(nameof(errorManagementService));
-            _exceptionHistory = new ConcurrentQueue<ExceptionRecord>();
-        }
 
         /// <summary>
         /// Handles an exception with centralized logging and user-friendly error messages.
@@ -63,19 +49,19 @@ namespace wolle.Services.Core
             {
                 try
                 {
-                    _errorManagementService.ShowError(userFriendlyMessage);
+                    errorManagementService.ShowError(userFriendlyMessage);
                 }
                 catch (Exception displayEx)
                 {
-                    _logger.LogError(displayEx, "Failed to display error message to user");
+                    logger.LogError(displayEx, "Failed to display error message to user");
                 }
             }
 
             // If critical, log additional information
             if (isCritical)
             {
-                _logger.LogCritical($"Critical exception occurred in {context}: {exception.Message}");
-                _logger.LogCritical($"Stack trace: {exception.StackTrace}");
+                logger.LogCritical($"Critical exception occurred in {context}: {exception.Message}");
+                logger.LogCritical($"Stack trace: {exception.StackTrace}");
             }
         }
 
@@ -113,26 +99,26 @@ namespace wolle.Services.Core
                     {
                         try
                         {
-                            _errorManagementService.ShowError(userFriendlyMessage);
+                            errorManagementService.ShowError(userFriendlyMessage);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Failed to display error message in Task.Run");
+                            logger.LogError(ex, "Failed to display error message in Task.Run");
                             throw;
                         }
                     });
                 }
                 catch (Exception displayEx)
                 {
-                    _logger.LogError(displayEx, "Failed to display error message asynchronously");
+                    logger.LogError(displayEx, "Failed to display error message asynchronously");
                 }
             }
 
             // If critical, log additional information
             if (isCritical)
             {
-                _logger.LogCritical($"Critical exception occurred in {context}: {exception.Message}");
-                _logger.LogCritical($"Stack trace: {exception.StackTrace}");
+                logger.LogCritical($"Critical exception occurred in {context}: {exception.Message}");
+                logger.LogCritical($"Stack trace: {exception.StackTrace}");
             }
         }
 
@@ -203,16 +189,16 @@ namespace wolle.Services.Core
             switch (severity)
             {
                 case ExceptionSeverity.Information:
-                    _logger.LogInformation(exception, message);
+                    logger.LogInformation(exception, message);
                     break;
                 case ExceptionSeverity.Warning:
-                    _logger.LogWarning(exception, message);
+                    logger.LogWarning(exception, message);
                     break;
                 case ExceptionSeverity.Error:
-                    _logger.LogError(exception, message);
+                    logger.LogError(exception, message);
                     break;
                 case ExceptionSeverity.Critical:
-                    _logger.LogCritical(exception, message);
+                    logger.LogCritical(exception, message);
                     break;
             }
         }

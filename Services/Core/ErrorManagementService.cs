@@ -10,21 +10,11 @@ namespace wolle.Services.Core
     /// <summary>
     /// Service for managing error display and handling
     /// </summary>
-    public class ErrorManagementService : IErrorManagementService
+    public class ErrorManagementService(IResourceManagementService resourceManagementService) : IErrorManagementService
     {
         private TextBlock? _errorTextBlock;
         private Border? _infoMessageBorder;
         private TextBlock? _infoMessageTextBlock;
-        private readonly IResourceManagementService _resourceManagementService;
-
-        /// <summary>
-        /// Initializes error management service
-        /// </summary>
-        /// <param name="resourceManagementService">The resource management service</param>
-        public ErrorManagementService(IResourceManagementService resourceManagementService)
-        {
-            _resourceManagementService = resourceManagementService ?? throw new ArgumentNullException(nameof(resourceManagementService));
-        }
 
         /// <summary>
         /// Initializes error management service
@@ -45,7 +35,7 @@ namespace wolle.Services.Core
         /// <param name="message">The error message</param>
         public void ShowError(string message)
         {
-            ShowError(message, _resourceManagementService.GetResourceBrush("SystemFillColorCriticalBrush"));
+            ShowError(message, resourceManagementService.GetResourceBrush("SystemFillColorCriticalBrush"));
         }
 
         /// <summary>

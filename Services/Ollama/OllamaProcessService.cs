@@ -60,25 +60,12 @@ public interface IOllamaProcessService
 /// <summary>
 /// Implements Ollama process management services.
 /// </summary>
-public class OllamaProcessService : IOllamaProcessService, IDisposable
+public class OllamaProcessService(ILogger<OllamaProcessService> logger, IExceptionHandlingService exceptionHandlingService) : IOllamaProcessService, IDisposable
 {
-    private readonly ILogger<OllamaProcessService> _logger;
-    private readonly IExceptionHandlingService _exceptionHandlingService;
     private Process? _ollamaServerProcess;
     private Process? _ollamaProcess;
     private bool _isDisposed = false;
     private readonly object _processLock = new();
-
-    /// <summary>
-    /// Initializes a new instance of OllamaProcessService class.
-    /// </summary>
-    /// <param name="logger">Logger service.</param>
-    /// <param name="exceptionHandlingService">Exception handling service.</param>
-    public OllamaProcessService(ILogger<OllamaProcessService> logger, IExceptionHandlingService exceptionHandlingService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _exceptionHandlingService = exceptionHandlingService ?? throw new ArgumentNullException(nameof(exceptionHandlingService));
-    }
 
     /// <summary>
     /// Starts Ollama server asynchronously.
@@ -90,13 +77,13 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     /// <returns>True if server started successfully, false otherwise.</returns>
     public Task<bool> StartOllamaServerAsync(string ollamaPath, Action<string>? onStatusUpdate = null, Action<string>? onError = null, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("StartOllamaServerAsync started");
+        logger?.LogInformation("StartOllamaServerAsync started");
 
         if (!wolle.Services.Processing.ValidationService.ValidateExecutablePath(ollamaPath))
         {
             var ex = new ArgumentException("Invalid Ollama executable path provided", nameof(ollamaPath));
-            _logger?.LogError("Invalid Ollama path: {Path}", ollamaPath);
-            _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+            logger?.LogError("Invalid Ollama path: {Path}", ollamaPath);
+            exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
                 "The Ollama executable path is invalid. Please check your settings.", ExceptionSeverity.Error);
             onError?.Invoke("Invalid Ollama executable path.");
             return Task.FromResult(false);
@@ -118,8 +105,8 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         if (sanitizedArguments == null || sanitizedArguments.Length == 0)
         {
             var ex = new ArgumentException("Invalid process arguments", nameof(ollamaPath));
-            _logger?.LogError("Process argument validation failed");
-            _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+            logger?.LogError("Process argument validation failed");
+            exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
                 "Invalid process arguments detected. Security validation failed.", ExceptionSeverity.Error);
             onError?.Invoke("Invalid process arguments. Security validation failed.");
             return Task.FromResult(false);
@@ -141,7 +128,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                     e.Data.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
                     e.Data.Contains("timeout", StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger?.LogError($"Ollama server error: {e.Data}");
+                    logger?.LogError($"Ollama server error: {e.Data}");
                 }
                 else if (e.Data.Contains("Listening on", StringComparison.OrdinalIgnoreCase) ||
                          e.Data.Contains("server config", StringComparison.OrdinalIgnoreCase) ||
@@ -151,7 +138,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                 {
                     if (!e.Data.Contains("env=\"map[", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger?.LogInformation($"Ollama server status: {e.Data}");
+                        logger?.LogInformation($"Ollama server status: {e.Data}");
                     }
                 }
 
@@ -176,11 +163,11 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                     {
                         if (e.Data.Contains("truncating input prompt", StringComparison.OrdinalIgnoreCase))
                         {
-                            _logger?.LogInformation($"Ollama server info: {e.Data}");
+                            logger?.LogInformation($"Ollama server info: {e.Data}");
                         }
                         else
                         {
-                            _logger?.LogError($"Ollama server error: {e.Data}");
+                            logger?.LogError($"Ollama server error: {e.Data}");
                             onError?.Invoke($"Ollama server error: {e.Data}");
                         }
                     }
@@ -189,7 +176,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                          e.Data.Contains("server config", StringComparison.OrdinalIgnoreCase) ||
                          e.Data.Contains("total blobs", StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger?.LogInformation($"Ollama server status: {e.Data}");
+                    logger?.LogInformation($"Ollama server status: {e.Data}");
                 }
             }
         };
@@ -198,7 +185,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             if (!_isDisposed)
             {
-                _logger?.LogInformation("Ollama server process exited");
+                logger?.LogInformation("Ollama server process exited");
             }
         };
 
@@ -219,31 +206,31 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
-                _logger?.LogError(ex, "Failed to start Ollama server process - Win32 error");
-                _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+                logger?.LogError(ex, "Failed to start Ollama server process - Win32 error");
+                exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
                     "Failed to start Ollama server. Please check if Ollama is properly installed.", ExceptionSeverity.Error);
                 onError?.Invoke("Failed to start Ollama server. Please check if Ollama is properly installed.");
                 return Task.FromResult(false);
             }
             catch (InvalidOperationException ex)
             {
-                _logger?.LogError(ex, "Failed to start Ollama server process - invalid operation");
-                _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+                logger?.LogError(ex, "Failed to start Ollama server process - invalid operation");
+                exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
                     "Invalid operation while starting Ollama server. Please restart the application.", ExceptionSeverity.Error);
                 onError?.Invoke("Invalid operation while starting Ollama server. Please restart the application.");
                 return Task.FromResult(false);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to start Ollama server process - unexpected error");
-                _exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
+                logger?.LogError(ex, "Failed to start Ollama server process - unexpected error");
+                exceptionHandlingService.HandleException(ex, "OllamaProcessService.StartOllamaServerAsync",
                     "Unexpected error while starting Ollama server. Please try again.", ExceptionSeverity.Error);
                 onError?.Invoke("Unexpected error while starting Ollama server. Please try again.");
                 return Task.FromResult(false);
             }
         }
 
-        _logger?.LogInformation("Ollama server started successfully");
+        logger?.LogInformation("Ollama server started successfully");
         return Task.FromResult(true);
     }
 
@@ -307,7 +294,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             var extension = Path.GetExtension(fullPath).ToLowerInvariant();
             if (extension != ".exe" && extension != ".com" && extension != ".bat" && extension != ".cmd")
             {
-                _logger?.LogError($"File is not an executable: {fullPath}");
+                logger?.LogError($"File is not an executable: {fullPath}");
                 return false;
             }
 
@@ -324,7 +311,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
 
             if (Array.Exists(suspiciousNames, name => name == fileName))
             {
-                _logger?.LogError($"Suspicious executable name detected: {fileName}");
+                logger?.LogError($"Suspicious executable name detected: {fileName}");
                 return false;
             }
 
@@ -340,20 +327,20 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             {
                 if (lowerDir.Contains(suspiciousDir))
                 {
-                    _logger?.LogWarning($"Executable in potentially suspicious directory: {directoryName}");
+                    logger?.LogWarning($"Executable in potentially suspicious directory: {directoryName}");
                 }
             }
 
             var fileInfo = new FileInfo(fullPath);
             if (fileInfo.Length == 0)
             {
-                _logger?.LogError("Executable file is empty");
+                logger?.LogError("Executable file is empty");
                 return false;
             }
 
             if (fileInfo.Length > 100 * 1024 * 1024)
             {
-                _logger?.LogError("Executable file is suspiciously large");
+                logger?.LogError("Executable file is suspiciously large");
                 return false;
             }
 
@@ -361,7 +348,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error validating executable path {executablePath}: {ex.Message}");
+            logger?.LogError($"Error validating executable path {executablePath}: {ex.Message}");
             return false;
         }
     }
@@ -383,7 +370,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             if (fullPath.Contains("..\\") || fullPath.Contains("../") ||
                 fullPath.Contains("\\..\\") || fullPath.Contains("/../"))
             {
-                _logger?.LogError($"Path traversal detected in directory: {directoryPath}");
+                logger?.LogError($"Path traversal detected in directory: {directoryPath}");
                 return false;
             }
 
@@ -399,7 +386,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             {
                 if (lowerDir.Contains(suspiciousDir))
                 {
-                    _logger?.LogWarning($"Directory path is potentially suspicious: {fullPath}");
+                    logger?.LogWarning($"Directory path is potentially suspicious: {fullPath}");
                 }
             }
 
@@ -413,7 +400,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             var isAllowedSystemDir = Array.Exists(allowedSystemDirs, dir => lowerDir.Contains(dir));
             if (isAllowedSystemDir)
             {
-                _logger?.LogInformation($"Directory is allowed system directory: {fullPath}");
+                logger?.LogInformation($"Directory is allowed system directory: {fullPath}");
             }
 
             if (!Directory.Exists(fullPath))
@@ -425,7 +412,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error validating directory path {directoryPath}: {ex.Message}");
+            logger?.LogError($"Error validating directory path {directoryPath}: {ex.Message}");
             return false;
         }
     }
@@ -444,14 +431,14 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             if (!process.HasExited)
             {
-                _logger?.LogInformation($"Killing {processName} process");
+                logger?.LogInformation($"Killing {processName} process");
                 process.Kill(true);
                 process.WaitForExit(5000);
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error killing {processName} process: {ex.Message}");
+            logger?.LogError($"Error killing {processName} process: {ex.Message}");
         }
     }
 
@@ -460,7 +447,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _logger?.LogInformation("OllamaProcessService Dispose called");
+        logger?.LogInformation("OllamaProcessService Dispose called");
 
         lock (_processLock)
         {
@@ -474,7 +461,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             StopAllProcesses();
         }
 
-        _logger?.LogInformation("OllamaProcessService Dispose completed");
+        logger?.LogInformation("OllamaProcessService Dispose completed");
     }
 
     /// <summary>
@@ -486,7 +473,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     {
         if (arguments == null || arguments.Length == 0)
         {
-            _logger?.LogWarning("No arguments provided for sanitization");
+            logger?.LogWarning("No arguments provided for sanitization");
             return arguments;
         }
 
@@ -498,14 +485,14 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             {
                 if (string.IsNullOrEmpty(arg))
                 {
-                    _logger?.LogWarning("Empty argument detected and skipped");
+                    logger?.LogWarning("Empty argument detected and skipped");
                     continue;
                 }
 
                 // Check for dangerous patterns
                 if (ContainsDangerousArgumentPatterns(arg))
                 {
-                    _logger?.LogError($"Dangerous argument pattern detected: {arg}");
+                    logger?.LogError($"Dangerous argument pattern detected: {arg}");
                     LogSecurityEvent("DangerousArgument", arg);
                     return null; // Reject all arguments if any dangerous pattern is found
                 }
@@ -518,12 +505,12 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                 }
             }
 
-            _logger?.LogInformation($"Sanitized {arguments.Length} arguments to {sanitizedArgs.Count} safe arguments");
+            logger?.LogInformation($"Sanitized {arguments.Length} arguments to {sanitizedArgs.Count} safe arguments");
             return sanitizedArgs.ToArray();
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error sanitizing process arguments: {ex.Message}");
+            logger?.LogError($"Error sanitizing process arguments: {ex.Message}");
             LogSecurityEvent("ArgumentSanitizationError", ex.Message);
             return null;
         }
@@ -551,7 +538,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             if (argument.Contains(pattern))
             {
-                _logger?.LogWarning($"Injection pattern '{pattern}' found in argument: {argument}");
+                logger?.LogWarning($"Injection pattern '{pattern}' found in argument: {argument}");
                 return true;
             }
         }
@@ -562,7 +549,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             var hexPattern = new Regex(@"%[0-9a-fA-F]{2}");
             if (hexPattern.IsMatch(argument))
             {
-                _logger?.LogWarning($"Potential URL-encoded injection attempt: {argument}");
+                logger?.LogWarning($"Potential URL-encoded injection attempt: {argument}");
                 return true;
             }
         }
@@ -570,7 +557,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         // Check for environment variable access attempts
         if (argument.Contains("%") && (argument.Contains("env") || argument.Contains("ENV")))
         {
-            _logger?.LogWarning($"Potential environment variable access attempt: {argument}");
+            logger?.LogWarning($"Potential environment variable access attempt: {argument}");
             return true;
         }
 
@@ -580,7 +567,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             if (argument.Contains(pattern))
             {
-                _logger?.LogWarning($"File redirection pattern '{pattern}' found in argument: {argument}");
+                logger?.LogWarning($"File redirection pattern '{pattern}' found in argument: {argument}");
                 return true;
             }
         }
@@ -591,7 +578,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         {
             if (argument.Contains(pattern, StringComparison.OrdinalIgnoreCase))
             {
-                _logger?.LogWarning($"Script execution pattern '{pattern}' found in argument: {argument}");
+                logger?.LogWarning($"Script execution pattern '{pattern}' found in argument: {argument}");
                 return true;
             }
         }
@@ -622,14 +609,14 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         // Validate length
         if (sanitized.Length > 1000) // Reasonable argument length limit
         {
-            _logger?.LogWarning($"Argument too long after sanitization: {sanitized.Length} characters");
+            logger?.LogWarning($"Argument too long after sanitization: {sanitized.Length} characters");
             return string.Empty;
         }
 
         // Ensure the sanitized argument is not empty
         if (string.IsNullOrWhiteSpace(sanitized))
         {
-            _logger?.LogWarning($"Argument became empty after sanitization: {argument}");
+            logger?.LogWarning($"Argument became empty after sanitization: {argument}");
             return string.Empty;
         }
 
@@ -648,14 +635,14 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             // Validate file name
             if (string.IsNullOrEmpty(startInfo.FileName))
             {
-                _logger?.LogError("Process start info has empty file name");
+                logger?.LogError("Process start info has empty file name");
                 return false;
             }
 
             // Validate that we're not using shell execute (security risk)
             if (startInfo.UseShellExecute)
             {
-                _logger?.LogError("Process start info uses shell execute - security risk");
+                logger?.LogError("Process start info uses shell execute - security risk");
                 return false;
             }
 
@@ -664,7 +651,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             {
                 if (!IsSafeDirectoryPath(startInfo.WorkingDirectory))
                 {
-                    _logger?.LogError($"Unsafe working directory: {startInfo.WorkingDirectory}");
+                    logger?.LogError($"Unsafe working directory: {startInfo.WorkingDirectory}");
                     return false;
                 }
             }
@@ -676,7 +663,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
                 {
                     if (IsSuspiciousEnvironmentVariable(key))
                     {
-                        _logger?.LogError($"Suspicious environment variable detected: {key}");
+                        logger?.LogError($"Suspicious environment variable detected: {key}");
                         return false;
                     }
                 }
@@ -686,7 +673,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error validating process start info: {ex.Message}");
+            logger?.LogError($"Error validating process start info: {ex.Message}");
             return false;
         }
     }
@@ -710,7 +697,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
         // Check for dangerous system environment variables
         if (Array.Exists(dangerousSystemVars, v => v == upperVar))
         {
-            _logger?.LogWarning($"Potentially dangerous system environment variable: {variableName}");
+            logger?.LogWarning($"Potentially dangerous system environment variable: {variableName}");
             return true;
         }
 
@@ -721,7 +708,7 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             upperVar.Contains("INJECT") || upperVar.Contains("EXPLOIT") ||
             upperVar.Contains("ATTACK") || upperVar.Contains("MALWARE"))
         {
-            _logger?.LogWarning($"Potentially malicious environment variable: {variableName}");
+            logger?.LogWarning($"Potentially malicious environment variable: {variableName}");
             return true;
         }
 
@@ -739,14 +726,14 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
     {
         try
         {
-            _logger?.LogWarning($"Process Security Event: {eventType} - {details}");
+            logger?.LogWarning($"Process Security Event: {eventType} - {details}");
 
             // Additional security logging could be added here
             // For example, writing to a security log file or sending to a monitoring service
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Failed to log process security event: {ex.Message}");
+            logger?.LogError($"Failed to log process security event: {ex.Message}");
         }
     }
 
@@ -763,32 +750,32 @@ public class OllamaProcessService : IOllamaProcessService, IDisposable
             // Validate process start info
             if (!ValidateProcessStartInfo(process.StartInfo))
             {
-                _logger?.LogError($"Process start info validation failed for {processName}");
+                logger?.LogError($"Process start info validation failed for {processName}");
                 LogSecurityEvent("ProcessStartInfoValidationFailed", processName);
                 return false;
             }
 
             // Log process startup attempt
-            _logger?.LogInformation($"Starting {processName} with enhanced security validation");
+            logger?.LogInformation($"Starting {processName} with enhanced security validation");
             LogSecurityEvent("ProcessStartAttempt", $"{processName}: {process.StartInfo.FileName}");
 
             // Start the process
             if (!process.Start())
             {
-                _logger?.LogError($"Failed to start {processName}");
+                logger?.LogError($"Failed to start {processName}");
                 LogSecurityEvent("ProcessStartFailed", processName);
                 return false;
             }
 
             // Log successful startup
-            _logger?.LogInformation($"{processName} started successfully with PID: {process.Id}");
+            logger?.LogInformation($"{processName} started successfully with PID: {process.Id}");
             LogSecurityEvent("ProcessStartSuccess", $"{processName}: PID {process.Id}");
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error starting {processName}: {ex.Message}");
+            logger?.LogError($"Error starting {processName}: {ex.Message}");
             LogSecurityEvent("ProcessStartError", $"{processName}: {ex.Message}");
             return false;
         }

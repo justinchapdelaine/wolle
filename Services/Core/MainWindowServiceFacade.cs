@@ -14,81 +14,41 @@ namespace wolle.Services.Core;
 /// <summary>
 /// Implementation of the MainWindow service facade that provides simplified access to multiple services.
 /// </summary>
-public class MainWindowServiceFacade : IMainWindowServiceFacade, IDisposable
+public class MainWindowServiceFacade(
+    SettingsService settingsService,
+    OllamaService ollamaService,
+    MarkdownService markdownService,
+    IResponseDisplayCoordinator responseDisplayCoordinator,
+    IProgressManagementService progressManagementService,
+    IStatusManagementService statusManagementService,
+    ISettingsManagementService settingsManagementService,
+    IUIInteractionService uiInteractionService,
+    IErrorManagementService errorManagementService,
+    IFileProcessingService fileProcessingService,
+    IWindowManagementService windowManagementService,
+    IEventManagementService eventManagementService,
+    IResourceManagementService resourceManagementService,
+    IEventAggregator eventAggregator,
+    IExceptionHandlingService exceptionHandlingService,
+    ILogger<MainWindowServiceFacade> logger) : IMainWindowServiceFacade, IDisposable
 {
-    private readonly ILogger<MainWindowServiceFacade> _logger;
     private bool _disposed = false;
 
-    public SettingsService SettingsService { get; }
-    public OllamaService OllamaService { get; }
-    public MarkdownService MarkdownService { get; }
-    public IResponseDisplayCoordinator ResponseDisplayCoordinator { get; }
-    public IProgressManagementService ProgressManagementService { get; }
-    public IStatusManagementService StatusManagementService { get; }
-    public ISettingsManagementService SettingsManagementService { get; }
-    public IUIInteractionService UIInteractionService { get; }
-    public IErrorManagementService ErrorManagementService { get; }
-    public IFileProcessingService FileProcessingService { get; }
-    public IWindowManagementService WindowManagementService { get; }
-    public IEventManagementService EventManagementService { get; }
-    public IResourceManagementService ResourceManagementService { get; }
-    public IEventAggregator EventAggregator { get; }
-    public IExceptionHandlingService ExceptionHandlingService { get; }
-
-    /// <summary>
-    /// Initializes a new instance of MainWindowServiceFacade.
-    /// </summary>
-    /// <param name="settingsService">Settings service.</param>
-    /// <param name="ollamaService">Ollama service.</param>
-    /// <param name="markdownService">Markdown service.</param>
-    /// <param name="responseDisplayCoordinator">Response display coordinator.</param>
-    /// <param name="progressManagementService">Progress management service.</param>
-    /// <param name="statusManagementService">Status management service.</param>
-    /// <param name="settingsManagementService">Settings management service.</param>
-    /// <param name="uiInteractionService">UI interaction service.</param>
-    /// <param name="errorManagementService">Error management service.</param>
-    /// <param name="fileProcessingService">File processing service.</param>
-    /// <param name="windowManagementService">Window management service.</param>
-    /// <param name="eventManagementService">Event management service.</param>
-    /// <param name="resourceManagementService">Resource management service.</param>
-    /// <param name="eventAggregator">Event aggregator.</param>
-    /// <param name="exceptionHandlingService">Exception handling service.</param>
-    /// <param name="logger">Logger service.</param>
-    public MainWindowServiceFacade(
-        SettingsService settingsService,
-        OllamaService ollamaService,
-        MarkdownService markdownService,
-        IResponseDisplayCoordinator responseDisplayCoordinator,
-        IProgressManagementService progressManagementService,
-        IStatusManagementService statusManagementService,
-        ISettingsManagementService settingsManagementService,
-        IUIInteractionService uiInteractionService,
-        IErrorManagementService errorManagementService,
-        IFileProcessingService fileProcessingService,
-        IWindowManagementService windowManagementService,
-        IEventManagementService eventManagementService,
-        IResourceManagementService resourceManagementService,
-        IEventAggregator eventAggregator,
-        IExceptionHandlingService exceptionHandlingService,
-        ILogger<MainWindowServiceFacade> logger)
-    {
-        SettingsService = ValidationUtilities.ValidateNotNull(settingsService, nameof(settingsService));
-        OllamaService = ValidationUtilities.ValidateNotNull(ollamaService, nameof(ollamaService));
-        MarkdownService = ValidationUtilities.ValidateNotNull(markdownService, nameof(markdownService));
-        ResponseDisplayCoordinator = ValidationUtilities.ValidateNotNull(responseDisplayCoordinator, nameof(responseDisplayCoordinator));
-        ProgressManagementService = ValidationUtilities.ValidateNotNull(progressManagementService, nameof(progressManagementService));
-        StatusManagementService = ValidationUtilities.ValidateNotNull(statusManagementService, nameof(statusManagementService));
-        SettingsManagementService = ValidationUtilities.ValidateNotNull(settingsManagementService, nameof(settingsManagementService));
-        UIInteractionService = ValidationUtilities.ValidateNotNull(uiInteractionService, nameof(uiInteractionService));
-        ErrorManagementService = ValidationUtilities.ValidateNotNull(errorManagementService, nameof(errorManagementService));
-        FileProcessingService = ValidationUtilities.ValidateNotNull(fileProcessingService, nameof(fileProcessingService));
-        WindowManagementService = ValidationUtilities.ValidateNotNull(windowManagementService, nameof(windowManagementService));
-        EventManagementService = ValidationUtilities.ValidateNotNull(eventManagementService, nameof(eventManagementService));
-        ResourceManagementService = ValidationUtilities.ValidateNotNull(resourceManagementService, nameof(resourceManagementService));
-        EventAggregator = ValidationUtilities.ValidateNotNull(eventAggregator, nameof(eventAggregator));
-        ExceptionHandlingService = ValidationUtilities.ValidateNotNull(exceptionHandlingService, nameof(exceptionHandlingService));
-        _logger = ValidationUtilities.ValidateNotNull(logger, nameof(logger));
-    }
+    public SettingsService SettingsService { get; } = ValidationUtilities.ValidateNotNull(settingsService, nameof(settingsService));
+    public OllamaService OllamaService { get; } = ValidationUtilities.ValidateNotNull(ollamaService, nameof(ollamaService));
+    public MarkdownService MarkdownService { get; } = ValidationUtilities.ValidateNotNull(markdownService, nameof(markdownService));
+    public IResponseDisplayCoordinator ResponseDisplayCoordinator { get; } = ValidationUtilities.ValidateNotNull(responseDisplayCoordinator, nameof(responseDisplayCoordinator));
+    public IProgressManagementService ProgressManagementService { get; } = ValidationUtilities.ValidateNotNull(progressManagementService, nameof(progressManagementService));
+    public IStatusManagementService StatusManagementService { get; } = ValidationUtilities.ValidateNotNull(statusManagementService, nameof(statusManagementService));
+    public ISettingsManagementService SettingsManagementService { get; } = ValidationUtilities.ValidateNotNull(settingsManagementService, nameof(settingsManagementService));
+    public IUIInteractionService UIInteractionService { get; } = ValidationUtilities.ValidateNotNull(uiInteractionService, nameof(uiInteractionService));
+    public IErrorManagementService ErrorManagementService { get; } = ValidationUtilities.ValidateNotNull(errorManagementService, nameof(errorManagementService));
+    public IFileProcessingService FileProcessingService { get; } = ValidationUtilities.ValidateNotNull(fileProcessingService, nameof(fileProcessingService));
+    public IWindowManagementService WindowManagementService { get; } = ValidationUtilities.ValidateNotNull(windowManagementService, nameof(windowManagementService));
+    public IEventManagementService EventManagementService { get; } = ValidationUtilities.ValidateNotNull(eventManagementService, nameof(eventManagementService));
+    public IResourceManagementService ResourceManagementService { get; } = ValidationUtilities.ValidateNotNull(resourceManagementService, nameof(resourceManagementService));
+    public IEventAggregator EventAggregator { get; } = ValidationUtilities.ValidateNotNull(eventAggregator, nameof(eventAggregator));
+    public IExceptionHandlingService ExceptionHandlingService { get; } = ValidationUtilities.ValidateNotNull(exceptionHandlingService, nameof(exceptionHandlingService));
 
     /// <summary>
     /// Disposes all managed services.
@@ -100,7 +60,7 @@ public class MainWindowServiceFacade : IMainWindowServiceFacade, IDisposable
 
         try
         {
-            _logger.LogInformation("Disposing MainWindow services");
+            logger.LogInformation("Disposing MainWindow services");
 
             // Dispose disposable services
             if (SettingsService is IDisposable disposableSettings)
@@ -148,11 +108,11 @@ public class MainWindowServiceFacade : IMainWindowServiceFacade, IDisposable
             if (ExceptionHandlingService is IDisposable disposableException)
                 disposableException.Dispose();
 
-            _logger.LogInformation("MainWindow services disposed successfully");
+            logger.LogInformation("MainWindow services disposed successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while disposing MainWindow services");
+            logger.LogError(ex, "Error occurred while disposing MainWindow services");
         }
 
         _disposed = true;

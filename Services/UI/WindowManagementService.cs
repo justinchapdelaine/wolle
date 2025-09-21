@@ -11,13 +11,9 @@ namespace wolle.Services.UI
     /// <summary>
     /// Service for managing window operations and lifecycle
     /// </summary>
-    public class WindowManagementService : IWindowManagementService
+    public class WindowManagementService(ILogger<WindowManagementService> logger, OllamaService ollamaService, IStatusManagementService statusManagementService, IEventManagementService eventManagementService) : IWindowManagementService
     {
         private Window? _mainWindow;
-        private readonly ILogger<WindowManagementService> _logger;
-        private readonly OllamaService _ollamaService;
-        private readonly IStatusManagementService _statusManagementService;
-        private readonly IEventManagementService _eventManagementService;
         private CancellationTokenSource? _cancellationTokenSource;
         private bool _isWindowClosing = false;
         private bool _isProcessingComplete = false;
@@ -26,26 +22,11 @@ namespace wolle.Services.UI
         /// <summary>
         /// Initializes window management service
         /// </summary>
-        /// <param name="logger">The logger</param>
-        /// <param name="ollamaService">The Ollama service</param>
-        /// <param name="statusManagementService">The status management service</param>
-        /// <param name="eventManagementService">The event management service</param>
-        public WindowManagementService(ILogger<WindowManagementService> logger, OllamaService ollamaService, IStatusManagementService statusManagementService, IEventManagementService eventManagementService)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _ollamaService = ollamaService ?? throw new ArgumentNullException(nameof(ollamaService));
-            _statusManagementService = statusManagementService ?? throw new ArgumentNullException(nameof(statusManagementService));
-            _eventManagementService = eventManagementService ?? throw new ArgumentNullException(nameof(eventManagementService));
-        }
-
-        /// <summary>
-        /// Initializes window management service
-        /// </summary>
         /// <param name="mainWindow">The main window</param>
         public void Initialize(Window mainWindow)
         {
             _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
-            _logger?.LogInformation("WindowManagementService initialized");
+            logger?.LogInformation("WindowManagementService initialized");
         }
 
         /// <summary>
@@ -80,7 +61,7 @@ namespace wolle.Services.UI
         /// <param name="e">The event arguments</param>
         public void OnWindowClosed(EventArgs e)
         {
-            _logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isWindowClosing={_isWindowClosing}");
+            logger?.LogInformation($"Window OnClosed called. _isProcessingComplete={_isProcessingComplete}, _isWindowClosing={_isWindowClosing}");
 
             lock (_stateLock)
             {
@@ -90,7 +71,7 @@ namespace wolle.Services.UI
             // First: Attempt graceful cancellation
             if (!_isProcessingComplete)
             {
-                _logger?.LogInformation("Processing not complete - attempting graceful cancellation");
+                logger?.LogInformation("Processing not complete - attempting graceful cancellation");
                 CancelOperations();
 
                 // Give a moment for graceful shutdown
@@ -98,13 +79,13 @@ namespace wolle.Services.UI
             }
             else
             {
-                _logger?.LogInformation("Processing complete - performing cleanup");
+                logger?.LogInformation("Processing complete - performing cleanup");
             }
 
             // Perform cleanup operations
             PerformCleanup();
 
-            _logger?.LogInformation("Window OnClosed completed");
+            logger?.LogInformation("Window OnClosed completed");
         }
 
         /// <summary>
@@ -117,7 +98,7 @@ namespace wolle.Services.UI
             lock (_stateLock)
             {
                 _isProcessingComplete = isComplete;
-                _logger?.LogInformation($"Processing state set: Active={isActive}, Complete={isComplete}");
+                logger?.LogInformation($"Processing state set: Active={isActive}, Complete={isComplete}");
             }
         }
 
@@ -153,7 +134,7 @@ namespace wolle.Services.UI
             lock (_stateLock)
             {
                 _isWindowClosing = false;
-                _logger?.LogInformation("Window closing cancelled");
+                logger?.LogInformation("Window closing cancelled");
             }
         }
 
@@ -165,7 +146,7 @@ namespace wolle.Services.UI
             lock (_stateLock)
             {
                 _isProcessingComplete = true;
-                _logger?.LogInformation("Window closing allowed");
+                logger?.LogInformation("Window closing allowed");
             }
         }
 
@@ -174,45 +155,45 @@ namespace wolle.Services.UI
         /// </summary>
         public void PerformCleanup()
         {
-            _logger?.LogInformation("Performing cleanup operations");
+            logger?.LogInformation("Performing cleanup operations");
 
             // Unsubscribe from all events
             try
             {
-                _eventManagementService?.UnsubscribeFromAllEvents();
-                _logger?.LogInformation("Event subscriptions cleaned up successfully");
+                eventManagementService?.UnsubscribeFromAllEvents();
+                logger?.LogInformation("Event subscriptions cleaned up successfully");
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error cleaning up event subscriptions: {ex.Message}");
+                logger?.LogError($"Error cleaning up event subscriptions: {ex.Message}");
             }
 
             // Dispose OllamaService to prevent memory leaks
             try
             {
-                _ollamaService?.Dispose();
-                _logger?.LogInformation("OllamaService disposed successfully");
+                ollamaService?.Dispose();
+                logger?.LogInformation("OllamaService disposed successfully");
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error disposing OllamaService: {ex.Message}");
+                logger?.LogError($"Error disposing OllamaService: {ex.Message}");
             }
 
             // Stop status update timer
             try
             {
-                if (_statusManagementService is StatusManagementService statusService)
+                if (statusManagementService is StatusManagementService statusService)
                 {
                     statusService.Dispose();
-                    _logger?.LogInformation("Status update timer disposed successfully");
+                    logger?.LogInformation("Status update timer disposed successfully");
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error disposing status update timer: {ex.Message}");
+                logger?.LogError($"Error disposing status update timer: {ex.Message}");
             }
 
-            _logger?.LogInformation("Cleanup operations completed");
+            logger?.LogInformation("Cleanup operations completed");
         }
 
         /// <summary>
@@ -239,7 +220,7 @@ namespace wolle.Services.UI
             {
                 _mainWindow.Activate();
                 _mainWindow.Focus();
-                _logger?.LogInformation("Window activated and focused");
+                logger?.LogInformation("Window activated and focused");
             });
         }
 
@@ -254,7 +235,7 @@ namespace wolle.Services.UI
             _mainWindow.Dispatcher.Invoke(() =>
             {
                 _mainWindow.WindowState = WindowState.Minimized;
-                _logger?.LogInformation("Window minimized");
+                logger?.LogInformation("Window minimized");
             });
         }
 
@@ -269,7 +250,7 @@ namespace wolle.Services.UI
             _mainWindow.Dispatcher.Invoke(() =>
             {
                 _mainWindow.WindowState = WindowState.Maximized;
-                _logger?.LogInformation("Window maximized");
+                logger?.LogInformation("Window maximized");
             });
         }
 
@@ -284,7 +265,7 @@ namespace wolle.Services.UI
             _mainWindow.Dispatcher.Invoke(() =>
             {
                 _mainWindow.WindowState = WindowState.Normal;
-                _logger?.LogInformation("Window restored");
+                logger?.LogInformation("Window restored");
             });
         }
 
@@ -295,7 +276,7 @@ namespace wolle.Services.UI
         public void SetCancellationTokenSource(CancellationTokenSource? cancellationTokenSource)
         {
             _cancellationTokenSource = cancellationTokenSource;
-            _logger?.LogInformation("Cancellation token source set in WindowManagementService");
+            logger?.LogInformation("Cancellation token source set in WindowManagementService");
         }
 
         /// <summary>
@@ -303,16 +284,16 @@ namespace wolle.Services.UI
         /// </summary>
         public void CancelOperations()
         {
-            _logger?.LogInformation("CancelOperations called - attempting graceful cancellation");
+            logger?.LogInformation("CancelOperations called - attempting graceful cancellation");
 
             try
             {
                 _cancellationTokenSource?.Cancel();
-                _logger?.LogInformation("Cancellation token cancelled successfully");
+                logger?.LogInformation("Cancellation token cancelled successfully");
             }
             catch (Exception ex)
             {
-                _logger?.LogError($"Error during cancellation: {ex.Message}");
+                logger?.LogError($"Error during cancellation: {ex.Message}");
             }
         }
     }
