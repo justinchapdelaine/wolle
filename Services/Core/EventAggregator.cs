@@ -160,6 +160,7 @@ public class EventAggregator : IEventAggregator, IDisposable
             }
 
             // Update weak handlers list if any were collected
+            // This prevents race conditions and ensures thread-safe updates
             if (liveWeakHandlers.Count != weakHandlers.Count)
             {
                 var newWeakHandlers = new ConcurrentBag<WeakReference>();
@@ -167,6 +168,7 @@ public class EventAggregator : IEventAggregator, IDisposable
                 {
                     newWeakHandlers.Add(liveHandler);
                 }
+                // Atomic update using TryUpdate to prevent concurrent modification issues
                 _weakHandlers.TryUpdate(eventType, newWeakHandlers, weakHandlers);
             }
         }
@@ -247,6 +249,7 @@ public class EventAggregator : IEventAggregator, IDisposable
                 var liveHandlers = new ConcurrentBag<WeakReference>();
 
                 // Use Chunk() to process handlers in batches of 10
+                // This improves performance by reducing memory pressure and GC overhead
                 foreach (var handlerBatch in handlers.Chunk(10))
                 {
                     foreach (var handlerRef in handlerBatch)
@@ -270,6 +273,7 @@ public class EventAggregator : IEventAggregator, IDisposable
         }
 
         // Also clean up dead subscriptions
+        // These are subscriptions where the weak handler reference is no longer alive
         var deadSubscriptions = _subscriptions.Where(kv =>
             !kv.Value.IsStrong && !kv.Value.WeakHandlerRef.IsAlive).ToList();
         deadReferencesRemoved += deadSubscriptions.Count;

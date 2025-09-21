@@ -447,12 +447,14 @@ public class OllamaService : IDisposable
         }
 
         // Check for encoded path traversal
+        // These are URL-encoded versions of ".." that could bypass simple string checks
         if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
             path.Contains("%2f", StringComparison.OrdinalIgnoreCase))
             return true;
 
         // Check for multiple consecutive dots that could be obfuscated traversal
         // Use span-based pattern matching instead of Regex for better performance
+        // This catches patterns like "..." or "...." which might be obfuscated traversal attempts
         var pathSpan = path.AsSpan();
         int consecutiveDots = 0;
         for (int i = 0; i < pathSpan.Length; i++)
@@ -483,6 +485,8 @@ public class OllamaService : IDisposable
             return true;
 
         // Characters that could indicate command injection or other attacks - use span-based operations
+        // These characters are commonly used in command injection, shell execution, and other attacks
+        // Using span-based operations for better performance and memory efficiency
         ReadOnlySpan<char> suspiciousChars = "|&;<>'`$(){}[]!@#^~*";
         return path.AsSpan().IndexOfAny(suspiciousChars) >= 0;
     }
@@ -522,6 +526,8 @@ public class OllamaService : IDisposable
             string fullPath = Path.GetFullPath(filePath);
 
             // Sensitive system directories
+            // These directories contain critical system files and should be protected from access
+            // We check against common Windows system directories to prevent unauthorized access
             var sensitiveDirs = new[]
             {
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),
@@ -534,6 +540,8 @@ public class OllamaService : IDisposable
 
             foreach (var sensitiveDir in sensitiveDirs)
             {
+                // Check if the file path starts with any sensitive directory
+                // Use OrdinalIgnoreCase for case-insensitive comparison that's culture-agnostic
                 if (!string.IsNullOrEmpty(sensitiveDir) &&
                     fullPath.StartsWith(sensitiveDir, StringComparison.OrdinalIgnoreCase))
                     return true;
@@ -561,14 +569,18 @@ public class OllamaService : IDisposable
         string fileName = Path.GetFileName(filePath);
 
         // Check for multiple extensions (potential spoofing)
+        // Files with multiple extensions (e.g., "file.txt.exe") can be used to disguise executable files
+        // Attackers often use this technique to make users think they're opening a harmless document
         int extensionCount = fileName.Count(c => c == '.');
 
         if (extensionCount > 1)
         {
             // Check if the last extension is executable
+            // If a file has multiple extensions, we check the rightmost one to determine if it's executable
             string lastExtension = Path.GetExtension(fileName).ToLowerInvariant();
             string[] executableExtensions = [".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".com", ".pif"];
 
+            // If the last extension is in the executable list, this could be extension spoofing
             if (Array.Exists(executableExtensions, ext => ext == lastExtension))
                 return true;
         }

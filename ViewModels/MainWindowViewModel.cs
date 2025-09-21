@@ -540,22 +540,27 @@ public partial class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             // Use span-based operations for better memory efficiency
+            // This reduces memory allocations and improves performance for string processing
             var sanitized = message;
 
             // Apply regex replacements - these work with strings but benefit from compiled regex
+            // Each replacement targets a specific type of sensitive information
             var driveReplaced = DrivePathRegex().Replace(sanitized, "[DRIVE]");
             var uncReplaced = UncPathRegex().Replace(driveReplaced, "[NETWORK_PATH]");
 
             // Handle user and machine name replacements using span-based operations
+            // Convert to spans for zero-allocation string operations
             var userName = Environment.UserName.AsSpan();
             var machineName = Environment.MachineName.AsSpan();
 
+            // Only perform replacement if the span is not empty to avoid unnecessary operations
             var userReplaced = !userName.IsEmpty ?
                 uncReplaced.Replace(userName.ToString(), "[USER]") : uncReplaced;
 
             var machineReplaced = !machineName.IsEmpty ?
                 userReplaced.Replace(machineName.ToString(), "[MACHINE]") : userReplaced;
 
+            // Continue with other sensitive data replacements
             var filePathReplaced = FilePathRegex().Replace(machineReplaced, "[FILE_PATH]");
             var ipReplaced = IpAddressRegex().Replace(filePathReplaced, "[IP_ADDRESS]");
             var portReplaced = PortNumberRegex().Replace(ipReplaced, ":[PORT]");

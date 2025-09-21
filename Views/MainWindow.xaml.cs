@@ -131,12 +131,17 @@ public partial class MainWindow : Window, IDisposable
     {
         if (@event.Owner != null)
         {
+            // Set the owner window to ensure proper window hierarchy and behavior
+            // This prevents the window from going behind the owner and ensures proper focus management
             Owner = @event.Owner;
         }
 
         // Reset window closing state to allow future closes
+        // This ensures that if the window was previously closed, it can be shown again
         _serviceFacade.WindowManagementService.CancelWindowClosing();
 
+        // Show and activate the window
+        // Show() makes the window visible, Activate() brings it to the foreground and gives it focus
         Show();
         Activate();
     }
@@ -155,6 +160,7 @@ public partial class MainWindow : Window, IDisposable
     private void OnCloseWindow(CloseWindowEvent @event)
     {
         // Force close by resetting window state first
+        // This bypasses any normal closing logic and ensures the window closes immediately
         if (@event.ForceClose)
         {
             _serviceFacade.WindowManagementService.AllowWindowClosing();
@@ -163,6 +169,7 @@ public partial class MainWindow : Window, IDisposable
         else
         {
             // Graceful close with proper cleanup
+            // This follows the normal window closing procedure with all cleanup operations
             Close();
         }
     }
@@ -500,25 +507,31 @@ public partial class MainWindow : Window, IDisposable
 
         lock (_stateLock)
         {
-            if (_isClosing) return; // Prevent multiple calls
+            // Prevent multiple calls to OnClosed by checking if we're already closing
+            // This prevents race conditions and ensures cleanup only happens once
+            if (_isClosing) return;
             _isClosing = true;
         }
 
         try
         {
             // WindowManagementService handles cancellation and cleanup
-            // No need to duplicate those operations here
+            // No need to duplicate those operations here as they're handled by the service
             _logger?.LogInformation("Window closed - cleanup handled by WindowManagementService");
         }
         catch (Exception ex)
         {
+            // Log any errors during window closed event
+            // This ensures we capture any issues that occur during cleanup
             _logger?.LogError($"Error during window closed: {ex.Message}");
         }
         finally
         {
+            // Call base implementation to ensure proper WPF window closing behavior
             base.OnClosed(e);
 
             // Shutdown the application after window closes
+            // Since this is a single-window application, we exit when the main window closes
             Application.Current.Shutdown();
         }
     }
@@ -543,9 +556,11 @@ public partial class MainWindow : Window, IDisposable
             if (disposing)
             {
                 // Dispose managed resources
+                // Cancel any pending operations and dispose the cancellation token source
                 _cancellationTokenSource?.Cancel();
                 _cancellationTokenSource?.Dispose();
                 // Note: _serviceFacade is disposed by WindowManagementService during window closing
+                // This prevents double disposal issues
             }
             _disposed = true;
         }
