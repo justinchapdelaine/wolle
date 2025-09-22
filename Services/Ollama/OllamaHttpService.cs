@@ -541,8 +541,8 @@ public class OllamaHttpService(IHttpClientFactory httpClientFactory, ILogger<Oll
         {
             var progress = new OllamaProgress
             {
-                Status = json.TryGetProperty("status", out var statusElement) 
-                    ? statusElement.GetString() ?? "" 
+                Status = json.TryGetProperty("status", out var statusElement)
+                    ? statusElement.GetString() ?? ""
                     : ""
             };
 

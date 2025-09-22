@@ -145,38 +145,38 @@ namespace wolle.Services.Core
                         var code when (int)code >= 400 => "Client error occurred. Please check your request and try again.",
                         _ => $"Network error occurred: {statusCode.Value}. Please check your connection and try again."
                     },
-                
+
                 TaskCanceledException { CancellationToken.IsCancellationRequested: false } =>
                     "The request timed out. Please check your network connection and try again.",
-                
+
                 TaskCanceledException => "The operation was cancelled.",
-                
+
                 OperationCanceledException => "The operation was cancelled.",
-                
+
                 IOException { Message: var message } when message.Contains("used by another process") =>
                     "The file is being used by another process. Please close any other applications that might be using it.",
-                
+
                 IOException { Message: var message } when message.Contains("not enough space") =>
                     "There is not enough disk space to complete the operation. Please free up some space and try again.",
-                
+
                 IOException { Message: var message } when (message.Contains("network path") || message.Contains("network name")) =>
                     "Network error occurred. Please check your network connection and try again.",
-                
+
                 IOException => "File system error occurred. Please check your file permissions and try again.",
-                
+
                 UnauthorizedAccessException => "Access denied. Please check your permissions and try again.",
-                
+
                 InvalidOperationException => "An invalid operation was performed. Please restart the application and try again.",
-                
+
                 ArgumentException { ParamName: var paramName } when !string.IsNullOrEmpty(paramName) =>
                     $"Invalid parameter '{paramName}' provided. Please check your settings and try again.",
-                
+
                 ArgumentException => "Invalid input provided. Please check your settings and try again.",
-                
+
                 JsonException => "Error processing data. Please check your file format and try again.",
-                
+
                 TimeoutException => "The operation timed out. Please try again.",
-                
+
                 _ => "An unexpected error occurred. Please restart the application and try again."
             };
         }
@@ -196,22 +196,22 @@ namespace wolle.Services.Core
                 System.Threading.ThreadAbortException => true,
                 AppDomainUnloadedException => true,
                 BadImageFormatException => true,
-                
+
                 // Enhanced pattern matching for HTTP-related critical errors
-                HttpRequestException { StatusCode: var statusCode } when statusCode.HasValue && 
-                    (statusCode.Value == HttpStatusCode.InternalServerError || 
+                HttpRequestException { StatusCode: var statusCode } when statusCode.HasValue &&
+                    (statusCode.Value == HttpStatusCode.InternalServerError ||
                      statusCode.Value == HttpStatusCode.ServiceUnavailable ||
                      (int)statusCode.Value >= 500) => true,
-                
+
                 // Enhanced pattern matching for IO critical errors
-                IOException { Message: var message } when message.Contains("disk full") || 
-                    message.Contains("corrupt") || 
+                IOException { Message: var message } when message.Contains("disk full") ||
+                    message.Contains("corrupt") ||
                     message.Contains("device not ready") => true,
-                
+
                 // Enhanced pattern matching for security-related critical errors
                 System.Security.SecurityException => true,
                 System.Security.Cryptography.CryptographicException => true,
-                
+
                 _ => false
             };
         }

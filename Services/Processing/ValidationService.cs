@@ -47,7 +47,7 @@ namespace wolle.Services.Processing
             {
                 // Enhanced pattern matching for null/empty validation
                 PathValidationResult validationResult;
-                
+
                 if (filePath == null || filePath == "" || string.IsNullOrWhiteSpace(filePath))
                 {
                     validationResult = PathValidationResult.NullOrEmpty;
@@ -85,43 +85,58 @@ namespace wolle.Services.Processing
                 switch (validationResult)
                 {
                     case PathValidationResult.Success:
-                        sanitizedPath = Path.GetFullPath(filePath);
-                        Debug.WriteLine($"Path validation successful: {sanitizedPath}");
+                        if (filePath != null)
+                        {
+                            sanitizedPath = Path.GetFullPath(filePath);
+                            Debug.WriteLine($"Path validation successful: {sanitizedPath}");
+                        }
                         return true;
-                    
+
                     case PathValidationResult.NullOrEmpty:
                         Debug.WriteLine("Path validation failed: path is null or empty");
                         return false;
-                    
+
                     case PathValidationResult.SuspiciousPatterns:
                         Debug.WriteLine($"Path validation failed: contains suspicious patterns: {filePath}");
                         return false;
-                    
+
                     case PathValidationResult.NormalizationFailed:
                         Debug.WriteLine($"Path validation failed: path normalization failed for: {filePath}");
                         return false;
-                    
+
                     case PathValidationResult.PathNotAllowed:
-                        var normalizedPath = Path.GetFullPath(filePath);
-                        Debug.WriteLine($"Path validation failed: path not in allowed directories: {normalizedPath}");
+                        if (filePath != null)
+                        {
+                            var normalizedPath = Path.GetFullPath(filePath);
+                            Debug.WriteLine($"Path validation failed: path not in allowed directories: {normalizedPath}");
+                        }
                         return false;
-                    
+
                     case PathValidationResult.ExtensionNotAllowed:
-                        normalizedPath = Path.GetFullPath(filePath);
-                        string extension = Path.GetExtension(normalizedPath).ToLowerInvariant();
-                        Debug.WriteLine($"Path validation failed: file extension not allowed: {extension}");
+                        if (filePath != null)
+                        {
+                            var extNormalizedPath = Path.GetFullPath(filePath);
+                            string extension = Path.GetExtension(extNormalizedPath).ToLowerInvariant();
+                            Debug.WriteLine($"Path validation failed: file extension not allowed: {extension}");
+                        }
                         return false;
-                    
+
                     case PathValidationResult.FileNotFound:
-                        normalizedPath = Path.GetFullPath(filePath);
-                        Debug.WriteLine($"Path validation failed: file does not exist: {normalizedPath}");
+                        if (filePath != null)
+                        {
+                            var notFoundNormalizedPath = Path.GetFullPath(filePath);
+                            Debug.WriteLine($"Path validation failed: file does not exist: {notFoundNormalizedPath}");
+                        }
                         return false;
-                    
+
                     case PathValidationResult.FileNotAccessible:
-                        normalizedPath = Path.GetFullPath(filePath);
-                        Debug.WriteLine($"Path validation failed: file is not accessible: {normalizedPath}");
+                        if (filePath != null)
+                        {
+                            var inaccessibleNormalizedPath = Path.GetFullPath(filePath);
+                            Debug.WriteLine($"Path validation failed: file is not accessible: {inaccessibleNormalizedPath}");
+                        }
                         return false;
-                    
+
                     default:
                         return false;
                 }
@@ -137,7 +152,7 @@ namespace wolle.Services.Processing
                     IOException => "IO error",
                     _ => "unexpected error"
                 };
-                
+
                 Debug.WriteLine($"Path validation failed: {errorResult}: {ex.Message}");
                 return false;
             }

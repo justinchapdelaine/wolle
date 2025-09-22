@@ -442,7 +442,7 @@ public class OllamaService : IDisposable
             var p when string.IsNullOrWhiteSpace(p) => true,
             _ => false
         };
-        
+
         if (validationResult)
             return true;
 
@@ -453,7 +453,7 @@ public class OllamaService : IDisposable
         var hasTraversalPattern = false;
         foreach (var pattern in traversalPatterns)
         {
-            if (path.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            if (path != null && path.Contains(pattern, StringComparison.OrdinalIgnoreCase))
             {
                 hasTraversalPattern = true;
                 break;
@@ -466,8 +466,8 @@ public class OllamaService : IDisposable
         // Enhanced pattern matching for encoded path traversal
         var hasEncodedTraversal = path switch
         {
-            var p when p.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) => true,
-            var p when p.Contains("%2f", StringComparison.OrdinalIgnoreCase) => true,
+            var p when p != null && p.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) => true,
+            var p when p != null && p.Contains("%2f", StringComparison.OrdinalIgnoreCase) => true,
             _ => false
         };
 
@@ -475,9 +475,9 @@ public class OllamaService : IDisposable
             return true;
 
         // Enhanced pattern matching for consecutive dots using span-based operations
-        var pathSpan = path.AsSpan();
+        var pathSpan = path != null ? path.AsSpan() : ReadOnlySpan<char>.Empty;
         int consecutiveDots = 0;
-        
+
         foreach (var c in pathSpan)
         {
             consecutiveDots = c switch
@@ -485,7 +485,7 @@ public class OllamaService : IDisposable
                 '.' => consecutiveDots + 1,
                 _ => 0
             };
-            
+
             if (consecutiveDots >= 2)
                 return true;
         }
@@ -508,7 +508,7 @@ public class OllamaService : IDisposable
             var p when string.IsNullOrWhiteSpace(p) => true,
             _ => false
         };
-        
+
         if (validationResult)
             return true;
 
@@ -516,14 +516,14 @@ public class OllamaService : IDisposable
         // These characters are commonly used in command injection, shell execution, and other attacks
         // Using span-based operations for better performance and memory efficiency
         ReadOnlySpan<char> suspiciousChars = "|&;<>'`$(){}[]!@#^~*";
-        
+
         // Enhanced pattern matching for suspicious character detection
         var hasSuspiciousChars = path.AsSpan().IndexOfAny(suspiciousChars) switch
         {
             var index when index >= 0 => true,
             _ => false
         };
-        
+
         return hasSuspiciousChars;
     }
 
@@ -542,11 +542,11 @@ public class OllamaService : IDisposable
             var p when string.IsNullOrWhiteSpace(p) => false,
             _ => true
         };
-        
+
         if (!validationResult)
             return false;
 
-        string extension = Path.GetExtension(filePath).ToLowerInvariant();
+        string extension = filePath != null ? Path.GetExtension(filePath).ToLowerInvariant() : string.Empty;
 
         // Allowed extensions based on project requirements - use modern .NET 9 span
         ReadOnlySpan<string> allowedExtensions = [".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py"];
@@ -561,7 +561,7 @@ public class OllamaService : IDisposable
                 break;
             }
         }
-        
+
         return isExtensionAllowed;
     }
 

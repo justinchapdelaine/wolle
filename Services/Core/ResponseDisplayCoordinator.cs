@@ -12,7 +12,6 @@ namespace wolle.Services.Core
     public class ResponseDisplayCoordinator(
         IMarkdownDebounceService debounceService,
         IResponseStateService stateService,
-        IMarkdownConversionService conversionService,
         IResponseUIService uiService,
         MarkdownService markdownService) : IResponseDisplayCoordinator
     {

@@ -74,12 +74,12 @@ public static class ValidationUtilities
         {
             throw new ArgumentOutOfRangeException(paramName, value, $"Parameter '{paramName}' must be at least {min}.");
         }
-        
+
         if (value.CompareTo(max) > 0)
         {
             throw new ArgumentOutOfRangeException(paramName, value, $"Parameter '{paramName}' must be at most {max}.");
         }
-        
+
         return value;
     }
 
