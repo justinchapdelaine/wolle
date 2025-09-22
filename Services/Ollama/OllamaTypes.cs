@@ -23,16 +23,16 @@ public record PerformanceMetric
 /// </summary>
 public class PerformanceStats
 {
-    public required TimeSpan ServiceUptime { get; set; }
-    public required int TotalFilesProcessed { get; set; }
-    public required int SuccessfulOperations { get; set; }
-    public required int FailedOperations { get; set; }
-    public required double SuccessRate { get; set; }
-    public required long TotalBytesProcessed { get; set; }
-    public required long AverageFileSizeBytes { get; set; }
-    public required double AverageProcessingTimeMs { get; set; }
-    public required double ThroughputBytesPerSecond { get; set; }
-    public required List<PerformanceMetric> RecentMetrics { get; set; } = new();
+    public required TimeSpan ServiceUptime { get; init; }
+    public required int TotalFilesProcessed { get; init; }
+    public required int SuccessfulOperations { get; init; }
+    public required int FailedOperations { get; init; }
+    public required double SuccessRate { get; init; }
+    public required long TotalBytesProcessed { get; init; }
+    public required long AverageFileSizeBytes { get; init; }
+    public required double AverageProcessingTimeMs { get; init; }
+    public required double ThroughputBytesPerSecond { get; init; }
+    public required List<PerformanceMetric> RecentMetrics { get; init; } = new();
 }
 
 /// <summary>
@@ -70,7 +70,7 @@ public record OllamaOptions
 /// </summary>
 public class OllamaProgress
 {
-    public string Status { get; set; } = string.Empty;
+    public required string Status { get; set; } = string.Empty;
     public string? Digest { get; set; }
     public long Total { get; set; }
     public long Completed { get; set; }
