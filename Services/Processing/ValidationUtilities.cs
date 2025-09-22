@@ -70,10 +70,16 @@ public static class ValidationUtilities
     /// <returns>The validated value.</returns>
     public static T ValidateRange<T>(T value, T min, T max, [CallerArgumentExpression(nameof(value))] string paramName = "") where T : IComparable<T>
     {
-        if (value.CompareTo(min) < 0 || value.CompareTo(max) > 0)
+        if (value.CompareTo(min) < 0)
         {
-            throw new ArgumentOutOfRangeException(paramName, value, $"Parameter '{paramName}' must be between {min} and {max}.");
+            throw new ArgumentOutOfRangeException(paramName, value, $"Parameter '{paramName}' must be at least {min}.");
         }
+        
+        if (value.CompareTo(max) > 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, $"Parameter '{paramName}' must be at most {max}.");
+        }
+        
         return value;
     }
 
@@ -91,9 +97,19 @@ public static class ValidationUtilities
             throw new ArgumentException($"File size cannot be negative for file '{fileName}'.");
         }
 
+        if (fileSize == 0)
+        {
+            throw new ArgumentException($"File '{fileName}' is empty (0 bytes).");
+        }
+
         if (fileSize > maxSizeBytes)
         {
             throw new ArgumentException($"File '{fileName}' exceeds maximum allowed size of {maxSizeBytes / (1024 * 1024)}MB.");
+        }
+
+        if (maxSizeBytes <= 0)
+        {
+            throw new ArgumentException($"Maximum file size must be positive for file '{fileName}'.");
         }
 
         return fileSize;
@@ -108,7 +124,27 @@ public static class ValidationUtilities
     /// <returns>The validated timeout value.</returns>
     public static int ValidateTimeout(int timeoutSeconds, int minTimeoutSeconds = 1, int maxTimeoutSeconds = 1800)
     {
-        return ValidateRange(timeoutSeconds, minTimeoutSeconds, maxTimeoutSeconds, nameof(timeoutSeconds));
+        if (timeoutSeconds < minTimeoutSeconds)
+        {
+            throw new ArgumentException($"Timeout value ({timeoutSeconds} seconds) must be at least {minTimeoutSeconds} seconds.");
+        }
+
+        if (timeoutSeconds > maxTimeoutSeconds)
+        {
+            throw new ArgumentException($"Timeout value ({timeoutSeconds} seconds) must be at most {maxTimeoutSeconds} seconds.");
+        }
+
+        if (minTimeoutSeconds <= 0)
+        {
+            throw new ArgumentException($"Minimum timeout value ({minTimeoutSeconds} seconds) must be positive.");
+        }
+
+        if (maxTimeoutSeconds <= minTimeoutSeconds)
+        {
+            throw new ArgumentException($"Maximum timeout value ({maxTimeoutSeconds} seconds) must be greater than minimum ({minTimeoutSeconds} seconds).");
+        }
+
+        return timeoutSeconds;
     }
 
     /// <summary>
@@ -120,11 +156,14 @@ public static class ValidationUtilities
     /// <returns>The validated collection.</returns>
     public static ICollection<T> ValidateNotNullOrEmpty<T>(ICollection<T> collection, [CallerArgumentExpression(nameof(collection))] string paramName = "")
     {
-        ValidateNotNull(collection, paramName);
+        if (collection == null)
+        {
+            throw new ArgumentException($"Parameter '{paramName}' cannot be null.");
+        }
 
         if (collection.Count == 0)
         {
-            throw new ArgumentException($"Parameter '{paramName}' cannot be an empty collection.", paramName);
+            throw new ArgumentException($"Parameter '{paramName}' cannot be an empty collection.");
         }
 
         return collection;
@@ -139,11 +178,14 @@ public static class ValidationUtilities
     /// <returns>The validated enumerable.</returns>
     public static IEnumerable<T> ValidateNotNullOrEmpty<T>(IEnumerable<T> enumerable, [CallerArgumentExpression(nameof(enumerable))] string paramName = "")
     {
-        ValidateNotNull(enumerable, paramName);
+        if (enumerable == null)
+        {
+            throw new ArgumentException($"Parameter '{paramName}' cannot be null.");
+        }
 
         if (!enumerable.Any())
         {
-            throw new ArgumentException($"Parameter '{paramName}' cannot be an empty enumerable.", paramName);
+            throw new ArgumentException($"Parameter '{paramName}' cannot be an empty enumerable.");
         }
 
         return enumerable;

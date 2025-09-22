@@ -131,19 +131,52 @@ namespace wolle.Services.Core
         {
             return exception switch
             {
-                HttpRequestException httpEx => GetHttpRequestExceptionMessage(httpEx),
-                TaskCanceledException taskEx when (!taskEx.CancellationToken.IsCancellationRequested) =>
+                HttpRequestException { StatusCode: var statusCode } when statusCode.HasValue =>
+                    statusCode.Value switch
+                    {
+                        HttpStatusCode.BadRequest => "Invalid request sent to server. Please check your settings.",
+                        HttpStatusCode.Unauthorized => "Authentication failed. Please check your credentials.",
+                        HttpStatusCode.Forbidden => "Access denied. Please check your permissions.",
+                        HttpStatusCode.NotFound => "The requested resource was not found. Please check your settings.",
+                        HttpStatusCode.RequestTimeout => "The request timed out. Please check your network connection.",
+                        HttpStatusCode.InternalServerError => "The server encountered an error. Please try again later.",
+                        HttpStatusCode.ServiceUnavailable => "The service is temporarily unavailable. Please try again later.",
+                        var code when (int)code >= 500 => "Server error occurred. Please try again later.",
+                        var code when (int)code >= 400 => "Client error occurred. Please check your request and try again.",
+                        _ => $"Network error occurred: {statusCode.Value}. Please check your connection and try again."
+                    },
+                
+                TaskCanceledException { CancellationToken.IsCancellationRequested: false } =>
                     "The request timed out. Please check your network connection and try again.",
+                
                 TaskCanceledException => "The operation was cancelled.",
+                
                 OperationCanceledException => "The operation was cancelled.",
+                
+                IOException { Message: var message } when message.Contains("used by another process") =>
+                    "The file is being used by another process. Please close any other applications that might be using it.",
+                
+                IOException { Message: var message } when message.Contains("not enough space") =>
+                    "There is not enough disk space to complete the operation. Please free up some space and try again.",
+                
+                IOException { Message: var message } when (message.Contains("network path") || message.Contains("network name")) =>
+                    "Network error occurred. Please check your network connection and try again.",
+                
+                IOException => "File system error occurred. Please check your file permissions and try again.",
+                
                 UnauthorizedAccessException => "Access denied. Please check your permissions and try again.",
+                
                 InvalidOperationException => "An invalid operation was performed. Please restart the application and try again.",
+                
+                ArgumentException { ParamName: var paramName } when !string.IsNullOrEmpty(paramName) =>
+                    $"Invalid parameter '{paramName}' provided. Please check your settings and try again.",
+                
                 ArgumentException => "Invalid input provided. Please check your settings and try again.",
-                FileNotFoundException => "Required file not found. Please ensure all necessary files are available.",
-                DirectoryNotFoundException => "Required directory not found. Please check your configuration.",
-                IOException ioEx => GetIOExceptionMessage(ioEx),
+                
                 JsonException => "Error processing data. Please check your file format and try again.",
+                
                 TimeoutException => "The operation timed out. Please try again.",
+                
                 _ => "An unexpected error occurred. Please restart the application and try again."
             };
         }
@@ -163,6 +196,22 @@ namespace wolle.Services.Core
                 System.Threading.ThreadAbortException => true,
                 AppDomainUnloadedException => true,
                 BadImageFormatException => true,
+                
+                // Enhanced pattern matching for HTTP-related critical errors
+                HttpRequestException { StatusCode: var statusCode } when statusCode.HasValue && 
+                    (statusCode.Value == HttpStatusCode.InternalServerError || 
+                     statusCode.Value == HttpStatusCode.ServiceUnavailable ||
+                     (int)statusCode.Value >= 500) => true,
+                
+                // Enhanced pattern matching for IO critical errors
+                IOException { Message: var message } when message.Contains("disk full") || 
+                    message.Contains("corrupt") || 
+                    message.Contains("device not ready") => true,
+                
+                // Enhanced pattern matching for security-related critical errors
+                System.Security.SecurityException => true,
+                System.Security.Cryptography.CryptographicException => true,
+                
                 _ => false
             };
         }
@@ -186,21 +235,19 @@ namespace wolle.Services.Core
         {
             var message = $"Exception in {context}: {exception.Message}";
 
-            switch (severity)
+            // Enhanced pattern matching for severity levels with relational patterns
+            var logLevel = severity switch
             {
-                case ExceptionSeverity.Information:
-                    logger.LogInformation(exception, message);
-                    break;
-                case ExceptionSeverity.Warning:
-                    logger.LogWarning(exception, message);
-                    break;
-                case ExceptionSeverity.Error:
-                    logger.LogError(exception, message);
-                    break;
-                case ExceptionSeverity.Critical:
-                    logger.LogCritical(exception, message);
-                    break;
-            }
+                ExceptionSeverity.Information => LogLevel.Information,
+                ExceptionSeverity.Warning => LogLevel.Warning,
+                ExceptionSeverity.Error => LogLevel.Error,
+                ExceptionSeverity.Critical => LogLevel.Critical,
+                var level when (int)level < (int)ExceptionSeverity.Information => LogLevel.Debug,
+                var level when (int)level > (int)ExceptionSeverity.Critical => LogLevel.Critical,
+                _ => LogLevel.Error
+            };
+
+            logger.Log(logLevel, exception, message);
         }
 
         /// <summary>
@@ -232,54 +279,6 @@ namespace wolle.Services.Core
             }
         }
 
-        /// <summary>
-        /// Gets a user-friendly message for HTTP request exceptions.
-        /// </summary>
-        /// <param name="exception">The HTTP request exception.</param>
-        /// <returns>A user-friendly error message.</returns>
-        private string GetHttpRequestExceptionMessage(HttpRequestException exception)
-        {
-            if (exception.StatusCode.HasValue)
-            {
-                return exception.StatusCode.Value switch
-                {
-                    HttpStatusCode.BadRequest => "Invalid request sent to server. Please check your settings.",
-                    HttpStatusCode.Unauthorized => "Authentication failed. Please check your credentials.",
-                    HttpStatusCode.Forbidden => "Access denied. Please check your permissions.",
-                    HttpStatusCode.NotFound => "The requested resource was not found. Please check your settings.",
-                    HttpStatusCode.RequestTimeout => "The request timed out. Please check your network connection.",
-                    HttpStatusCode.InternalServerError => "The server encountered an error. Please try again later.",
-                    HttpStatusCode.ServiceUnavailable => "The service is temporarily unavailable. Please try again later.",
-                    _ => $"Network error occurred: {exception.StatusCode.Value}. Please check your connection and try again."
-                };
-            }
 
-            return "Network error occurred. Please check your connection and try again.";
-        }
-
-        /// <summary>
-        /// Gets a user-friendly message for IO exceptions.
-        /// </summary>
-        /// <param name="exception">The IO exception.</param>
-        /// <returns>A user-friendly error message.</returns>
-        private string GetIOExceptionMessage(IOException exception)
-        {
-            if (exception.Message.Contains("used by another process"))
-            {
-                return "The file is being used by another process. Please close any other applications that might be using it.";
-            }
-
-            if (exception.Message.Contains("not enough space"))
-            {
-                return "There is not enough disk space to complete the operation. Please free up some space and try again.";
-            }
-
-            if (exception.Message.Contains("network path") || exception.Message.Contains("network name"))
-            {
-                return "Network error occurred. Please check your network connection and try again.";
-            }
-
-            return "File system error occurred. Please check your file permissions and try again.";
-        }
     }
 }

@@ -434,41 +434,60 @@ public class OllamaService : IDisposable
     /// <returns>True if path traversal is detected, false otherwise.</returns>
     private bool ContainsPathTraversal(string path)
     {
-        if (string.IsNullOrEmpty(path))
+        // Enhanced pattern matching for null/empty validation
+        var validationResult = path switch
+        {
+            null => true,
+            "" => true,
+            var p when string.IsNullOrWhiteSpace(p) => true,
+            _ => false
+        };
+        
+        if (validationResult)
             return true;
 
         // Check for obvious path traversal patterns using modern .NET 9 span-based operations
         ReadOnlySpan<string> traversalPatterns = ["..\\", "../", "..\t", "..\n", "..\r"];
 
+        // Enhanced pattern matching for traversal detection
+        var hasTraversalPattern = false;
         foreach (var pattern in traversalPatterns)
         {
             if (path.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                return true;
+            {
+                hasTraversalPattern = true;
+                break;
+            }
         }
 
-        // Check for encoded path traversal
-        // These are URL-encoded versions of ".." that could bypass simple string checks
-        if (path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) ||
-            path.Contains("%2f", StringComparison.OrdinalIgnoreCase))
+        if (hasTraversalPattern)
             return true;
 
-        // Check for multiple consecutive dots that could be obfuscated traversal
-        // Use span-based pattern matching instead of Regex for better performance
-        // This catches patterns like "..." or "...." which might be obfuscated traversal attempts
+        // Enhanced pattern matching for encoded path traversal
+        var hasEncodedTraversal = path switch
+        {
+            var p when p.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase) => true,
+            var p when p.Contains("%2f", StringComparison.OrdinalIgnoreCase) => true,
+            _ => false
+        };
+
+        if (hasEncodedTraversal)
+            return true;
+
+        // Enhanced pattern matching for consecutive dots using span-based operations
         var pathSpan = path.AsSpan();
         int consecutiveDots = 0;
-        for (int i = 0; i < pathSpan.Length; i++)
+        
+        foreach (var c in pathSpan)
         {
-            if (pathSpan[i] == '.')
+            consecutiveDots = c switch
             {
-                consecutiveDots++;
-                if (consecutiveDots >= 2)
-                    return true;
-            }
-            else
-            {
-                consecutiveDots = 0;
-            }
+                '.' => consecutiveDots + 1,
+                _ => 0
+            };
+            
+            if (consecutiveDots >= 2)
+                return true;
         }
 
         return false;
@@ -481,14 +500,31 @@ public class OllamaService : IDisposable
     /// <returns>True if suspicious characters are found, false otherwise.</returns>
     private bool ContainsSuspiciousCharacters(string path)
     {
-        if (string.IsNullOrEmpty(path))
+        // Enhanced pattern matching for null/empty validation
+        var validationResult = path switch
+        {
+            null => true,
+            "" => true,
+            var p when string.IsNullOrWhiteSpace(p) => true,
+            _ => false
+        };
+        
+        if (validationResult)
             return true;
 
         // Characters that could indicate command injection or other attacks - use span-based operations
         // These characters are commonly used in command injection, shell execution, and other attacks
         // Using span-based operations for better performance and memory efficiency
         ReadOnlySpan<char> suspiciousChars = "|&;<>'`$(){}[]!@#^~*";
-        return path.AsSpan().IndexOfAny(suspiciousChars) >= 0;
+        
+        // Enhanced pattern matching for suspicious character detection
+        var hasSuspiciousChars = path.AsSpan().IndexOfAny(suspiciousChars) switch
+        {
+            var index when index >= 0 => true,
+            _ => false
+        };
+        
+        return hasSuspiciousChars;
     }
 
     /// <summary>
@@ -498,7 +534,16 @@ public class OllamaService : IDisposable
     /// <returns>True if extension is allowed, false otherwise.</returns>
     private bool ValidateFileExtension(string filePath)
     {
-        if (string.IsNullOrEmpty(filePath))
+        // Enhanced pattern matching for null/empty validation
+        var validationResult = filePath switch
+        {
+            null => false,
+            "" => false,
+            var p when string.IsNullOrWhiteSpace(p) => false,
+            _ => true
+        };
+        
+        if (!validationResult)
             return false;
 
         string extension = Path.GetExtension(filePath).ToLowerInvariant();
@@ -506,12 +551,18 @@ public class OllamaService : IDisposable
         // Allowed extensions based on project requirements - use modern .NET 9 span
         ReadOnlySpan<string> allowedExtensions = [".txt", ".md", ".png", ".jpg", ".jpeg", ".cs", ".js", ".py"];
 
-        for (int i = 0; i < allowedExtensions.Length; i++)
+        // Enhanced pattern matching for extension validation
+        var isExtensionAllowed = false;
+        foreach (var allowedExt in allowedExtensions)
         {
-            if (string.Equals(allowedExtensions[i], extension, StringComparison.OrdinalIgnoreCase))
-                return true;
+            if (string.Equals(allowedExt, extension, StringComparison.OrdinalIgnoreCase))
+            {
+                isExtensionAllowed = true;
+                break;
+            }
         }
-        return false;
+        
+        return isExtensionAllowed;
     }
 
     /// <summary>
