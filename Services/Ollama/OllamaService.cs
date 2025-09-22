@@ -200,7 +200,7 @@ public class OllamaService : IDisposable
                 string? base64Image = await _ollamaFileService.ConvertImageToBase64Async(filePath);
                 if (!string.IsNullOrEmpty(base64Image))
                 {
-                    request = request with { Images = new List<string> { base64Image } };
+                    request = request with { Images = [base64Image] };
                     _logger?.LogInformation("Image successfully converted to base64 and added to request");
                 }
                 else
@@ -515,7 +515,7 @@ public class OllamaService : IDisposable
         // Characters that could indicate command injection or other attacks - use span-based operations
         // These characters are commonly used in command injection, shell execution, and other attacks
         // Using span-based operations for better performance and memory efficiency
-        ReadOnlySpan<char> suspiciousChars = "|&;<>'`$(){}[]!@#^~*";
+        ReadOnlySpan<char> suspiciousChars = ['|', '&', ';', '<', '>', '\'', '`', '$', '(', ')', '{', '}', '[', ']', '!', '@', '#', '^', '~', '*'];
 
         // Enhanced pattern matching for suspicious character detection
         var hasSuspiciousChars = path.AsSpan().IndexOfAny(suspiciousChars) switch
@@ -579,8 +579,7 @@ public class OllamaService : IDisposable
             // Sensitive system directories
             // These directories contain critical system files and should be protected from access
             // We check against common Windows system directories to prevent unauthorized access
-            var sensitiveDirs = new[]
-            {
+            var sensitiveDirs = new string[] {
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                 Environment.GetFolderPath(Environment.SpecialFolder.System),
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),

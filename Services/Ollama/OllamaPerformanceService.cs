@@ -240,10 +240,9 @@ public class OllamaPerformanceService : IOllamaPerformanceService, IDisposable
             await _metricsLock.WaitAsync();
             try
             {
-                var lines = new List<string>
-                    {
-                        "Timestamp,OperationType,FileName,FileSizeBytes,ProcessingTimeMs,Success,ErrorMessage"
-                    };
+                var lines = new List<string> {
+                    "Timestamp,OperationType,FileName,FileSizeBytes,ProcessingTimeMs,Success,ErrorMessage"
+                };
 
                 foreach (var metric in _performanceMetrics)
                 {

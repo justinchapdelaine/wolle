@@ -269,7 +269,7 @@ namespace wolle.Services.Core
                         results[kvp.Key] = new PluginValidationResult
                         {
                             IsValid = false,
-                            Errors = new List<string> { $"Validation failed: {ex.Message}" }
+                            Errors = [$"Validation failed: {ex.Message}"]
                         };
                     }
                 }
